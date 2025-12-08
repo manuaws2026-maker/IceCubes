@@ -107,7 +107,9 @@
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "notarize": false,
+      "notarize": {
+        "teamId": "V3ED3574U9"
+      },
       "extendInfo": {
         "NSMicrophoneUsageDescription": "IceCubes needs microphone access to transcribe your meetings.",
         "NSScreenCaptureUsageDescription": "IceCubes needs screen recording permission to capture meeting audio.",
