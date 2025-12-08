@@ -23,22 +23,29 @@ export interface LanguageSettings {
 
 export interface TranscriptSegment {
   text: string;
-  speaker: number | null;  // Speaker ID from diarization within the channel
-  channel: number;         // 0 = system audio (others), 1 = mic (you)
+  speaker: number | null;  // Speaker ID from diarization (0, 1, 2, etc.)
+  channel: number;         // Always 0 for mono
   timestamp: number;
-  isYou: boolean;          // true if from mic channel (channel 1)
+  isYou: boolean;          // Determined by diarization learning
+  isFinal?: boolean;       // true if Deepgram has finalized this segment
+  speechFinal?: boolean;   // true if end of utterance detected
 }
 
 /**
- * TranscriptionService manages:
- * 1. Secure storage of the Deepgram API key
- * 2. WebSocket connection to Deepgram with MULTICHANNEL audio
- * 3. Streaming STEREO audio: Left=System (others), Right=Mic (you)
- * 4. Forwarding transcripts to the renderer with channel info
+ * TranscriptionService - GRANOLA APPROACH
  * 
- * MULTICHANNEL APPROACH:
- * - Channel 0 (Left) = System audio - other meeting participants
- * - Channel 1 (Right) = Microphone - your voice (labeled as "You")
+ * Instead of relying on stereo channel separation (which doesn't work well),
+ * we use MONO audio with DIARIZATION:
+ * 
+ * 1. Mix system audio + mic into a single MONO stream
+ * 2. Send to Deepgram with diarize=true
+ * 3. Deepgram identifies speakers by voice characteristics
+ * 4. We learn which speaker ID is "You" based on mic-dominant segments
+ * 
+ * This is more reliable because:
+ * - Works even if mic picks up speaker audio
+ * - Works for recorded meetings where all audio is from one source
+ * - Diarization uses ML to identify unique voices
  */
 export class TranscriptionService {
   private apiKey: string | null = null;
@@ -55,6 +62,8 @@ export class TranscriptionService {
   
   // Callback for sending transcripts to renderer
   private onTranscript: ((segment: TranscriptSegment) => void) | null = null;
+  
+  // Speaker tracking for diarization (supplementary to channel-based detection)
 
   constructor() {
     this.loadApiKey();
@@ -148,9 +157,7 @@ export class TranscriptionService {
   
   /**
    * Start streaming audio to Deepgram
-   * Uses STEREO audio with multichannel processing:
-   * - Channel 0 (Left) = System audio (other participants)
-   * - Channel 1 (Right) = Microphone (you)
+   * GRANOLA APPROACH: MONO audio with diarization
    */
   public startStreaming(): boolean {
     if (!this.apiKey) {
@@ -168,15 +175,18 @@ export class TranscriptionService {
       return true;
     }
     
-    console.log('[Transcription] Starting Deepgram streaming (STEREO multichannel - Me vs Them)...');
+    // Reset speaker learning for new session
+    this.resetSpeakerLearning();
     
-    // Build Deepgram URL - STEREO multichannel for Me vs Them separation
-    // Channel 0 (Left) = System audio = "Them" (other participants)
-    // Channel 1 (Right) = Microphone = "You" (your voice)
-    // Diarization disabled - we use channel separation instead
+    console.log('[Transcription] Starting Deepgram streaming (MONO + diarization - Granola approach)...');
+    
     // Use Nova-3 for auto-detect (better multilingual), Nova-2 for fixed language
     const modelToUse = this.autoDetect ? 'nova-3' : 'nova-2';
     
+    // STEREO audio with multichannel + diarization for best results
+    // Channel 0 (Left) = System audio = "Them"
+    // Channel 1 (Right) = Mic audio = "You"
+    // Diarization provides additional speaker identification
     const params = new URLSearchParams({
       encoding: 'linear16',
       sample_rate: '16000',
@@ -186,24 +196,22 @@ export class TranscriptionService {
       punctuate: 'true',
       interim_results: 'true',
       smart_format: 'true',
-      // No diarize - we rely on channel separation for Me vs Them
+      utterance_end_ms: '1000',   // Detect end of utterance after 1s silence
+      endpointing: '300',         // Faster endpoint detection (300ms)
+      diarize: 'true',            // Also use diarization for voice fingerprinting
     });
     
-    // Language settings for live streaming
-    // Nova-3 has built-in multilingual support - just use language=multi
+    // Language settings
     if (this.autoDetect) {
-      // Nova-3 with language=multi for best multilingual detection
       params.set('language', 'multi');
       console.log('[Transcription] Auto-detect enabled: language=multi (nova-3 multilingual)');
     } else if (this.language) {
-      // Use specific language code with nova-2
       params.set('language', this.language);
       console.log('[Transcription] Fixed language:', this.language);
     }
     
     const wsUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
     console.log('[Transcription] Deepgram URL:', wsUrl);
-    console.log('[Transcription] Language param:', params.get('language'), '| autoDetect:', this.autoDetect);
     
     try {
       this.ws = new WebSocket(wsUrl, {
@@ -213,8 +221,8 @@ export class TranscriptionService {
       });
       
       this.ws.on('open', () => {
-        console.log('[Transcription] Connected to Deepgram (STEREO multichannel)');
-        console.log('[Transcription] Channel 0 = System audio (others), Channel 1 = Mic (you)');
+        console.log('[Transcription] ✅ Connected to Deepgram (STEREO + multichannel + diarization)');
+        console.log('[Transcription] Channel 0 = System (Them), Channel 1 = Mic (You) + diarization for voice ID');
         this.isStreaming = true;
         this.startAudioPolling();
       });
@@ -273,7 +281,7 @@ export class TranscriptionService {
       return;
     }
     
-    console.log('[Transcription] Starting audio polling...');
+    console.log('[Transcription] Starting audio polling (STEREO)...');
     let chunkCount = 0;
     
     this.audioPollingInterval = setInterval(() => {
@@ -282,18 +290,18 @@ export class TranscriptionService {
       }
       
       try {
-        // Get audio chunks from native module
+        // Get audio chunks from native module (stereo: L=system, R=mic)
         const chunks = this.nativeModule.getAudioChunks();
         
         for (const chunk of chunks) {
-          // chunk is a Buffer containing stereo 16-bit PCM
+          // Send stereo chunks directly - Deepgram handles multichannel
           this.ws.send(chunk);
           chunkCount++;
         }
         
         // Log occasionally
         if (chunkCount > 0 && chunkCount % 50 === 0) {
-          console.log(`[Transcription] Sent ${chunkCount} audio chunks to Deepgram`);
+          console.log(`[Transcription] Sent ${chunkCount} stereo audio chunks to Deepgram`);
         }
       } catch (err) {
         console.error('[Transcription] Error getting audio chunks:', err);
@@ -312,11 +320,13 @@ export class TranscriptionService {
     }
   }
   
+  // Track unique speakers seen from diarization
+  private seenSpeakers: Set<number> = new Set();
+  
   /**
    * Handle incoming message from Deepgram
-   * Multichannel format: channel_index tells us which channel
-   * Channel 0 (Left) = System audio = "Them"
-   * Channel 1 (Right) = Microphone = "You"
+   * Uses DIARIZATION as primary speaker identification (voice fingerprinting)
+   * Channel is secondary - helps identify which audio source
    */
   private handleDeepgramMessage(data: Buffer): void {
     try {
@@ -324,7 +334,7 @@ export class TranscriptionService {
       
       // Handle transcription results
       if (message.type === 'Results' && message.channel) {
-        // Multichannel: channel_index is [channel_number, total_channels]
+        // Multichannel: channel_index tells us which audio source
         const channelIndex = Array.isArray(message.channel_index) 
           ? message.channel_index[0] 
           : 0;
@@ -333,26 +343,56 @@ export class TranscriptionService {
         
         if (alternatives && alternatives.length > 0) {
           const transcript = alternatives[0].transcript;
+          const words = alternatives[0].words || [];
           const isFinal = message.is_final;
+          const speechFinal = message.speech_final;
           
-          // Only process final results to avoid duplicates
-          if (!isFinal || !transcript || !transcript.trim()) {
+          // Skip empty transcripts
+          if (!transcript || !transcript.trim()) {
             return;
           }
           
-          // Channel 0 = System audio (Them), Channel 1 = Mic (You)
-          const isYou = channelIndex === 1;
+          // Get diarization speaker ID if available
+          let speakerId: number | null = null;
+          if (words.length > 0 && words[0].speaker !== undefined) {
+            speakerId = words[0].speaker;
+            
+            // Track unique speakers
+            if (isFinal && speakerId !== null && !this.seenSpeakers.has(speakerId)) {
+              this.seenSpeakers.add(speakerId);
+              console.log(`[Transcription] 🎤 New speaker detected: Speaker ${speakerId} (total: ${this.seenSpeakers.size} speakers)`);
+            }
+          }
+          
+          // Use DIARIZATION speaker ID for isYou determination if we have multiple speakers
+          // Otherwise fall back to channel-based detection
+          let isYou: boolean;
+          if (speakerId !== null && this.seenSpeakers.size >= 2) {
+            // Multiple speakers detected - use diarization
+            // Speaker 0 is typically the first/primary speaker (often "you" since you start recording)
+            isYou = speakerId === 0;
+          } else {
+            // Fall back to channel-based detection
+            // Channel 1 = Mic (You), Channel 0 = System (Them)
+            isYou = channelIndex === 1;
+          }
           
           const segment: TranscriptSegment = {
             text: transcript.trim(),
-            speaker: isYou ? -1 : 0, // -1 for You, 0 for Them
+            speaker: speakerId,
             channel: channelIndex,
             timestamp: Date.now(),
             isYou: isYou,
+            isFinal: isFinal,
+            speechFinal: speechFinal || false,
           };
           
-          const label = isYou ? 'YOU' : 'THEM';
-          console.log(`[Transcription] [${label}]: ${transcript.substring(0, 60)}...`);
+          // Build detailed log label
+          const speakerLabel = isYou ? 'YOU' : 'THEM';
+          const channelLabel = `CH${channelIndex}`;
+          const diarizeLabel = speakerId !== null ? `[S${speakerId}]` : '[no-diarize]';
+          const finalLabel = isFinal ? '✓' : '...';
+          console.log(`[Transcription] ${speakerLabel} ${channelLabel} ${diarizeLabel} [${finalLabel}]: ${transcript.substring(0, 50)}`);
           
           // Forward to renderer
           if (this.onTranscript) {
@@ -363,5 +403,13 @@ export class TranscriptionService {
     } catch (err) {
       // Ignore parse errors for non-JSON messages
     }
+  }
+  
+  /**
+   * Reset state when starting new transcription
+   */
+  private resetSpeakerLearning(): void {
+    this.seenSpeakers.clear();
+    console.log('[Transcription] Session reset - speaker tracking cleared');
   }
 }

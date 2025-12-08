@@ -3555,6 +3555,59 @@
       border-color: #e0e4e8;
     }
     
+    /* Templates modal theme support */
+    [data-theme="light"] .templates-modal-content {
+      background: #fff;
+    }
+    
+    [data-theme="light"] .templates-modal-sidebar {
+      background: #f5f5f7;
+    }
+    
+    [data-theme="light"] .template-section-item {
+      background: #f5f5f7;
+    }
+    
+    [data-theme="light"] .template-list-item {
+      background: transparent;
+    }
+    
+    [data-theme="light"] .template-list-item:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    
+    [data-theme="light"] .template-list-item.active {
+      background: var(--accent);
+    }
+    
+    [data-theme="dark"] .templates-modal-content {
+      background: #1e1e2e;
+    }
+    
+    [data-theme="dark"] .templates-modal-sidebar {
+      background: #151520;
+    }
+    
+    [data-theme="dark"] .template-section-item {
+      background: #252538;
+      border-color: #353548;
+    }
+    
+    [data-theme="dark"] .template-context-input {
+      background: #252538;
+      border-color: #353548;
+    }
+    
+    [data-theme="dark"] .template-edit-icon-picker {
+      background: #252538;
+      border-color: #353548;
+    }
+    
+    [data-theme="dark"] .template-edit-icon-dropdown {
+      background: #1e1e2e;
+      border-color: #353548;
+    }
+    
     /* Past notes section styling */
     .past-notes-wrapper {
       margin-top: 8px;
@@ -4797,19 +4850,41 @@
     }
     
     .transcript-turn {
-      padding: 12px 16px;
-      background: var(--bg);
-      border-radius: 10px;
-      margin-bottom: 8px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
     }
     
+    /* Speaker label styling */
     .transcript-speaker {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 6px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+    }
+    
+    .speaker-badge {
+      display: none;  /* Hidden - just show Speaker N text */
+    }
+    
+    /* Interim (non-final) text shown in light grey */
+    .interim-text {
+      color: #999;
+      font-style: italic;
+    }
+    
+    .transcript-speaker .transcript-timestamp {
+      margin-left: auto;
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -4821,19 +4896,33 @@
     }
     
     .transcript-text {
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 15px;
+      line-height: 1.7;
       color: var(--text);
+      font-weight: 400;
     }
     
-    /* "You" transcript styling - highlighted with green accent */
-    .transcript-turn.is-you {
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%);
-      border-left: 3px solid #10b981;
+    .transcript-timestamp {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
     }
     
-    .transcript-turn.is-you .transcript-speaker {
-      color: #10b981 !important;
+    /* Interim (in-progress) transcript - shown in grey while Deepgram processes */
+    .transcript-turn.transcript-interim {
+      opacity: 0.6;
+      border-style: dashed;
+    }
+    
+    .transcript-turn.transcript-interim .transcript-text {
+      color: var(--text-muted);
+    }
+    
+    /* Speaker-colored left border */
+    .transcript-turn[data-speaker] {
+      border-left: 3px solid var(--speaker-color, var(--border));
     }
     
     /* AI Generating Banner */
@@ -7417,13 +7506,29 @@
     }
     
     setupMicBtn?.addEventListener('click', async () => {
-      await ipcRenderer.invoke('request-permissions');
-      setTimeout(checkSetup, 1000);
+      // Open System Settings to Microphone permissions
+      ipcRenderer.send('open-microphone-settings');
+      // Keep checking until permission is granted
+      const checkMicPermission = setInterval(async () => {
+        const setup = await checkSetup();
+        if (setup || setupState.microphone) {
+          clearInterval(checkMicPermission);
+        }
+      }, 2000);
     });
     
     setupScreenBtn?.addEventListener('click', async () => {
-      await ipcRenderer.invoke('request-permissions');
-      setTimeout(checkSetup, 1000);
+      // Request and trigger screen recording permission prompt
+      await ipcRenderer.invoke('request-screen-recording-permission');
+      // Open System Settings to Screen Recording permissions
+      ipcRenderer.send('open-screen-recording-settings');
+      // Keep checking until permission is granted
+      const checkScreenPermission = setInterval(async () => {
+        const setup = await checkSetup();
+        if (setup || setupState.screenRecording) {
+          clearInterval(checkScreenPermission);
+        }
+      }, 2000);
     });
     
     setupDeepgramBtn?.addEventListener('click', () => {
@@ -7605,6 +7710,7 @@
     let silenceTimer = null;
     const SILENCE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
     let isRecording = false;
+    let recordingStartTime = null; // Track when recording started for timestamps
     let notes = [];
     let currentNoteId = null;
     let currentNoteFolderId = null; // Track folder so it's preserved on save
@@ -8437,67 +8543,135 @@
       transcriptBubbles.style.display = 'flex';
       
       // Group consecutive segments by speaker/channel
+      // Use Deepgram's speechFinal to determine segment boundaries
+      // Each speechFinal=true marks end of an utterance (natural pause)
+      // Group consecutive segments from same speaker until speechFinal
       const grouped = [];
       let currentGroup = null;
       
       for (const item of transcript) {
         // Handle both old format (string) and new format (object with speaker/isYou/speakerName)
         const text = typeof item === 'string' ? item : item.text;
+        if (!text) continue;
+        
         const isYou = typeof item === 'object' ? item.isYou : false;
         const speakerName = typeof item === 'object' ? item.speakerName : null;
         const channel = typeof item === 'object' ? item.channel : 0;
+        const timestamp = typeof item === 'object' ? item.timestamp : null;
+        const speaker = typeof item === 'object' ? item.speaker : null;
+        const speechFinal = typeof item === 'object' ? item.speechFinal : false;
         
-        // Create a unique key for grouping: "you" for mic, or speakerName for others
-        const groupKey = isYou ? 'you' : (speakerName || `ch${channel}`);
+        // Group by speaker ID if available, otherwise by channel
+        const groupKey = speaker !== null ? `speaker-${speaker}` : (isYou ? 'you' : `ch${channel}`);
         
-        if (currentGroup && currentGroup.groupKey === groupKey) {
-          // Same speaker - append to current group
+        // Only continue grouping if same speaker AND previous segment wasn't speechFinal
+        const shouldGroup = currentGroup && 
+                           currentGroup.groupKey === groupKey &&
+                           !currentGroup.speechFinal;  // Don't group after utterance end
+        
+        if (shouldGroup) {
+          // Same speaker, not end of utterance - append to current group
           currentGroup.texts.push(text);
+          currentGroup.lastTimestamp = timestamp;
+          currentGroup.speechFinal = speechFinal;  // Update with latest speechFinal status
         } else {
-          // New speaker - create new group
-          currentGroup = { groupKey, isYou, speakerName, channel, texts: [text] };
+          // New segment - create new group
+          currentGroup = { 
+            groupKey, 
+            isYou, 
+            speakerName, 
+            speaker,  // diarization speaker ID
+            channel, 
+            texts: [text], 
+            timestamp,
+            lastTimestamp: timestamp,
+            speechFinal: speechFinal  // Track if this segment ends the utterance
+          };
           grouped.push(currentGroup);
         }
       }
       
-      // Update count (number of speaker turns, not individual segments)
+      // Update count
       if (transcriptCount) {
-        transcriptCount.textContent = `${grouped.length} turn${grouped.length !== 1 ? 's' : ''}`;
+        transcriptCount.textContent = `${grouped.length} segment${grouped.length !== 1 ? 's' : ''}`;
       }
       
-      // Render grouped transcripts
-      // Use detected speaker name from computer vision, or fallback to You/Them
-      transcriptBubbles.innerHTML = grouped.map(group => {
-        const isYou = group.isYou;
+      // Render grouped transcripts with speaker colors
+      let html = grouped.map((group, index) => {
+        const combinedText = group.texts.join(' ');
         
-        // Use actual speaker name if detected, otherwise fallback
-        let speakerLabel;
-        let speakerColor;
+        // Get speaker info
+        const speakerId = group.speaker !== undefined && group.speaker !== null ? group.speaker : null;
+        const speakerColor = speakerId !== null ? SPEAKER_COLORS[speakerId % SPEAKER_COLORS.length] : '#888';
+        const speakerLabel = speakerId !== null ? `Speaker ${speakerId + 1}` : 'Unknown';
         
-        if (isYou) {
-          speakerLabel = 'You';
-          speakerColor = '#10b981'; // Green for You
-        } else if (group.speakerName && group.speakerName !== 'Them') {
-          speakerLabel = group.speakerName;
-          speakerColor = '#3b82f6'; // Blue for detected speakers
-        } else {
-          speakerLabel = 'Them';
-          speakerColor = '#6b7280'; // Gray for unknown
+        // Calculate timestamp relative to first segment (recording start)
+        let timestampStr = '';
+        if (group.timestamp && recordingStartTime) {
+          const elapsedMs = group.timestamp - recordingStartTime;
+          const minutes = Math.floor(elapsedMs / 60000);
+          const seconds = Math.floor((elapsedMs % 60000) / 1000);
+          timestampStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        } else if (index === 0) {
+          timestampStr = '00:00';
         }
         
-        const combinedText = group.texts.join(' ');
-        const youClass = isYou ? 'is-you' : '';
-        
         return `
-          <div class="transcript-turn ${youClass}">
-            <div class="transcript-speaker" style="color: ${speakerColor}">
-              <span class="speaker-dot" style="background: ${speakerColor}"></span>
-              ${speakerLabel}
+          <div class="transcript-turn" data-speaker="${speakerId}" style="--speaker-color: ${speakerColor}">
+            <div class="transcript-speaker">
+              <span>${speakerLabel}</span>
+              ${timestampStr ? `<span class="transcript-timestamp">${timestampStr}</span>` : ''}
             </div>
             <div class="transcript-text">${combinedText}</div>
           </div>
         `;
       }).join('');
+      
+      // Append interim text to the last bubble if same speaker, or show separately
+      if (currentInterim && currentInterim.text) {
+        const interimSpeakerId = currentInterim.speaker !== undefined ? currentInterim.speaker : null;
+        const lastGroup = grouped[grouped.length - 1];
+        const lastSpeakerId = lastGroup ? lastGroup.speaker : null;
+        
+        // Check if interim is from same speaker as last group
+        if (lastGroup && interimSpeakerId === lastSpeakerId) {
+          // Append to last bubble - re-render last bubble with interim appended in grey
+          const lastBubbleHtml = html.lastIndexOf('<div class="transcript-turn"');
+          if (lastBubbleHtml >= 0) {
+            // Find the transcript-text div in the last bubble and append interim
+            const textDivEnd = html.lastIndexOf('</div>\n          </div>');
+            if (textDivEnd >= 0) {
+              html = html.substring(0, textDivEnd) + 
+                     ` <span class="interim-text">${currentInterim.text}</span>` + 
+                     html.substring(textDivEnd);
+            }
+          }
+        } else {
+          // Different speaker - show interim in its own bubble
+          let timestampStr = '';
+          if (currentInterim.timestamp && recordingStartTime) {
+            const elapsedMs = currentInterim.timestamp - recordingStartTime;
+            const minutes = Math.floor(elapsedMs / 60000);
+            const seconds = Math.floor((elapsedMs % 60000) / 1000);
+            timestampStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          }
+          
+          const speakerColor = interimSpeakerId !== null ? SPEAKER_COLORS[interimSpeakerId % SPEAKER_COLORS.length] : '#888';
+          const speakerLabel = interimSpeakerId !== null ? `Speaker ${interimSpeakerId + 1}` : 'Unknown';
+          
+          html += `
+            <div class="transcript-turn transcript-interim" data-speaker="${interimSpeakerId}" style="--speaker-color: ${speakerColor}">
+              <div class="transcript-speaker">
+                <span>${speakerLabel}</span>
+                ${timestampStr ? `<span class="transcript-timestamp">${timestampStr}</span>` : ''}
+              </div>
+              <div class="transcript-text"><span class="interim-text">${currentInterim.text}</span></div>
+            </div>
+          `;
+        }
+      }
+      
+      transcriptBubbles.innerHTML = html;
       
       // Auto-expand transcript section when content arrives
       if (transcriptSection?.classList.contains('collapsed')) {
@@ -11514,7 +11688,7 @@
     }
     
     function renderNotesList() {
-      console.log('[Editor] Rendering notes list, count:', notes.length, notes);
+      // Reduced logging to avoid console spam during recording
       if (!notesList) {
         console.error('[Editor] notesList element not found!');
         return;
@@ -11837,6 +12011,7 @@
       transcript = [];
       setEditorContent('');
       isRecording = true;
+      recordingStartTime = Date.now();
       isMicActive = true;
       currentAINotes = null;
       currentTemplateId = null;
@@ -11907,6 +12082,7 @@
       
       document.body.classList.add('recording-mode');
       isRecording = true;
+      recordingStartTime = Date.now();
       isMicActive = true;
       
       // Reset transcript for new recording
@@ -11936,26 +12112,67 @@
     });
     
     // Receive transcript segments from main process (multichannel format)
-    // segment: { text, speaker, channel, timestamp, isYou }
+    // Track current interim segment (only ONE at a time - the latest)
+    let currentInterim = null;
+    
+    // segment: { text, speaker, channel, timestamp, isYou, isFinal, speechFinal }
     ipcRenderer.on('transcript-segment', (_, segment) => {
-      const label = segment.isYou ? 'YOU' : `Speaker ${segment.speaker ?? '?'}`;
-      console.log(`[Transcript] CH${segment.channel} [${label}]: ${segment.text}`);
+      const finalLabel = segment.isFinal ? '✓' : '...';
+      const speakerLabel = segment.isYou ? 'YOU' : 'THEM';
+      const channelLabel = `CH${segment.channel}`;
+      console.log(`[Transcript] ${speakerLabel} ${channelLabel} [${finalLabel}]: ${segment.text.substring(0, 50)}`);
       
-      // Store segment with full info
-      transcript.push({
-        text: segment.text,
-        speaker: segment.speaker,
-        channel: segment.channel,
-        timestamp: segment.timestamp,
-        isYou: segment.isYou
-      });
+      if (!segment.isFinal) {
+        // Interim result - replace the single interim display
+        currentInterim = {
+          text: segment.text,
+          timestamp: segment.timestamp,
+          channel: segment.channel,
+          speaker: segment.speaker,
+          isYou: segment.isYou
+        };
+      } else {
+        // Final result - smart deduplication
+        // Check if this final overlaps with the last segment (common with Deepgram)
+        const lastSegment = transcript.length > 0 ? transcript[transcript.length - 1] : null;
+        
+        let shouldAdd = true;
+        if (lastSegment && typeof lastSegment === 'object') {
+          // If new text starts with the last segment's text, it's an extension - replace
+          if (segment.text.startsWith(lastSegment.text.substring(0, Math.min(30, lastSegment.text.length)))) {
+            // Replace the last segment with the extended version
+            lastSegment.text = segment.text;
+            lastSegment.timestamp = segment.timestamp;
+            shouldAdd = false;
+          }
+          // If last text contains most of this text, skip (duplicate)
+          else if (lastSegment.text.includes(segment.text.substring(0, Math.min(20, segment.text.length)))) {
+            shouldAdd = false;
+          }
+        }
+        
+        if (shouldAdd) {
+          transcript.push({
+            text: segment.text,
+            speaker: segment.speaker,
+            channel: segment.channel,
+            timestamp: segment.timestamp,
+            isYou: segment.isYou,
+            isFinal: true,
+            speechFinal: segment.speechFinal || false  // Deepgram's utterance end signal
+          });
+        }
+        
+        // Clear interim
+        currentInterim = null;
+        
+        // Trigger auto-save for final transcript changes
+        hasUnsavedChanges = true;
+        scheduleAutoSave();
+      }
       
       lastTranscriptTime = Date.now();
       renderTranscript();
-      
-      // Trigger auto-save for transcript changes
-      hasUnsavedChanges = true;
-      scheduleAutoSave();
     });
     
     // Receive transcript text (legacy - from widget)
@@ -11969,20 +12186,35 @@
       scheduleAutoSave();
     });
     
-    // Recording stopped (from main process)
+    // Recording stopped (from main process) - AUTO-GENERATE AI NOTES
     ipcRenderer.on('recording-stopped', async (_, data) => {
       isRecording = false;
       isMicActive = false;
       updateMicUI();
       micLabel.textContent = 'Start';
       
-      // Show "Generate notes" button if we have transcript but no AI notes yet
-      if (transcript.length > 0 && !currentAINotes) {
+      // Auto-generate AI notes if we have enough transcript (Granola-style)
+      const transcriptText = transcript.map(t => typeof t === 'object' ? t.text : t).join(' ');
+      const hasEnoughContent = transcriptText.length > 100;
+      
+      if (transcript.length > 0 && hasEnoughContent && !currentAINotes) {
+        console.log('[Granola] Meeting ended - auto-generating AI notes...');
+        // Small delay to let final transcript segments arrive
+        setTimeout(() => {
+          if (!currentAINotes) {
+            generateEnhancedNotes();
+          }
+        }, 2000);
+      } else if (transcript.length > 0 && !currentAINotes) {
+        // Not enough content - show manual button
         showGenerateNotesButton();
       }
     });
     
-    // Note saved - refresh list
+    // Note saved - refresh list (but not during active recording to avoid excessive re-renders)
+    let lastNotesRefresh = 0;
+    const NOTES_REFRESH_DEBOUNCE = 5000; // Only refresh notes list every 5 seconds max
+    
     ipcRenderer.on('note-saved', async (_, savedNote) => {
       if (savedNote && savedNote.id) {
         currentNoteId = savedNote.id;
@@ -11992,8 +12224,15 @@
       setTimeout(() => {
         if (!hasUnsavedChanges) saveStatus.textContent = '';
       }, 2000);
-      await loadNotes();
-      await loadPeopleAndCompanies();
+      
+      // Skip refreshing notes list during active recording (causes excessive re-renders)
+      // Only refresh if enough time has passed since last refresh
+      const now = Date.now();
+      if (!isRecording || (now - lastNotesRefresh > NOTES_REFRESH_DEBOUNCE)) {
+        lastNotesRefresh = now;
+        await loadNotes();
+        await loadPeopleAndCompanies();
+      }
     });
     
     // Notes updated - refresh list
@@ -12434,6 +12673,7 @@
       console.log('[Granola] Starting transcription');
       isMicActive = true;
       isRecording = true;
+      recordingStartTime = Date.now();
       lastTranscriptTime = Date.now();
       
       // Store raw notes state at start

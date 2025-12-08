@@ -379,15 +379,25 @@ ${template && template.sections && template.sections.length > 0 ?
 `YOU MUST USE THE TEMPLATE SECTIONS SPECIFIED ABOVE. The "enhancedNotes" field MUST contain markdown with those section headers (## Section Name) - TRANSLATED to ${this.getLanguageName(outputLanguage)}. Do NOT use generic sections like "Summary", "Key Points" - use the TEMPLATE sections but translate them.` : 
 `Use standard meeting note sections translated to ${this.getLanguageName(outputLanguage)}: Summary, Key Points, Action Items, Decisions (translate these headers!).`}
 
-FORMATTING REQUIREMENTS - Use COMPACT markdown formatting:
-- Use ## for section headers (translated to ${this.getLanguageName(outputLanguage)})
-- Use **bold** for emphasis on important terms
-- Use bullet points (-) for lists, NO blank lines between items
-- Use task list format (- [ ]) for action items
-- Keep content COMPACT - minimal blank lines, no extra spacing
-- Put list items directly after section headers with just ONE newline
-- NO blank lines between list items
-- Short, scannable bullet points preferred over long paragraphs
+FORMATTING REQUIREMENTS - Granola-style notes:
+- Use ## for main topic sections (group by themes/topics from the meeting)
+- Use **bold** for emphasis on important terms, names, decisions
+- Use bullet points (-) with sub-bullets for details (indent with 2 spaces)
+- ACTION ITEMS MUST have owner names: "- **Alex**: Help Richard set up environment"
+- Group related items together under topic headers
+- Keep content COMPACT - minimal blank lines
+- Short, scannable bullet points (not paragraphs)
+
+STRUCTURE EXAMPLE:
+## Topic/Theme Name (from meeting content)
+- Main point about this topic
+  - Sub-detail or clarification
+  - Another sub-point
+- Next main point
+
+## Action Items
+- **PersonName**: Specific action to take
+- **AnotherPerson**: Their action item
 
 CRITICAL - USER'S PERSONAL NOTES:
 - The "User's Personal Notes" are reminders/details the user typed - NOT things said in the meeting
@@ -399,7 +409,7 @@ CRITICAL - USER'S PERSONAL NOTES:
 Output Format (JSON):
 {
   "summary": "1-2 sentence executive summary",
-  "enhancedNotes": "Full markdown-formatted notes with ## headers matching the template sections exactly"
+  "enhancedNotes": "Full markdown-formatted notes organized by TOPICS discussed (not generic headers)"
 }
 
 IMPORTANT: The "enhancedNotes" field is the PRIMARY output. It MUST use the template section names as ## headers, TRANSLATED to ${this.getLanguageName(outputLanguage)}.

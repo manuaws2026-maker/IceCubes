@@ -995,6 +995,9 @@ function openEditorWindow(showHome = true) {
     height: editorHeight,
     x: Math.floor((width - editorWidth) / 2),
     y: Math.floor((height - editorHeight) / 2),
+    minWidth: 350,
+    minHeight: 400,
+    resizable: true,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
@@ -1024,8 +1027,8 @@ function openEditorWindow(showHome = true) {
   editorWindow.webContents.on('did-finish-load', () => {
     console.log('[Editor] Page loaded successfully');
     
-    // DevTools disabled in production
-    editorWindow?.webContents.openDevTools({ mode: 'detach' });
+    // DevTools - uncomment for debugging
+    // editorWindow?.webContents.openDevTools({ mode: 'detach' });
     
     // Small delay to ensure all JS event listeners are registered
     setTimeout(() => {
@@ -1065,9 +1068,16 @@ async function checkPermissions() {
   const screen = systemPreferences.getMediaAccessStatus('screen');
   const accessibility = systemPreferences.isTrustedAccessibilityClient(false);
   
+  // Also check using native module for more accurate ScreenCaptureKit permission
+  const native = getNativeModule();
+  const nativeScreenPermission = native ? native.checkScreenRecordingPermission() : false;
+  
+  console.log('[Permissions] Mic:', mic, '| Screen (system):', screen, '| Screen (native):', nativeScreenPermission, '| Accessibility:', accessibility);
+  
+  // Use native check for screen recording as it's more accurate for ScreenCaptureKit
   return {
     microphone: mic === 'granted',
-    screenRecording: screen === 'granted',
+    screenRecording: nativeScreenPermission,
     accessibility,
   };
 }
@@ -1105,6 +1115,7 @@ function getNativeModule() {
     return null;
   }
 }
+
 
 // ============================================================================
 // IPC HANDLERS
@@ -1206,6 +1217,31 @@ function setupIPC() {
       editorWindow.show();
       editorWindow.focus();
     }
+  });
+  
+  // Permission checking IPC handlers
+  ipcMain.handle('request-screen-recording-permission', async () => {
+    const native = getNativeModule();
+    if (native) {
+      // Trigger the ScreenCaptureKit permission prompt
+      native.triggerScreenRecordingPrompt();
+    }
+    
+    // Return current status
+    const perms = await checkPermissions();
+    return perms.screenRecording;
+  });
+  
+  ipcMain.on('open-screen-recording-settings', () => {
+    // Open System Settings to Screen Recording
+    const { shell } = require('electron');
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+  });
+  
+  ipcMain.on('open-microphone-settings', () => {
+    // Open System Settings to Microphone
+    const { shell } = require('electron');
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
   });
   
   // Reposition window for recording mode (right side of screen)

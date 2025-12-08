@@ -328,14 +328,15 @@ unsafe fn start_microphone_capture() -> Result<(), AudioError> {
         return Err(AudioError::StreamCreationFailed("No input node".into()));
     }
     
-    // Enable Voice Processing (Echo Cancellation + Noise Suppression)
-    // This removes speaker output from the microphone input
-    let vp_enabled: BOOL = YES;
+    // DISABLED Voice Processing - it causes speaker volume to dip on macOS
+    // We don't need echo cancellation because we capture system audio and mic separately
+    // on different channels, and Deepgram processes them independently
+    let vp_enabled: BOOL = NO;
     let vp_result: BOOL = msg_send![input_node, setVoiceProcessingEnabled: vp_enabled error: std::ptr::null_mut::<id>()];
     if vp_result == YES {
-        println!("[Audio] ✅ Voice Processing (Echo Cancellation) enabled");
+        println!("[Audio] Voice Processing DISABLED (prevents volume dipping)");
     } else {
-        println!("[Audio] ⚠️ Voice Processing not available - echo may be present");
+        println!("[Audio] Voice Processing was already disabled");
     }
     
     // Get the input format

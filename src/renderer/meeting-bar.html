@@ -176,12 +176,23 @@
       hideBar();
     });
     
-    // Close button
-    closeBtn.addEventListener('click', () => {
+    // Close button - use mousedown for immediate response
+    closeBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[MeetingBar] Close button clicked');
+      hideBar();
+    });
+    
+    // Also handle click as backup
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       hideBar();
     });
     
     function hideBar() {
+      if (bar.classList.contains('hiding')) return; // Prevent double-hide
       bar.classList.add('hiding');
       setTimeout(() => {
         ipcRenderer.send('close-meeting-bar');

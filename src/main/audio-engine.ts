@@ -28,6 +28,8 @@ export class AudioEngine {
   }
 
   async startRecording(pid: number, provider: string): Promise<void> {
+    console.log('[AudioEngine] startRecording called, pid:', pid, 'provider:', provider);
+    
     if (this.recording) {
       throw new Error('Already recording');
     }
@@ -43,12 +45,20 @@ export class AudioEngine {
     const filename = `${provider}-${timestamp}.wav`;
     this.currentOutputPath = path.join(recordingsDir, filename);
 
-    await this.native.startAudioCapture(pid, {
-      sampleRate: 48000,
-      channels: 2,
-      outputPath: this.currentOutputPath,
-      includeMicrophone: true,
-    });
+    console.log('[AudioEngine] Calling native.startAudioCapture with path:', this.currentOutputPath);
+    
+    try {
+      await this.native.startAudioCapture(pid, {
+        sampleRate: 48000,
+        channels: 2,
+        outputPath: this.currentOutputPath,
+        includeMicrophone: true,
+      });
+      console.log('[AudioEngine] ✅ Native audio capture started successfully');
+    } catch (err) {
+      console.error('[AudioEngine] ❌ Failed to start native audio capture:', err);
+      throw err;
+    }
 
     this.recording = true;
     this.recordingStartTime = Date.now();
