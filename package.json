@@ -1,0 +1,133 @@
+{
+  "name": "icecubes",
+  "version": "0.1.0",
+  "description": "AI-powered meeting notes that help you focus on the conversation",
+  "main": "dist/main/index.js",
+  "author": "IceCubes.ai",
+  "scripts": {
+    "dev": "npm run build:all && concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "NODE_ENV=development electron .",
+    "build": "npm run build:all",
+    "build:all": "npm run build:native && npm run build:main && npm run build:renderer && npm run copy:assets",
+    "build:native": "cd src-native && npm run build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "copy:assets": "cp src/renderer/indicator.html src/renderer/meeting-bar.html src/renderer/editor.html dist/renderer/ && cp assets/logo.png dist/renderer/assets/ && mkdir -p dist/renderer/assets/wasm && cp assets/wasm/sql-wasm.wasm dist/renderer/assets/wasm/",
+    "rebuild": "npm run build:native && npm rebuild ghost-native",
+    "start": "electron .",
+    "start:dev": "NODE_ENV=development electron .",
+    "pack": "npm run build:all && electron-builder --dir",
+    "dist": "npm run build:all && electron-builder",
+    "dist:mac": "npm run build:all && electron-builder --mac",
+    "lint": "eslint src --ext .ts,.tsx",
+    "postinstall": "electron-builder install-app-deps || true"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.12.1",
+    "@tiptap/extension-image": "^3.13.0",
+    "@tiptap/extension-link": "^3.12.1",
+    "@tiptap/extension-placeholder": "^3.12.1",
+    "@tiptap/extension-task-item": "^3.12.1",
+    "@tiptap/extension-task-list": "^3.12.1",
+    "@tiptap/extension-underline": "^3.12.1",
+    "@tiptap/pm": "^3.12.1",
+    "@tiptap/starter-kit": "^3.12.1",
+    "ghost-native": "file:src-native",
+    "googleapis": "^167.0.0",
+    "openai": "^6.10.0",
+    "sql.js-fts5": "^1.4.0",
+    "vectra": "^0.11.1",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/sql.js": "^1.4.9",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "eslint": "^8.55.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "build": {
+    "appId": "ai.icecubes.app",
+    "productName": "IceCubes",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,readme.md,README,readme}",
+      "!node_modules/**/*.{map,ts}",
+      "!**/target/**",
+      "!**/.fingerprint/**",
+      "!**/deps/**",
+      "!**/.cargo/**",
+      "!**/src-native/target/**"
+    ],
+    "extraResources": [
+      {
+        "from": "build/trayTemplate.png",
+        "to": "trayTemplate.png"
+      },
+      {
+        "from": "build/trayTemplate@2x.png",
+        "to": "trayTemplate@2x.png"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "IceCubes needs microphone access to transcribe your meetings.",
+        "NSScreenCaptureUsageDescription": "IceCubes needs screen recording permission to capture meeting audio.",
+        "NSAppleEventsUsageDescription": "IceCubes needs accessibility access to detect active meetings.",
+        "LSUIElement": false
+      }
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}

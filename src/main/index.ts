@@ -1,0 +1,2477 @@
+// Polyfill for undici/openai compatibility with Electron
+// These globals are expected by undici but not available in Electron's main process
+if (typeof (globalThis as any).File === 'undefined') {
+  (globalThis as any).File = class {
+    name: string;
+    lastModified: number;
+    size: number = 0;
+    type: string = '';
+    constructor(chunks: any[], name: string, options?: any) {
+      this.name = name;
+      this.lastModified = options?.lastModified || Date.now();
+    }
+  };
+}
+if (typeof (globalThis as any).FormData === 'undefined') {
+  (globalThis as any).FormData = class {
+    private data: Map<string, any> = new Map();
+    append(name: string, value: any) { this.data.set(name, value); }
+    get(name: string) { return this.data.get(name); }
+    has(name: string) { return this.data.has(name); }
+    delete(name: string) { this.data.delete(name); }
+    entries() { return this.data.entries(); }
+  };
+}
+
+import { app, BrowserWindow, ipcMain, systemPreferences, shell, Tray, Menu, Notification, nativeImage, screen, powerMonitor } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { MeetingWatcher, MeetingInfo } from './meeting-watcher';
+import { AudioEngine } from './audio-engine';
+import { TranscriptionService } from './transcription';
+import { CalendarService } from './calendar';
+import { OpenAIService } from './openai';
+// Note: Folder service replaced with database service
+import { getVectorSearchService } from './vector-search';
+import { databaseService } from './database';
+import type { CalendarEvent } from './calendar';
+import { exec } from 'child_process';
+
+// Migration flag for SQLite database
+const MIGRATION_DONE_FLAG = path.join(app.getPath('userData'), '.db-migrated');
+
+// Flag to track if we're truly quitting vs hiding to tray
+let forceQuit = false;
+
+// ============================================================================
+// SETTINGS STORE
+// ============================================================================
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
+
+const store = {
+  data: {} as Record<string, any>,
+  load() {
+    try {
+      if (fs.existsSync(SETTINGS_PATH)) {
+        this.data = JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+      }
+    } catch (e) {
+      console.error('[Settings] Error loading:', e);
+    }
+  },
+  save() {
+    try {
+      fs.writeFileSync(SETTINGS_PATH, JSON.stringify(this.data, null, 2));
+    } catch (e) {
+      console.error('[Settings] Error saving:', e);
+    }
+  },
+  get(key: string, defaultValue: any = null) {
+    return this.data[key] ?? defaultValue;
+  },
+  set(key: string, value: any) {
+    this.data[key] = value;
+    this.save();
+  }
+};
+store.load();
+
+// ============================================================================
+// STATE
+// ============================================================================
+let tray: Tray | null = null;
+let anchorWindow: BrowserWindow | null = null; // Hidden window to keep app alive
+let meetingBarWindow: BrowserWindow | null = null; // Floating meeting bar
+let reminderWindow: BrowserWindow | null = null; // Meeting reminder slide-in
+let editorWindow: BrowserWindow | null = null;
+// Transcript widget removed - transcription now handled directly in editor
+let settingsWindow: BrowserWindow | null = null;
+let meetingWatcher: MeetingWatcher | null = null;
+let audioEngine: AudioEngine | null = null;
+let transcriptionService: TranscriptionService | null = null;
+let calendarService: CalendarService | null = null;
+let openaiService: OpenAIService | null = null;
+let currentMeeting: MeetingInfo | null = null;
+let isRecording = false;
+let currentTranscript: string[] = [];
+let lastNotifiedMeetingPid: number | null = null; // Track which meeting we already showed bar for
+
+const isDev = process.env.NODE_ENV === 'development';
+
+// Notes storage - now using SQLite database (icecubes.db)
+// Legacy JSON files in 'notes/' folder are no longer used
+
+// ============================================================================
+// NOTES STORAGE
+// ============================================================================
+interface Note {
+  id: string;
+  title: string;
+  provider: string;
+  date: string;
+  transcript: string[] | any[];
+  notes?: string;  // User's raw notes
+  enhancedNotes?: string;  // AI-generated notes (stored separately)
+  audioPath?: string;
+  calendarEventId?: string;  // Link to calendar event
+  startTime?: string;  // Scheduled meeting time
+  folderId?: string;  // Folder this note belongs to
+  suggestedFolderId?: string;  // AI-suggested folder
+  suggestedFolderConfidence?: 'high' | 'medium' | 'low';  // Confidence level
+  templateId?: string;  // Template used to generate AI notes
+  people?: string[];  // People mentioned in the note
+  companies?: string[];  // Companies mentioned in the note
+}
+
+// ============================================================================
+// DATABASE-BACKED NOTE FUNCTIONS (SQLite only)
+// ============================================================================
+
+function saveNote(note: Note): string {
+  databaseService.saveNote({
+    id: note.id,
+    title: note.title,
+    provider: note.provider,
+    date: note.date,
+    transcript: JSON.stringify(note.transcript || []),
+    notes: note.notes || '',
+    enhancedNotes: note.enhancedNotes || null,
+    audioPath: note.audioPath || null,
+    calendarEventId: note.calendarEventId || null,
+    startTime: note.startTime || null,
+    folderId: note.folderId || null,
+    templateId: note.templateId || null
+  });
+  
+  // Add people and companies to junction tables
+  if (note.people) {
+    note.people.forEach(person => databaseService.addPersonToNote(note.id, person));
+  }
+  if (note.companies) {
+    note.companies.forEach(company => databaseService.addCompanyToNote(note.id, company));
+  }
+  
+  return note.id;
+}
+
+function loadNotes(): Note[] {
+  const dbNotes = databaseService.getAllNotes();
+  return dbNotes.map(n => ({
+    ...n,
+    transcript: JSON.parse(n.transcript || '[]'),
+    enhancedNotes: n.enhancedNotes ?? undefined,
+    audioPath: n.audioPath ?? undefined,
+    calendarEventId: n.calendarEventId ?? undefined,
+    startTime: n.startTime ?? undefined,
+    folderId: n.folderId ?? undefined,
+    templateId: n.templateId ?? undefined,
+    people: databaseService.getPeopleForNote(n.id).map(p => p.name),
+    companies: databaseService.getCompaniesForNote(n.id).map(c => c.name)
+  }));
+}
+
+function loadNote(id: string): Note | null {
+  const note = databaseService.getNote(id);
+  if (!note) return null;
+  return {
+    ...note,
+    transcript: JSON.parse(note.transcript || '[]'),
+    enhancedNotes: note.enhancedNotes ?? undefined,
+    audioPath: note.audioPath ?? undefined,
+    calendarEventId: note.calendarEventId ?? undefined,
+    startTime: note.startTime ?? undefined,
+    folderId: note.folderId ?? undefined,
+    templateId: note.templateId ?? undefined,
+    people: databaseService.getPeopleForNote(id).map(p => p.name),
+    companies: databaseService.getCompaniesForNote(id).map(c => c.name)
+  };
+}
+
+function deleteNote(id: string): boolean {
+  return databaseService.deleteNote(id);
+}
+
+// ============================================================================
+// ANCHOR WINDOW - Hidden window to keep the app process stable
+// ============================================================================
+function createAnchorWindow() {
+  anchorWindow = new BrowserWindow({
+    width: 1,
+    height: 1,
+    x: -100,
+    y: -100,
+    show: false,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: false,
+    },
+  });
+  
+  anchorWindow.loadURL('about:blank');
+  console.log('[Anchor] Hidden window created');
+}
+
+// ============================================================================
+// TRAY - ALWAYS VISIBLE, COMPLETELY INDEPENDENT
+// The tray is created ONCE and NEVER destroyed or recreated
+// ============================================================================
+function createTray() {
+  if (tray) {
+    console.log('[Tray] Already exists, skipping');
+    return;
+  }
+  
+  console.log('[Tray] Creating system tray...');
+  
+  try {
+    // Load logo and resize for tray (32x32 for retina, will be displayed at 16x16)
+    let icon: Electron.NativeImage;
+    const logoPath = path.join(__dirname, '..', 'renderer', 'assets', 'logo.png');
+    
+    if (fs.existsSync(logoPath)) {
+      icon = nativeImage.createFromPath(logoPath);
+      // Resize to 32x32 for retina display (shows as 16x16 in menu bar)
+      icon = icon.resize({ width: 32, height: 32 });
+      console.log('[Tray] Using logo icon');
+    } else {
+      // Fallback to minimal icon
+      icon = nativeImage.createFromDataURL(
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      );
+      console.log('[Tray] Logo not found, using fallback');
+    }
+    
+    tray = new Tray(icon);
+    tray.setToolTip('IceCubes - AI Meeting Notes');
+    
+    // Set initial menu with quit options
+    const initialMenu = Menu.buildFromTemplate([
+      { label: 'IceCubes', enabled: false },
+      { type: 'separator' },
+      { label: 'Open', click: () => openEditorWindow() },
+      { label: 'Settings', click: openSettingsWindow },
+      { type: 'separator' },
+      { label: 'Quit', click: () => {
+        // Hide from dock but keep running
+        if (process.platform === 'darwin' && app.dock) {
+          app.dock.hide();
+        }
+        if (editorWindow && !editorWindow.isDestroyed()) {
+          editorWindow.hide();
+        }
+      }},
+      { 
+        label: 'Quit Options',
+        submenu: [
+          { 
+            label: 'Restart IceCubes', 
+            click: () => {
+              forceQuit = true;
+              app.relaunch();
+              app.quit();
+            }
+          },
+          { 
+            label: 'Quit Completely', 
+            click: () => {
+              forceQuit = true;
+              app.quit();
+            }
+          },
+        ]
+      },
+    ]);
+    tray.setContextMenu(initialMenu);
+    
+    // Store globally to prevent garbage collection - CRITICAL
+    (global as any).__ghostTray = tray;
+    (global as any).__ghostTrayRef = tray; // Double reference
+    
+    console.log('[Tray] ✅ Created successfully');
+  } catch (e) {
+    console.error('[Tray] Failed to create:', e);
+  }
+}
+
+// Safe menu update - deferred to avoid race conditions
+function updateTrayMenu() {
+  // Use setTimeout to defer update and avoid blocking
+  setTimeout(() => {
+    if (!tray || tray.isDestroyed()) {
+      console.log('[Tray] Cannot update - tray not available');
+      return;
+    }
+    
+    try {
+      const menuItems: Electron.MenuItemConstructorOptions[] = [];
+      
+  // Status
+  if (isRecording && currentMeeting) {
+    menuItems.push({
+      label: `🔴 Recording: ${currentMeeting.provider}`,
+      enabled: false,
+    });
+    menuItems.push({
+      label: 'Open Current Note',
+      click: () => setTimeout(() => {
+        console.log('[Tray] Open Current Note clicked');
+        console.log('[Tray] editorWindow exists:', !!editorWindow);
+        if (editorWindow && !editorWindow.isDestroyed()) {
+          editorWindow.show();
+          editorWindow.focus();
+          // Tell renderer to show editor view, not home
+          editorWindow.webContents.send('show-editor-view');
+          console.log('[Tray] Editor window shown and focused, sent show-editor-view');
+        } else {
+          console.log('[Tray] Editor window not available, opening new one');
+          openEditorWindow(false); // Open in editor view, not home
+        }
+      }, 0),
+    });
+    menuItems.push({
+      label: '⏹ Stop Recording',
+      click: () => setTimeout(stopRecording, 0),
+    });
+  } else if (currentMeeting) {
+        menuItems.push({
+          label: `📍 ${currentMeeting.provider.toUpperCase()}: ${currentMeeting.title.slice(0, 25)}...`,
+          enabled: false,
+        });
+        menuItems.push({
+          label: '🔴 Start Recording',
+          click: () => setTimeout(startRecording, 0),
+        });
+      } else {
+        menuItems.push({
+          label: '⏳ Watching for meetings...',
+          enabled: false,
+        });
+      }
+      
+      menuItems.push({ type: 'separator' });
+      
+      menuItems.push({
+        label: 'Open',
+        click: () => setTimeout(openEditorWindow, 0),
+      });
+      
+      menuItems.push({ type: 'separator' });
+      
+      menuItems.push({
+        label: 'Settings',
+        click: () => setTimeout(openSettingsWindow, 0),
+      });
+      
+      menuItems.push({ type: 'separator' });
+      
+      menuItems.push({
+        label: 'Quit',
+        click: () => {
+          // Hide from dock but keep running in tray
+          if (process.platform === 'darwin' && app.dock) {
+            app.dock.hide();
+          }
+          if (editorWindow && !editorWindow.isDestroyed()) {
+            editorWindow.hide();
+          }
+        },
+      });
+      
+      menuItems.push({
+        label: 'Quit Options',
+        submenu: [
+          { 
+            label: 'Restart IceCubes', 
+            click: () => {
+              forceQuit = true;
+              app.relaunch();
+              app.quit();
+            }
+          },
+          { 
+            label: 'Quit Completely', 
+            click: () => {
+              forceQuit = true;
+              app.quit();
+            }
+          },
+        ]
+      });
+      
+      tray.setContextMenu(Menu.buildFromTemplate(menuItems));
+      console.log('[Tray] Menu updated');
+    } catch (e) {
+      console.error('[Tray] Error updating menu:', e);
+    }
+  }, 10);
+}
+
+// ============================================================================
+// MEETING BAR - Floating bar that slides in when meeting detected
+// ============================================================================
+function showMeetingBar(meeting: MeetingInfo) {
+  // Close existing bar if any
+  if (meetingBarWindow && !meetingBarWindow.isDestroyed()) {
+    meetingBarWindow.close();
+    meetingBarWindow = null;
+  }
+  
+  const { width } = screen.getPrimaryDisplay().workAreaSize;
+  const barWidth = 320;
+  const barHeight = 60;
+  const margin = 16;
+  
+  meetingBarWindow = new BrowserWindow({
+    width: barWidth,
+    height: barHeight,
+    x: width - barWidth - margin,
+    y: margin + 30, // Below menu bar
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  
+  meetingBarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  
+  if (isDev) {
+    meetingBarWindow.loadURL('http://localhost:5173/meeting-bar.html');
+  } else {
+    meetingBarWindow.loadFile(path.join(__dirname, '../renderer/meeting-bar.html'));
+  }
+  
+  meetingBarWindow.once('ready-to-show', () => {
+    meetingBarWindow?.webContents.send('set-meeting', meeting);
+  });
+  
+  // Also send after a small delay to ensure window is ready
+  setTimeout(() => {
+    if (meetingBarWindow && !meetingBarWindow.isDestroyed()) {
+      meetingBarWindow.webContents.send('set-meeting', {
+        ...meeting,
+        appName: meeting.isBrowser ? 'Chrome' : meeting.provider,
+      });
+    }
+  }, 100);
+  
+  meetingBarWindow.on('closed', () => {
+    meetingBarWindow = null;
+  });
+  
+  console.log('[MeetingBar] Shown for', meeting.provider);
+}
+
+function closeMeetingBar() {
+  if (meetingBarWindow && !meetingBarWindow.isDestroyed()) {
+    meetingBarWindow.close();
+    meetingBarWindow = null;
+  }
+}
+
+// ============================================================================
+// MEETING REMINDER - Slide-in notification 3 min before meeting
+// ============================================================================
+function showMeetingReminder(event: CalendarEvent) {
+  // Check if scheduled meeting notifications are enabled
+  const notifSettings = store.get('notifSettings', {
+    scheduledMeetings: true,
+    autoDetectedMeetings: true,
+    mutedApps: []
+  });
+  
+  if (!notifSettings.scheduledMeetings) {
+    console.log('[Reminder] Scheduled meeting notifications disabled');
+    return;
+  }
+  
+  // Close existing reminder if any
+  if (reminderWindow && !reminderWindow.isDestroyed()) {
+    reminderWindow.close();
+    reminderWindow = null;
+  }
+  
+  const { width } = screen.getPrimaryDisplay().workAreaSize;
+  const barWidth = 360;
+  const barHeight = 320; // Taller to accommodate expanded view
+  const margin = 16;
+  
+  reminderWindow = new BrowserWindow({
+    width: barWidth,
+    height: barHeight,
+    x: width - barWidth - margin,
+    y: margin + 30, // Below menu bar
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  
+  reminderWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  
+  // Create inline HTML for the reminder
+  const minutesUntil = Math.round((event.start.getTime() - Date.now()) / 60000);
+  const timeStr = event.start.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    hour12: true 
+  });
+  
+  // Extract attendees (exclude self)
+  const attendees = (event.attendees || []).filter(a => !a.self);
+  const attendeeCount = attendees.length;
+  const attendeeNames = attendees
+    .slice(0, 5)
+    .map(a => a.displayName || a.email.split('@')[0])
+    .join(', ');
+  const moreAttendees = attendeeCount > 5 ? ` +${attendeeCount - 5} more` : '';
+  
+  // Extract agenda/description (clean up HTML and limit length)
+  let agenda = (event.description || '')
+    .replace(/<[^>]*>/g, ' ')  // Remove HTML tags
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (agenda.length > 200) {
+    agenda = agenda.substring(0, 200) + '...';
+  }
+  
+  const hasDetails = true; // Always show details section
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+          background: transparent;
+          -webkit-app-region: drag;
+          padding: 8px;
+        }
+        .reminder {
+          background: #ffffff;
+          border-radius: 14px;
+          padding: 14px 16px;
+          color: #1f2937;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+          animation: slideIn 0.25s ease-out;
+        }
+        @keyframes slideIn {
+          from { transform: translateX(120%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .header {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 8px;
+        }
+        .logo { font-size: 20px; line-height: 1; }
+        .header-content {
+          flex: 1;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .badge {
+          background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+          color: #92400e;
+          padding: 4px 10px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .time {
+          font-size: 13px;
+          color: #6b7280;
+          font-weight: 500;
+        }
+        .title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .title {
+          flex: 1;
+          font-size: 14px;
+          font-weight: 600;
+          color: #111827;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+          font-size: 12px;
+          color: #6b7280;
+        }
+        .meta-item {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .expand-btn {
+          background: none;
+          border: none;
+          color: #6b7280;
+          font-size: 11px;
+          cursor: pointer;
+          padding: 2px 6px;
+          border-radius: 4px;
+          transition: all 0.15s;
+          -webkit-app-region: no-drag;
+        }
+        .expand-btn:hover {
+          background: #f3f4f6;
+          color: #374151;
+        }
+        .details {
+          display: none;
+          margin-bottom: 12px;
+          padding: 10px 12px;
+          background: #f9fafb;
+          border-radius: 8px;
+          font-size: 12px;
+        }
+        .details.show { display: block; }
+        .details-section {
+          margin-bottom: 10px;
+        }
+        .details-section:last-child { margin-bottom: 0; }
+        .details-label {
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 4px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .details-text {
+          color: #6b7280;
+          line-height: 1.4;
+        }
+        .details-text.empty {
+          color: #9ca3af;
+          font-style: italic;
+        }
+        .participant-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+        .participant {
+          background: #e5e7eb;
+          padding: 2px 8px;
+          border-radius: 10px;
+          font-size: 11px;
+          color: #374151;
+        }
+        .actions {
+          display: flex;
+          gap: 8px;
+          -webkit-app-region: no-drag;
+        }
+        .btn {
+          flex: 1;
+          padding: 9px 14px;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn:hover { transform: scale(1.02); }
+        .btn:active { transform: scale(0.98); }
+        .btn-join {
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        .btn-dismiss {
+          background: #f3f4f6;
+          color: #4b5563;
+        }
+        .btn-dismiss:hover { background: #e5e7eb; }
+      </style>
+    </head>
+    <body>
+      <div class="reminder">
+        <div class="header">
+          <img class="logo" src="assets/logo.png" style="width:20px;height:20px;">
+          <div class="header-content">
+            <span class="badge">⏰ In ${minutesUntil} min</span>
+            <span class="time">${timeStr}</span>
+          </div>
+        </div>
+        <div class="title-row">
+          <div class="title">${event.title}</div>
+        </div>
+        <div class="meta">
+          ${attendeeCount > 0 ? `<span class="meta-item">👥 ${attendeeCount} participant${attendeeCount !== 1 ? 's' : ''}</span>` : ''}
+          ${hasDetails ? `<button class="expand-btn" id="expandBtn" onclick="toggleDetails()">▼ Details</button>` : ''}
+        </div>
+        <div class="details" id="details">
+          ${attendeeCount > 0 ? `
+            <div class="details-section">
+              <div class="details-label">👥 Participants</div>
+              <div class="participant-list">
+                ${attendees.slice(0, 8).map(a => `<span class="participant">${a.displayName || a.email.split('@')[0]}</span>`).join('')}
+                ${attendeeCount > 8 ? `<span class="participant">+${attendeeCount - 8} more</span>` : ''}
+              </div>
+            </div>
+          ` : ''}
+          <div class="details-section">
+              <div class="details-label">📋 Agenda</div>
+              <div class="details-text${!agenda ? ' empty' : ''}">${agenda || 'No agenda provided'}</div>
+            </div>
+        </div>
+        <div class="actions">
+          ${event.meetingLink ? `<button class="btn btn-join" onclick="join()">Join Meeting</button>` : ''}
+          <button class="btn btn-dismiss" onclick="dismiss()">Dismiss</button>
+        </div>
+      </div>
+      <script>
+        const { ipcRenderer, shell } = require('electron');
+        let expanded = false;
+        
+        function toggleDetails() {
+          expanded = !expanded;
+          document.getElementById('details').classList.toggle('show', expanded);
+          document.getElementById('expandBtn').textContent = expanded ? '▲ Hide' : '▼ Details';
+        }
+        
+        function join() {
+          ${event.meetingLink ? `shell.openExternal('${event.meetingLink}');` : ''}
+          ipcRenderer.send('dismiss-reminder');
+        }
+        function dismiss() {
+          ipcRenderer.send('dismiss-reminder');
+        }
+        // Auto-dismiss after 45 seconds (longer for reading details)
+        setTimeout(() => ipcRenderer.send('dismiss-reminder'), 45000);
+      </script>
+    </body>
+    </html>
+  `;
+  
+  reminderWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  
+  reminderWindow.on('closed', () => {
+    reminderWindow = null;
+  });
+  
+  console.log('[Reminder] Shown for:', event.title);
+}
+
+function closeReminder() {
+  if (reminderWindow && !reminderWindow.isDestroyed()) {
+    reminderWindow.close();
+    reminderWindow = null;
+  }
+}
+
+// ============================================================================
+// RECORDING
+// ============================================================================
+async function startRecording() {
+  console.log('[Recording] startRecording called');
+  console.log('[Recording] currentMeeting:', currentMeeting?.title, 'windowId:', currentMeeting?.windowId);
+  
+  if (!currentMeeting) {
+    console.log('[Recording] No current meeting - ABORTING');
+    return;
+  }
+  if (!audioEngine) {
+    console.log('[Recording] No audio engine');
+    return;
+  }
+  if (isRecording) {
+    console.log('[Recording] Already recording');
+    return;
+  }
+  
+  console.log('[Recording] Starting capture...');
+  currentTranscript = [];
+  
+  // Close existing transcript window to ensure fresh state
+  if (editorWindow && !editorWindow.isDestroyed()) {
+    editorWindow.close();
+    editorWindow = null;
+  }
+  
+  try {
+    // Start audio capture
+    await audioEngine.startRecording(currentMeeting.pid, currentMeeting.provider);
+    console.log('[Recording] Audio capture started');
+    
+    meetingWatcher?.setRecordingLock(true);
+    isRecording = true;
+    
+    // Update tray menu (deferred, won't block)
+    updateTrayMenu();
+    
+    // Open editor window (show editor view, not home)
+    console.log('[Recording] Opening editor window...');
+    openEditorWindow(false);
+    
+    // Start streaming to Deepgram from main process (multichannel audio)
+    setTimeout(() => {
+      if (transcriptionService) {
+        // Pass native module to transcription service
+        transcriptionService.setNativeModule(getNativeModule());
+        
+        // Set up callback to forward transcripts to renderer
+        transcriptionService.setOnTranscript((segment) => {
+          // Simple labels: You vs Them (based on audio channel)
+          const label = segment.isYou ? '[You]' : '[Them]';
+          
+          // Send to renderer (with safety checks for disposed frames)
+          const enrichedSegment = {
+            ...segment,
+            speakerName: segment.isYou ? 'You' : 'Them',
+          };
+          
+          try {
+            if (editorWindow && !editorWindow.isDestroyed() && editorWindow.webContents && !editorWindow.webContents.isDestroyed()) {
+              editorWindow.webContents.send('transcript-segment', enrichedSegment);
+            }
+          } catch (err) {
+            // Silently ignore - window was closed/disposed during send
+          }
+          
+          // Also store in currentTranscript for saving
+          currentTranscript.push(`${label} ${segment.text}`);
+        });
+        
+        // Start streaming
+        transcriptionService.startStreaming();
+        console.log('[Recording] Transcription streaming started');
+      }
+      
+      // Also tell editor that transcription has started (for UI)
+      if (editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send('start-transcription');
+      }
+    }, 1000);
+    
+    console.log('[Recording] ✅ Started successfully');
+  } catch (e) {
+    console.error('[Recording] Failed to start:', e);
+    isRecording = false;
+  }
+}
+
+async function stopRecording(): Promise<string | null> {
+  if (!audioEngine || !isRecording) return null;
+  
+  console.log('[Recording] Stopping...');
+  
+  try {
+    // Stop transcription streaming first
+    if (transcriptionService) {
+      transcriptionService.stopStreaming();
+      console.log('[Recording] Transcription streaming stopped');
+    }
+    
+    const audioPath = await audioEngine.stopRecording();
+    
+    // Delete the audio file - we don't store recordings
+    if (audioPath && fs.existsSync(audioPath)) {
+      try {
+        fs.unlinkSync(audioPath);
+        console.log('[Recording] Deleted temp audio file');
+      } catch (e) {
+        // Ignore deletion errors
+      }
+    }
+    
+    meetingWatcher?.setRecordingLock(false);
+    isRecording = false;
+    updateTrayMenu();
+    
+    // Tell editor window recording stopped (no audio path)
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('recording-stopped', {});
+    }
+    
+    console.log('[Recording] ✅ Stopped');
+    return null;
+  } catch (e) {
+    console.error('[Recording] Failed to stop:', e);
+    return null;
+  }
+}
+
+function saveCurrentNote(audioPath?: string) {
+  if (currentTranscript.length === 0 && !audioPath) return null;
+  
+  const note: Note = {
+    id: Date.now().toString(),
+    title: currentMeeting?.title || 'Untitled Meeting',
+    provider: currentMeeting?.provider || 'unknown',
+    date: new Date().toISOString(),
+    transcript: currentTranscript,
+    audioPath,
+  };
+  
+  const notePath = saveNote(note);
+  console.log('[Notes] Saved note:', notePath);
+  
+  // Notify editor window to refresh notes list
+  if (editorWindow && !editorWindow.isDestroyed()) {
+    editorWindow.webContents.send('notes-updated');
+  }
+  
+  return note;
+}
+
+// ============================================================================
+// WINDOWS
+// ============================================================================
+function openEditorWindow(showHome = true) {
+  console.log('[Editor] Opening editor window...', showHome ? '(home view)' : '(editor view)');
+  console.log('[Editor] isDev:', isDev);
+  
+  // Show in dock when opening window with custom icon
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.show();
+    // Set dock icon to our logo PNG
+    const pngPath = path.join(__dirname, '..', 'renderer', 'assets', 'logo.png');
+    if (fs.existsSync(pngPath)) {
+      const dockIcon = nativeImage.createFromPath(pngPath);
+      if (!dockIcon.isEmpty()) {
+        app.dock.setIcon(dockIcon);
+      }
+    }
+  }
+  
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  
+  // Close existing editor window if any
+  if (editorWindow && !editorWindow.isDestroyed()) {
+    editorWindow.show();
+    editorWindow.focus();
+    // Send command to show home or editor view
+    if (showHome) {
+      try {
+        if (!editorWindow.webContents.isDestroyed()) {
+          editorWindow.webContents.send('show-home-view');
+        }
+      } catch (e) {
+        console.log('[Editor] Could not send show-home-view:', e);
+      }
+    }
+    return;
+  }
+  
+  // Editor window - larger to accommodate sidebar
+  const editorWidth = Math.floor(width * 0.55);
+  const editorHeight = Math.floor(height * 0.8);
+  editorWindow = new BrowserWindow({
+    width: editorWidth,
+    height: editorHeight,
+    x: Math.floor((width - editorWidth) / 2),
+    y: Math.floor((height - editorHeight) / 2),
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 16 },
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  
+  // Clear cache to ensure latest HTML is loaded
+  editorWindow.webContents.session.clearCache();
+  
+  const filePath = path.join(__dirname, '../renderer/editor.html');
+  console.log('[Editor] __dirname:', __dirname);
+  console.log('[Editor] File path:', filePath);
+  
+  if (isDev) {
+    editorWindow.loadURL('http://localhost:5173/editor.html');
+  } else {
+    editorWindow.loadFile(filePath);
+  }
+  
+  // Log any load errors
+  editorWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('[Editor] Failed to load:', errorCode, errorDescription);
+  });
+  
+  editorWindow.webContents.on('did-finish-load', () => {
+    console.log('[Editor] Page loaded successfully');
+    
+    // DevTools disabled in production
+    editorWindow?.webContents.openDevTools({ mode: 'detach' });
+    
+    // Small delay to ensure all JS event listeners are registered
+    setTimeout(() => {
+      // If we have a current meeting and not showing home, send meeting info
+      if (currentMeeting && !showHome && editorWindow && !editorWindow.isDestroyed()) {
+        console.log('[Editor] Sending current meeting info:', currentMeeting.title);
+        editorWindow.webContents.send('set-meeting', currentMeeting);
+      } else if (showHome && editorWindow && !editorWindow.isDestroyed()) {
+        // Explicitly show home view
+        editorWindow.webContents.send('show-home-view');
+      }
+    }, 100);
+  });
+  
+  editorWindow.on('closed', () => {
+    editorWindow = null;
+  });
+}
+
+// openTranscriptWidget removed - transcription now handled directly in editor
+
+function openSettingsWindow() {
+  // Open settings in the integrated panel instead of separate window
+  openEditorWindow();
+  setTimeout(() => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('show-settings');
+    }
+  }, 500);
+}
+
+// ============================================================================
+// PERMISSIONS
+// ============================================================================
+async function checkPermissions() {
+  const mic = systemPreferences.getMediaAccessStatus('microphone');
+  const screen = systemPreferences.getMediaAccessStatus('screen');
+  const accessibility = systemPreferences.isTrustedAccessibilityClient(false);
+  
+  return {
+    microphone: mic === 'granted',
+    screenRecording: screen === 'granted',
+    accessibility,
+  };
+}
+
+async function requestPermissions() {
+  // Request microphone
+  await systemPreferences.askForMediaAccess('microphone');
+  
+  // Open system settings for screen recording and accessibility
+  const perms = await checkPermissions();
+  
+  if (!perms.screenRecording) {
+    exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"');
+  }
+  
+  if (!perms.accessibility) {
+    exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"');
+  }
+}
+
+// ============================================================================
+// NATIVE MODULE
+// ============================================================================
+let nativeModule: any = null;
+
+function getNativeModule() {
+  if (nativeModule) return nativeModule;
+  
+  try {
+    nativeModule = require('ghost-native');
+    console.log('[Native] Module loaded');
+    return nativeModule;
+  } catch (e) {
+    console.error('[Native] Failed to load:', e);
+    return null;
+  }
+}
+
+// ============================================================================
+// IPC HANDLERS
+// ============================================================================
+function setupIPC() {
+  // Meeting bar controls
+  ipcMain.on('start-recording-from-bar', () => {
+    console.log('[IPC] Start recording from bar');
+    console.log('[IPC] currentMeeting:', currentMeeting?.title, 'windowId:', currentMeeting?.windowId);
+    closeMeetingBar();
+    
+    setTimeout(async () => {
+      await startRecording();
+      
+      // Wait for editor window to be fully loaded before positioning and sending recording mode
+      const setupRecordingMode = () => {
+        if (editorWindow && !editorWindow.isDestroyed()) {
+          const primaryDisplay = screen.getPrimaryDisplay();
+          const { width, height } = primaryDisplay.workAreaSize;
+          
+          // Recording mode: right side, full height, comfortable width
+          const recordingWidth = 420;
+          editorWindow.setBounds({
+            x: width - recordingWidth - 20,
+            y: 20,
+            width: recordingWidth,
+            height: height - 40
+          }, true);
+          
+          // IMPORTANT: Send meeting info first, then recording mode
+          // This ensures the renderer knows about the meeting before entering recording mode
+          if (currentMeeting) {
+            console.log('[IPC] Sending meeting info to renderer:', currentMeeting.title);
+            editorWindow.webContents.send('set-meeting', currentMeeting);
+          }
+          
+          // Small delay then send recording mode command
+          setTimeout(() => {
+            if (editorWindow && !editorWindow.isDestroyed()) {
+              editorWindow.webContents.send('enter-recording-mode-from-main');
+              console.log('[Editor] Entered recording mode from bar - positioned right');
+            }
+          }, 150);
+        }
+      };
+      
+      // Wait for editor to be ready (it was just opened by startRecording)
+      if (editorWindow && !editorWindow.isDestroyed()) {
+        if (editorWindow.webContents.isLoading()) {
+          editorWindow.webContents.once('did-finish-load', () => {
+            // Additional delay after load to ensure renderer JS is fully initialized
+            setTimeout(setupRecordingMode, 300);
+          });
+        } else {
+          // Already loaded, small delay to ensure renderer is ready
+          setTimeout(setupRecordingMode, 300);
+        }
+      }
+    }, 100);
+  });
+  
+  ipcMain.on('close-meeting-bar', () => {
+    closeMeetingBar();
+  });
+  
+  ipcMain.on('close-editor', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.close();
+    }
+  });
+  
+  ipcMain.on('focus-editor-window', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.show();
+      editorWindow.focus();
+    }
+  });
+  
+  ipcMain.on('minimize-editor', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.minimize();
+    }
+  });
+  
+  ipcMain.on('maximize-editor', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      if (editorWindow.isMaximized()) {
+        editorWindow.unmaximize();
+      } else {
+        editorWindow.maximize();
+      }
+    }
+  });
+  
+  // Transcript widget IPC handlers removed - transcription in editor now
+  
+  ipcMain.on('show-editor', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.show();
+      editorWindow.focus();
+    }
+  });
+  
+  // Reposition window for recording mode (right side of screen)
+  ipcMain.on('enter-recording-mode', () => {
+    console.log('[IPC] enter-recording-mode received');
+    
+    // Small delay to ensure any window creation/rendering is complete
+    setTimeout(() => {
+      if (editorWindow && !editorWindow.isDestroyed()) {
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width, height } = primaryDisplay.workAreaSize;
+        
+        // Recording mode: right side, full height, comfortable width
+        const recordingWidth = 420;
+        const newBounds = {
+          x: width - recordingWidth - 10, // 10px margin from edge
+          y: 10, // Small margin from top
+          width: recordingWidth,
+          height: height - 20 // Small margin from bottom
+        };
+        
+        console.log('[Editor] Setting recording mode bounds:', newBounds);
+        editorWindow.setBounds(newBounds, true); // animate
+        editorWindow.focus();
+        
+        console.log('[Editor] Entered recording mode - positioned right');
+      } else {
+        console.log('[Editor] Cannot enter recording mode - no editor window');
+      }
+    }, 100);
+  });
+  
+  // Exit recording mode - restore center position
+  ipcMain.on('exit-recording-mode', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.workAreaSize;
+      
+      // Normal mode: centered, 55% width, 80% height
+      const editorWidth = Math.floor(width * 0.55);
+      const editorHeight = Math.floor(height * 0.8);
+      editorWindow.setBounds({
+        x: Math.floor((width - editorWidth) / 2),
+        y: Math.floor((height - editorHeight) / 2),
+        width: editorWidth,
+        height: editorHeight
+      }, true); // animate
+      
+      console.log('[Editor] Exited recording mode - centered');
+    }
+  });
+  
+  // transcript-from-widget removed - editor handles Deepgram directly now
+  
+  // Recording controls
+  ipcMain.on('stop-recording', async () => {
+    const audioPath = await stopRecording();
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('recording-stopped', { audioPath });
+    }
+  });
+  
+  // Stop Deepgram streaming (called from renderer)
+  ipcMain.on('stop-deepgram-stream', () => {
+    console.log('[IPC] stop-deepgram-stream received');
+    if (transcriptionService) {
+      transcriptionService.stopStreaming();
+    }
+  });
+  
+  // Manual mic recording (when no meeting detected, or restart after stop)
+  ipcMain.on('start-manual-recording', async (_, data: { title: string }) => {
+    console.log('[Ghost] Starting manual recording:', data.title);
+    
+    if (isRecording) {
+      console.log('[Ghost] Already recording');
+      return;
+    }
+    
+    // Create a virtual meeting info for manual recording
+    currentMeeting = {
+      provider: 'manual',
+      title: data.title || 'Voice Note',
+      pid: 0,
+      isBrowser: false,
+    };
+    currentTranscript = [];
+    
+    try {
+      // Start audio capture
+      if (audioEngine) {
+        await audioEngine.startRecording(0, 'manual');
+        console.log('[Ghost] Audio capture started');
+      }
+      
+      isRecording = true;
+      updateTrayMenu();
+      
+      // Start transcription streaming to Deepgram
+      if (transcriptionService) {
+        transcriptionService.setNativeModule(getNativeModule());
+        transcriptionService.setOnTranscript((segment) => {
+          try {
+            if (editorWindow && !editorWindow.isDestroyed() && editorWindow.webContents && !editorWindow.webContents.isDestroyed()) {
+              editorWindow.webContents.send('transcript-segment', segment);
+            }
+          } catch (err) {
+            // Silently ignore - window was closed/disposed during send
+          }
+          const label = segment.isYou ? '[You]' : (segment.speaker !== null ? `[Speaker ${segment.speaker + 1}]` : '');
+          currentTranscript.push(label ? `${label} ${segment.text}` : segment.text);
+        });
+        transcriptionService.startStreaming();
+        console.log('[Ghost] Transcription streaming started');
+      }
+      
+      // Tell editor transcription has started
+      if (editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send('start-transcription');
+      }
+      
+      console.log('[Ghost] Manual recording started successfully');
+    } catch (e) {
+      console.error('[Ghost] Failed to start manual recording:', e);
+      isRecording = false;
+    }
+  });
+  
+  ipcMain.on('save-note', async (_, data: { id?: string; title?: string; notes?: string; enhancedNotes?: string; transcript?: any[]; audioPath?: string; calendarEventId?: string; startTime?: string; folderId?: string; templateId?: string; attendees?: { email: string; name?: string; self?: boolean }[] }) => {
+    // Use data from editor if provided, otherwise fall back to current state
+    // For date: use meeting's scheduled time if available, otherwise use now
+    // This ensures notes for future meetings show under the correct day
+    const meetingDate = data?.startTime 
+      ? new Date(data.startTime).toISOString()
+      : new Date().toISOString();
+    
+    let title = data?.title || currentMeeting?.title || 'Untitled Meeting';
+    const transcriptData = data?.transcript || currentTranscript;
+    
+    // Check if title is generic and we have transcript to generate from
+    const genericTitles = ['untitled meeting', 'window', 'google chrome', 'chrome', 'safari', 'meeting notes'];
+    const isGenericTitle = genericTitles.includes(title.toLowerCase()) || title.toLowerCase().startsWith('google meet ') || title.toLowerCase().startsWith('zoom ');
+    
+    if (isGenericTitle && transcriptData.length > 0 && openaiService?.hasApiKey()) {
+      console.log('[Notes] Title is generic, attempting AI generation...');
+      try {
+        // Convert transcript to string array
+        const transcriptStrings = transcriptData.map((item: any) => 
+          typeof item === 'string' ? item : item.text
+        );
+        // Get language settings for title generation
+        const langSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false }) as any;
+        const titleLang = langSettings.aiNotesLang === 'same' ? langSettings.transcriptionLang : langSettings.aiNotesLang;
+        const aiTitle = await openaiService.generateMeetingTitle(transcriptStrings, titleLang);
+        if (aiTitle) {
+          // Remove any quotes the LLM might have added
+          title = aiTitle.replace(/^["']|["']$/g, '');
+          console.log('[Notes] AI generated title:', title);
+        }
+      } catch (e) {
+        console.error('[Notes] AI title generation failed:', e);
+      }
+    }
+    
+    // Use the provided folder ID (no auto-assignment to default folder)
+    const assignedFolderId = data?.folderId;
+    
+    // Load existing note to preserve fields not being updated
+    const noteId = data?.id || Date.now().toString();
+    const existingNote = data?.id ? loadNote(data.id) : null;
+    
+    // Extract people and companies from attendees if provided
+    let people = existingNote?.people || [];
+    let companies = existingNote?.companies || [];
+    
+    if (data?.attendees && data.attendees.length > 0) {
+      const excludeDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'me.com', 'aol.com', 'protonmail.com', 'mail.com'];
+      const seenCompanies = new Set<string>();
+      people = [];
+      companies = [];
+      
+      data.attendees.forEach((attendee: any) => {
+        if (attendee.self) return;
+        
+        // Extract person name (displayName from calendar API or name from custom)
+        const personName = attendee.displayName || attendee.name;
+        if (personName) {
+          people.push(personName);
+        } else if (attendee.email) {
+          const name = attendee.email.split('@')[0].replace(/[._]/g, ' ');
+          const formattedName = name.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          people.push(formattedName);
+        }
+        
+        // Extract company from email domain
+        if (attendee.email) {
+          const domain = attendee.email.split('@')[1]?.toLowerCase();
+          if (domain && !excludeDomains.includes(domain) && !seenCompanies.has(domain)) {
+            seenCompanies.add(domain);
+            const companyName = domain.split('.')[0];
+            const formattedCompany = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+            companies.push(formattedCompany);
+          }
+        }
+      });
+      console.log('[Notes] Extracted from attendees - people:', people, 'companies:', companies);
+    }
+    
+    const noteData = {
+      id: noteId,
+      title: title,
+      provider: existingNote?.provider || currentMeeting?.provider || 'manual',
+      date: existingNote?.date || meetingDate,
+      transcript: transcriptData,
+      notes: data?.notes ?? existingNote?.notes ?? '',
+      enhancedNotes: data?.enhancedNotes ?? existingNote?.enhancedNotes,
+      audioPath: data?.audioPath || existingNote?.audioPath,
+      calendarEventId: data?.calendarEventId || existingNote?.calendarEventId,
+      startTime: data?.startTime || existingNote?.startTime,
+      folderId: assignedFolderId,
+      templateId: data?.templateId ?? existingNote?.templateId,
+      people: people,
+      companies: companies,
+    };
+    
+    // Save the note (folderId is already part of noteData)
+    const notePath = saveNote(noteData as Note);
+    console.log('[Notes] Saved note:', notePath);
+    if (assignedFolderId) {
+      console.log('[Notes] Assigned to folder:', assignedFolderId);
+    }
+    
+    // Index for vector search (async, don't block)
+    if (transcriptData && transcriptData.length > 0) {
+      const vectorService = getVectorSearchService();
+      if (vectorService.isReady()) {
+        vectorService.indexNote(noteData.id, title, transcriptData, assignedFolderId || null, noteData.notes || '')
+          .then(indexed => {
+            if (indexed) console.log('[Notes] Indexed for vector search');
+          })
+          .catch(err => console.error('[Notes] Vector index error:', err));
+      }
+    }
+    
+    // Notify editor window
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('note-saved', noteData);
+      editorWindow.webContents.send('notes-updated');
+    }
+  });
+  
+  ipcMain.on('close-transcript', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.hide();
+    }
+  });
+  
+  // Notes
+  ipcMain.handle('get-notes', () => loadNotes());
+  ipcMain.handle('get-note', (_, id: string) => loadNote(id));
+  ipcMain.handle('delete-note', (_, id: string) => deleteNote(id));
+  
+  // Update note with AI-suggested folder (suggestion stored temporarily in memory, actual folder set when user confirms)
+  ipcMain.handle('update-note-suggestion', (_, noteId: string, suggestedFolderId: string, confidence: 'high' | 'medium' | 'low', reason?: string) => {
+    // Note: Suggestions are now handled in the UI and applied via folder assignment
+    console.log('[Notes] Suggestion for note:', noteId, '-> folder:', suggestedFolderId, 'confidence:', confidence);
+    return true;
+  });
+  
+  // Backfill people/companies for existing notes from calendar events
+  ipcMain.handle('backfill-people-companies', async () => {
+    const notes = loadNotes();
+    let updated = 0;
+    
+    for (const note of notes) {
+      // Skip if already has people/companies
+      if ((note.people && note.people.length > 0) || (note.companies && note.companies.length > 0)) {
+        continue;
+      }
+      
+      // Try to get attendees from calendar event if linked
+      if (note.calendarEventId && calendarService?.isConnected()) {
+        try {
+          const events = await calendarService.getEvents();
+          const event = events.find(e => e.id === note.calendarEventId);
+          
+          if (event?.attendees && event.attendees.length > 0) {
+            const excludeDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'me.com', 'aol.com', 'protonmail.com', 'mail.com'];
+            const seenCompanies = new Set<string>();
+            const people: string[] = [];
+            const companies: string[] = [];
+            
+            event.attendees.forEach(attendee => {
+              if (attendee.self) return;
+              
+              // Extract person name
+              const personName = attendee.displayName;
+              if (personName) {
+                people.push(personName);
+              } else if (attendee.email) {
+                const name = attendee.email.split('@')[0].replace(/[._]/g, ' ');
+                const formattedName = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                people.push(formattedName);
+              }
+              
+              // Extract company from email domain
+              if (attendee.email) {
+                const domain = attendee.email.split('@')[1]?.toLowerCase();
+                if (domain && !excludeDomains.includes(domain) && !seenCompanies.has(domain)) {
+                  seenCompanies.add(domain);
+                  const companyName = domain.split('.')[0];
+                  const formattedCompany = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+                  companies.push(formattedCompany);
+                }
+              }
+            });
+            
+            if (people.length > 0 || companies.length > 0) {
+              // Add people and companies to database
+              people.forEach(person => databaseService.addPersonToNote(note.id, person));
+              companies.forEach(company => databaseService.addCompanyToNote(note.id, company));
+              updated++;
+              console.log('[Notes] Backfilled note', note.id, 'with', people.length, 'people,', companies.length, 'companies');
+            }
+          }
+        } catch (e) {
+          console.error('[Notes] Failed to backfill note', note.id, e);
+        }
+      }
+    }
+    
+    console.log('[Notes] Backfill complete, updated', updated, 'notes');
+    return updated;
+  });
+  
+  // Get all people across notes with their note counts, emails, and last note date
+  ipcMain.handle('get-all-people', () => {
+    return databaseService.getAllPeople();
+  });
+  
+  // Get all companies across notes with their note counts, domains, and last note date
+  ipcMain.handle('get-all-companies', () => {
+    return databaseService.getAllCompanies();
+  });
+  
+  // Get notes filtered by person
+  ipcMain.handle('get-notes-by-person', (_, personName: string) => {
+    const dbNotes = databaseService.getNotesByPerson(personName);
+    return dbNotes.map(n => ({
+      ...n,
+      transcript: JSON.parse(n.transcript || '[]'),
+      people: databaseService.getPeopleForNote(n.id).map(p => p.name),
+      companies: databaseService.getCompaniesForNote(n.id).map(c => c.name)
+    }));
+  });
+  
+  // Get notes filtered by company
+  ipcMain.handle('get-notes-by-company', (_, companyName: string) => {
+    const dbNotes = databaseService.getNotesByCompany(companyName);
+    return dbNotes.map(n => ({
+      ...n,
+      transcript: JSON.parse(n.transcript || '[]'),
+      people: databaseService.getPeopleForNote(n.id).map(p => p.name),
+      companies: databaseService.getCompaniesForNote(n.id).map(c => c.name)
+    }));
+  });
+  
+  // Full-text search across notes
+  ipcMain.handle('search-notes', (_, query: string) => {
+    const results = databaseService.searchNotes(query);
+    return results.map(n => ({
+      ...n,
+      transcript: JSON.parse(n.transcript || '[]'),
+      people: databaseService.getPeopleForNote(n.id).map(p => p.name),
+      companies: databaseService.getCompaniesForNote(n.id).map(c => c.name)
+    }));
+  });
+  
+  // Global search across notes, people, companies, and folders
+  ipcMain.handle('global-search', (_, query: string) => {
+    const noteResults = databaseService.searchNotes(query, 10);
+    const notes = noteResults.map(n => ({
+      ...n,
+      transcript: JSON.parse(n.transcript || '[]'),
+      people: databaseService.getPeopleForNote(n.id).map(p => p.name),
+      companies: databaseService.getCompaniesForNote(n.id).map(c => c.name)
+    }));
+    
+    return {
+      notes,
+      people: databaseService.searchPeople(query, 5),
+      companies: databaseService.searchCompanies(query, 5),
+      folders: databaseService.searchFolders(query, 5)
+    };
+  });
+  
+  // Extract people and companies from calendar attendees
+  // People = attendee names, Companies = email domains
+  ipcMain.handle('extract-people-companies', async (_, data: { noteId: string; attendees?: { email: string; name?: string; self?: boolean }[] }) => {
+    const note = loadNote(data.noteId);
+    if (!note) return null;
+    
+    const attendees = data.attendees || [];
+    const people: string[] = [];
+    const companies: string[] = [];
+    const seenCompanies = new Set<string>();
+    
+    // Common email providers to exclude from company extraction
+    const excludeDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'me.com', 'aol.com', 'protonmail.com', 'mail.com'];
+    
+    attendees.forEach(attendee => {
+      // Skip self
+      if (attendee.self) return;
+      
+      // Extract person name
+      if (attendee.name) {
+        people.push(attendee.name);
+      } else if (attendee.email) {
+        // Use email prefix as name if no name provided
+        const name = attendee.email.split('@')[0].replace(/[._]/g, ' ');
+        // Capitalize first letter of each word
+        const formattedName = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        people.push(formattedName);
+      }
+      
+      // Extract company from email domain
+      if (attendee.email) {
+        const domain = attendee.email.split('@')[1]?.toLowerCase();
+        if (domain && !excludeDomains.includes(domain) && !seenCompanies.has(domain)) {
+          seenCompanies.add(domain);
+          // Convert domain to company name (e.g., google.com -> Google)
+          const companyName = domain.split('.')[0];
+          const formattedCompany = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+          companies.push(formattedCompany);
+        }
+      }
+    });
+    
+    // Add people and companies to database
+    people.forEach(person => databaseService.addPersonToNote(data.noteId, person));
+    companies.forEach(company => databaseService.addCompanyToNote(data.noteId, company));
+    console.log('[Notes] Updated note with people/companies:', { people, companies });
+    
+    // Notify frontend
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('people-companies-updated');
+    }
+    
+    return { people, companies };
+  });
+  
+  // Settings
+  ipcMain.handle('get-deepgram-key', () => transcriptionService?.getApiKey() ?? null);
+  ipcMain.handle('save-deepgram-key', (_, key: string) => transcriptionService?.saveApiKey(key) ?? false);
+  ipcMain.handle('has-deepgram-key', () => transcriptionService?.hasApiKey() ?? false);
+  
+  // Permissions
+  ipcMain.handle('check-permissions', checkPermissions);
+  ipcMain.handle('request-permissions', requestPermissions);
+  
+  // Calendar (PKCE flow - no secrets needed)
+  ipcMain.handle('calendar-is-connected', () => {
+    console.log('[IPC] calendar-is-connected called');
+    const connected = calendarService?.isConnected() ?? false;
+    console.log('[IPC] calendar-is-connected returning:', connected);
+    console.log('[IPC] calendarService exists:', !!calendarService);
+    return connected;
+  });
+  ipcMain.handle('calendar-has-client-id', () => {
+    console.log('[IPC] calendar-has-client-id called');
+    return calendarService?.hasClientId() ?? false;
+  });
+  ipcMain.handle('calendar-connect', async () => {
+    console.log('[IPC] calendar-connect called');
+    if (!calendarService) {
+      console.log('[IPC] No calendar service!');
+      return false;
+    }
+    const connected = await calendarService.authenticate();
+    console.log('[IPC] calendar-connect result:', connected);
+    if (connected) {
+      calendarService.startReminderService(showMeetingReminder);
+    }
+    return connected;
+  });
+  ipcMain.handle('calendar-disconnect', async () => {
+    await calendarService?.disconnect();
+    return true;
+  });
+  ipcMain.handle('calendar-get-events', async () => {
+    if (!calendarService?.isConnected()) return [];
+    return await calendarService.fetchEvents();
+  });
+  
+  ipcMain.handle('calendar-get-list', async () => {
+    if (!calendarService?.isConnected()) return [];
+    return await calendarService.fetchCalendarList();
+  });
+  
+  ipcMain.handle('calendar-set-selected', async (_, calendarId: string, selected: boolean) => {
+    calendarService?.setCalendarSelected(calendarId, selected);
+    return true;
+  });
+  
+  // Calendar Token Testing (for debugging refresh flow)
+  ipcMain.handle('calendar-force-expire-token', () => {
+    console.log('[IPC] Force-expire token requested');
+    return calendarService?.forceExpireToken() || false;
+  });
+  
+  ipcMain.handle('calendar-get-token-status', () => {
+    console.log('[IPC] Get token status requested');
+    return calendarService?.getTokenStatus() || { isExpired: true, expiresIn: null, hasRefreshToken: false };
+  });
+  
+  // ============================================================================
+  // FOLDERS (using SQLite database)
+  // ============================================================================
+  
+  ipcMain.handle('folders-get-all', () => {
+    const folders = databaseService.getAllFolders();
+    // Add note counts to each folder
+    return folders.map(folder => ({
+      ...folder,
+      noteCount: databaseService.getNotesInFolder(folder.id).length
+    }));
+  });
+  
+  ipcMain.handle('folders-get', (_, folderId: string) => {
+    const folders = databaseService.getAllFolders();
+    return folders.find(f => f.id === folderId) || null;
+  });
+  
+  ipcMain.handle('folders-create', (_, name: string, icon?: string, color?: string, isDefault?: boolean, description?: string) => {
+    const folder = {
+      id: `folder-${Date.now()}`,
+      name,
+      icon: icon || '📁',
+      color: color || '#6366f1',
+      description: description || '',
+      createdAt: new Date().toISOString()
+    };
+    databaseService.saveFolder(folder);
+    return folder;
+  });
+  
+  ipcMain.handle('folders-update', (_, folderId: string, updates: { name?: string; icon?: string; color?: string; description?: string }) => {
+    const folders = databaseService.getAllFolders();
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return null;
+    
+    const updatedFolder = {
+      ...folder,
+      ...updates
+    };
+    databaseService.saveFolder(updatedFolder);
+    return updatedFolder;
+  });
+  
+  ipcMain.handle('folders-get-default', () => {
+    // No default folder concept in new system
+    return null;
+  });
+  
+  ipcMain.handle('folders-set-default', (_, folderId: string) => {
+    // No default folder concept in new system
+    return true;
+  });
+  
+  ipcMain.handle('folders-delete', (_, folderId: string) => {
+    databaseService.deleteFolder(folderId);
+    return true;
+  });
+  
+  // Delete folder AND all notes in it
+  ipcMain.handle('folders-delete-with-notes', async (_, folderId: string) => {
+    // Get all notes in the folder
+    const notesInFolder = databaseService.getNotesInFolder(folderId);
+    
+    // Delete each note
+    for (const note of notesInFolder) {
+      deleteNote(note.id);
+    }
+    
+    // Delete the folder
+    databaseService.deleteFolder(folderId);
+    return true;
+  });
+  
+  ipcMain.handle('folders-add-note', (_, folderId: string, noteId: string) => {
+    databaseService.addNoteToFolder(noteId, folderId);
+    return true;
+  });
+  
+  ipcMain.handle('folders-remove-note', (_, folderId: string, noteId: string) => {
+    databaseService.removeNoteFromFolder(noteId);
+    return true;
+  });
+  
+  ipcMain.handle('folders-get-notes', (_, folderId: string) => {
+    // Get notes from database
+    const dbNotes = databaseService.getNotesInFolder(folderId);
+    return dbNotes.map(n => ({
+      ...n,
+      transcript: JSON.parse(n.transcript || '[]'),
+      enhancedNotes: n.enhancedNotes ?? undefined,
+      people: databaseService.getPeopleForNote(n.id).map(p => p.name),
+      companies: databaseService.getCompaniesForNote(n.id).map(c => c.name)
+    }));
+  });
+  
+  ipcMain.handle('folders-get-for-note', (_, noteId: string) => {
+    const note = databaseService.getNote(noteId);
+    if (!note || !note.folderId) return null;
+    const folders = databaseService.getAllFolders();
+    return folders.find(f => f.id === note.folderId) || null;
+  });
+  
+  // ============================================================================
+  // VECTOR SEARCH & FOLDER AI Q&A
+  // ============================================================================
+  
+  const vectorSearchService = getVectorSearchService();
+  
+  // Initialize vector search with OpenAI API key
+  ipcMain.handle('vector-search-init', async () => {
+    console.log('[VectorSearch] Init called, openaiService exists:', !!openaiService);
+    console.log('[VectorSearch] hasApiKey:', openaiService?.hasApiKey());
+    const apiKey = openaiService?.getApiKey();
+    console.log('[VectorSearch] apiKey exists:', !!apiKey);
+    if (!apiKey) {
+      console.log('[VectorSearch] No API key configured');
+      return false;
+    }
+    return await vectorSearchService.initialize(apiKey);
+  });
+  
+  ipcMain.handle('vector-search-ready', () => {
+    return vectorSearchService.isReady();
+  });
+  
+  ipcMain.handle('vector-search-index-note', async (_, noteId: string, noteTitle: string, transcript: any[], folderId: string | null, userNotes?: string) => {
+    return await vectorSearchService.indexNote(noteId, noteTitle, transcript, folderId, userNotes);
+  });
+  
+  ipcMain.handle('vector-search-remove-note', async (_, noteId: string) => {
+    return await vectorSearchService.removeNote(noteId);
+  });
+  
+  ipcMain.handle('vector-search-query', async (_, query: string, folderId?: string, limit?: number) => {
+    return await vectorSearchService.search(query, folderId, limit);
+  });
+  
+  ipcMain.handle('vector-search-stats', async () => {
+    return await vectorSearchService.getStats();
+  });
+  
+  // Reindex all existing notes (useful after creating test data or first setup)
+  ipcMain.handle('vector-search-reindex-all', async () => {
+    const apiKey = openaiService?.getApiKey();
+    if (!apiKey) {
+      console.log('[VectorSearch] No API key, cannot reindex');
+      return { indexed: 0, errors: 0 };
+    }
+    
+    await vectorSearchService.initialize(apiKey);
+    if (!vectorSearchService.isReady()) {
+      return { indexed: 0, errors: 0 };
+    }
+    
+    // Get all notes
+    const notesPath = path.join(app.getPath('userData'), 'notes');
+    if (!fs.existsSync(notesPath)) {
+      return { indexed: 0, errors: 0 };
+    }
+    
+    const noteFiles = fs.readdirSync(notesPath).filter(f => f.endsWith('.json'));
+    console.log('[VectorSearch] Reindexing', noteFiles.length, 'notes...');
+    
+    let indexed = 0;
+    let errors = 0;
+    
+    for (const file of noteFiles) {
+      try {
+        const notePath = path.join(notesPath, file);
+        const noteData = JSON.parse(fs.readFileSync(notePath, 'utf-8'));
+        
+        if (noteData.transcript && noteData.transcript.length > 0) {
+          const success = await vectorSearchService.indexNote(
+            noteData.id,
+            noteData.title || 'Untitled',
+            noteData.transcript,
+            noteData.folderId || null,
+            noteData.notes || ''
+          );
+          if (success) indexed++;
+          else errors++;
+        }
+      } catch (err) {
+        console.error('[VectorSearch] Error indexing note:', file, err);
+        errors++;
+      }
+    }
+    
+    console.log('[VectorSearch] ✅ Reindex complete:', indexed, 'indexed,', errors, 'errors');
+    return { indexed, errors };
+  });
+  
+  // Folder search with LLM synthesis
+  ipcMain.handle('folder-search-llm', async (_, data: { question: string, context: string, folderId: string }) => {
+    console.log('[FolderSearch] LLM query:', data.question.substring(0, 50) + '...');
+    
+    try {
+      const apiKey = openaiService?.getApiKey();
+      if (!apiKey) {
+        return { answer: null, error: 'No API key configured' };
+      }
+      
+      const OpenAI = require('openai');
+      const openai = new OpenAI({ apiKey });
+      
+      const systemPrompt = `You are a helpful assistant that answers questions based on meeting transcripts.
+
+INSTRUCTIONS:
+- Answer the question using ONLY the provided transcript excerpts
+- Be concise and direct
+- If the information isn't in the transcripts, say "I couldn't find specific information about that in these notes."
+- Use bullet points for lists
+- Cite which meeting the information came from when possible (shown in brackets like [From "Meeting Name"])`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Based on these meeting transcript excerpts:\n\n${data.context}\n\nQuestion: ${data.question}\n\nAnswer:` }
+        ],
+        temperature: 0.3,
+        max_tokens: 600
+      });
+      
+      const answer = response.choices[0]?.message?.content;
+      return { answer };
+    } catch (err: any) {
+      console.error('[FolderSearch] LLM error:', err);
+      return { answer: null, error: err.message };
+    }
+  });
+  
+  // Folder AI Q&A - combines vector search with LLM
+  ipcMain.handle('folder-ai-ask', async (_, folderId: string, question: string) => {
+    console.log('[FolderAI] Question for folder', folderId, ':', question.substring(0, 50) + '...');
+    
+    try {
+      // Get relevant context from folder transcripts
+      const context = await vectorSearchService.getFolderContext(question, folderId, 5);
+      
+      if (!context) {
+        return { 
+          answer: "I couldn't find any relevant information in this folder's transcripts. Make sure there are notes with transcripts in this folder.",
+          sources: []
+        };
+      }
+      
+      // Use OpenAI to answer the question with the context
+      const apiKey = openaiService?.getApiKey();
+      if (!apiKey) {
+        return { 
+          answer: "Please configure your OpenAI API key in Settings to use AI features.",
+          sources: []
+        };
+      }
+      
+      const OpenAI = require('openai');
+      const openai = new OpenAI({ apiKey });
+      
+      const systemPrompt = `You are a helpful assistant that answers questions based on meeting transcripts. 
+Use ONLY the provided transcript excerpts to answer the question. 
+If the information isn't in the transcripts, say so.
+Be concise and cite which meeting the information came from when possible.`;
+
+      const userPrompt = `Based on these meeting transcript excerpts:
+
+${context}
+
+Question: ${question}
+
+Answer:`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
+      
+      const answer = response.choices[0]?.message?.content || "I couldn't generate an answer.";
+      
+      // Get sources (search results) to show which notes were used
+      const sources = await vectorSearchService.search(question, folderId, 3);
+      
+      return { 
+        answer,
+        sources: sources.map(s => ({ noteId: s.noteId, noteTitle: s.noteTitle }))
+      };
+    } catch (err: any) {
+      console.error('[FolderAI] Error:', err);
+      return { 
+        answer: `Error: ${err.message}`,
+        sources: []
+      };
+    }
+  });
+  
+  // Theme
+  ipcMain.handle('theme-get', () => {
+    return store.get('theme', 'system');
+  });
+  
+  ipcMain.handle('theme-set', (_, theme: string) => {
+    store.set('theme', theme);
+    // Apply theme to all windows
+    const allWindows = BrowserWindow.getAllWindows();
+    allWindows.forEach(win => {
+      win.webContents.send('theme-changed', theme);
+    });
+    return true;
+  });
+  
+  // Notification Settings
+  ipcMain.handle('notif-get-settings', () => {
+    return store.get('notifSettings', {
+      scheduledMeetings: true,
+      autoDetectedMeetings: true,
+      mutedApps: []
+    });
+  });
+  
+  ipcMain.handle('notif-save-settings', (_, settings: any) => {
+    store.set('notifSettings', settings);
+    return true;
+  });
+  
+  // Note Templates
+  ipcMain.handle('templates-get-all', () => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().getTemplates();
+  });
+  
+  ipcMain.handle('templates-get', (_, id: string) => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().getTemplate(id);
+  });
+  
+  ipcMain.handle('templates-get-default', () => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().getDefaultTemplate();
+  });
+  
+  ipcMain.handle('templates-create', (_, template: any) => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().createTemplate(template);
+  });
+  
+  ipcMain.handle('templates-update', (_, id: string, updates: any) => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().updateTemplate(id, updates);
+  });
+  
+  ipcMain.handle('templates-delete', (_, id: string) => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().deleteTemplate(id);
+  });
+  
+  ipcMain.handle('templates-set-default', (_, id: string) => {
+    const { getTemplateService } = require('./templates');
+    return getTemplateService().setDefaultTemplate(id);
+  });
+  
+  // Language Settings
+  ipcMain.handle('lang-get-settings', () => {
+    return store.get('langSettings', {
+      transcriptionLang: 'en',
+      aiNotesLang: 'same',
+      autoDetect: false
+    });
+  });
+  
+  ipcMain.handle('lang-save-settings', (_, settings: any) => {
+    store.set('langSettings', settings);
+    // Notify transcription service of language change
+    if (transcriptionService) {
+      transcriptionService.setLanguage(settings.transcriptionLang, settings.autoDetect);
+    }
+    return true;
+  });
+  
+  // Reminder
+  ipcMain.on('dismiss-reminder', () => {
+    closeReminder();
+  });
+  
+  // Open folders
+  // Recordings folder removed - audio no longer saved
+  ipcMain.on('open-notes', () => shell.openPath(app.getPath('userData')));
+  
+  // ============================================================================
+  // OPENAI IPC HANDLERS
+  // ============================================================================
+  ipcMain.handle('openai-has-key', () => {
+    return openaiService?.hasApiKey() ?? false;
+  });
+  
+  ipcMain.handle('openai-get-key', () => {
+    return openaiService?.getApiKey() ?? null;
+  });
+  
+  ipcMain.handle('openai-save-key', (_, key: string) => {
+    return openaiService?.saveApiKey(key) ?? false;
+  });
+  
+  ipcMain.handle('openai-clear-key', () => {
+    openaiService?.clearApiKey();
+    return true;
+  });
+  
+  ipcMain.handle('openai-generate-notes', async (_, data: { transcript: string[], meetingTitle: string, existingNotes: string }) => {
+    if (!openaiService?.hasApiKey()) return null;
+    return await openaiService.generateNotes(data.transcript, data.meetingTitle, data.existingNotes);
+  });
+  
+  ipcMain.handle('openai-should-generate', (_, transcript: string[]) => {
+    return openaiService?.shouldGenerateNotes(transcript) ?? false;
+  });
+  
+  ipcMain.handle('openai-reset-session', () => {
+    openaiService?.resetSession();
+    return true;
+  });
+  
+  ipcMain.handle('openai-generate-final', async (_, data: { transcript: string[], meetingTitle: string, userNotes: string }) => {
+    if (!openaiService?.hasApiKey()) return null;
+    // Get language settings
+    const langSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false });
+    return await openaiService.generateFinalSummary(
+      data.transcript, 
+      data.meetingTitle, 
+      data.userNotes,
+      langSettings.aiNotesLang,
+      langSettings.transcriptionLang
+    );
+  });
+  
+  // Granola-style enhanced notes (generated AFTER meeting ends)
+  ipcMain.handle('openai-generate-enhanced', async (_, data: { transcript: string, rawNotes: string, meetingTitle: string, meetingInfo?: any, templateId?: string }) => {
+    if (!openaiService?.hasApiKey()) return null;
+    console.log('[IPC] Generating enhanced notes...');
+    
+    // Get language settings
+    const langSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false }) as any;
+    const outputLanguage = langSettings.aiNotesLang === 'same' ? langSettings.transcriptionLang : langSettings.aiNotesLang;
+    console.log('[IPC] Output language:', outputLanguage);
+    
+    // Get template if specified
+    let template = null;
+    if (data.templateId) {
+      const { getTemplateService } = require('./templates');
+      template = getTemplateService().getTemplate(data.templateId);
+      console.log('[IPC] Using template:', template?.name);
+    } else {
+      // Use default template
+      const { getTemplateService } = require('./templates');
+      template = getTemplateService().getDefaultTemplate();
+      console.log('[IPC] Using default template:', template?.name);
+    }
+    
+    return await openaiService.generateEnhancedNotes(data.transcript, data.rawNotes, data.meetingTitle, data.meetingInfo, outputLanguage, template);
+  });
+  
+  // AI Q&A - Ask questions about meeting
+  ipcMain.handle('openai-ask-question', async (_, data: { question: string, transcript: string, notes: string, meetingTitle: string }) => {
+    if (!openaiService?.hasApiKey()) return { answer: null, error: 'No API key configured' };
+    console.log('[IPC] AI Q&A - Question:', data.question.substring(0, 50) + '...');
+    
+    try {
+      const answer = await openaiService.askQuestion(data.question, data.transcript, data.notes, data.meetingTitle);
+      return { answer };
+    } catch (err: any) {
+      console.error('[IPC] AI Q&A Error:', err);
+      return { answer: null, error: err.message };
+    }
+  });
+  
+  // AI Folder Suggestion - Suggest a folder based on note content
+  ipcMain.handle('openai-suggest-folder', async (_, data: { noteContent: string, meetingTitle: string }) => {
+    if (!openaiService?.hasApiKey()) return null;
+    console.log('[IPC] Suggesting folder for:', data.meetingTitle);
+    
+    try {
+      // Get all folders from database
+      const allFolders = databaseService.getAllFolders();
+      const folders = allFolders.map(f => ({
+        id: f.id,
+        name: f.name,
+        description: f.description || ''
+      }));
+      
+      console.log('[IPC] Available folders for suggestion:', folders.map(f => f.name));
+      if (folders.length === 0) return null;
+      
+      const suggestion = await openaiService.suggestFolder(
+        data.noteContent,
+        data.meetingTitle,
+        folders
+      );
+      
+      return suggestion;
+    } catch (err: any) {
+      console.error('[IPC] Folder suggestion error:', err);
+      return null;
+    }
+  });
+  
+  // AI Template Suggestion
+  ipcMain.handle('openai-suggest-template', async (_, data: { rawNotes: string, transcript: string, meetingTitle: string }) => {
+    if (!openaiService?.hasApiKey()) return null;
+    console.log('[IPC] Suggesting template for:', data.meetingTitle);
+    
+    try {
+      const { getTemplateService } = require('./templates');
+      const templateService = getTemplateService();
+      const templates = templateService.getTemplates().map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description || ''
+      }));
+      
+      if (templates.length === 0) return null;
+      
+      const suggestion = await openaiService.suggestTemplate(
+        data.rawNotes,
+        data.transcript,
+        data.meetingTitle,
+        templates
+      );
+      
+      return suggestion;
+    } catch (err: any) {
+      console.error('[IPC] Template suggestion error:', err);
+      return null;
+    }
+  });
+}
+
+// ============================================================================
+// APP LIFECYCLE
+// ============================================================================
+app.whenReady().then(async () => {
+  console.log('[Ghost] Starting...');
+  
+  // Show app in Dock (macOS) with custom icon
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.show();
+    // Set dock icon to our logo PNG
+    const pngPath = path.join(__dirname, '..', 'renderer', 'assets', 'logo.png');
+    console.log('[App] Setting dock icon from:', pngPath, 'exists:', fs.existsSync(pngPath));
+    if (fs.existsSync(pngPath)) {
+      const dockIcon = nativeImage.createFromPath(pngPath);
+      if (!dockIcon.isEmpty()) {
+        app.dock.setIcon(dockIcon);
+        console.log('[App] ✅ Dock icon set successfully, size:', dockIcon.getSize());
+      } else {
+        console.log('[App] ❌ Dock icon was empty');
+      }
+    }
+  }
+  
+  // 1. Create anchor window FIRST (keeps app stable)
+  createAnchorWindow();
+  
+  // 2. Setup IPC
+  setupIPC();
+  
+  // 3. Initialize services
+  transcriptionService = new TranscriptionService();
+  calendarService = new CalendarService();
+  openaiService = new OpenAIService();
+  
+  // Apply saved language settings to transcription service
+  const savedLangSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false }) as any;
+  if (transcriptionService) {
+    transcriptionService.setLanguage(savedLangSettings.transcriptionLang, savedLangSettings.autoDetect);
+    console.log('[App] Applied saved language settings:', savedLangSettings);
+  }
+  
+  // 4. Initialize database (required - no fallback)
+  console.log('[Database] Initializing SQLite database...');
+  const dbInitialized = await databaseService.initialize();
+  if (!dbInitialized) {
+    console.error('[Database] ❌ Failed to initialize SQLite database!');
+    throw new Error('Database initialization failed. Cannot start app without database.');
+  }
+  console.log('[Database] ✅ SQLite database ready');
+  
+  // Run migration if not done yet
+  if (!fs.existsSync(MIGRATION_DONE_FLAG)) {
+    console.log('[Database] Running migration from JSON files...');
+    const stats = await databaseService.migrateFromJSON();
+    console.log('[Database] ✅ Migration complete:', stats);
+    fs.writeFileSync(MIGRATION_DONE_FLAG, new Date().toISOString());
+  }
+  
+  // Start calendar reminder service if connected
+  if (calendarService.isConnected()) {
+    calendarService.startReminderService(showMeetingReminder);
+  }
+  
+  // Handle sleep/wake to prevent crashes
+  powerMonitor.on('suspend', () => {
+    console.log('[IceCubes] System suspending - pausing services...');
+    // Stop active recording/transcription gracefully
+    if (isRecording) {
+      console.log('[IceCubes] Stopping recording due to system sleep');
+      // Tell editor to stop transcription
+      if (editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send('recording-stopped');
+      }
+      isRecording = false;
+    }
+    // Stop meeting watcher
+    meetingWatcher?.stop();
+  });
+  
+  powerMonitor.on('resume', () => {
+    console.log('[IceCubes] System resuming - restarting services...');
+    // Restart meeting watcher after brief delay
+    setTimeout(() => {
+      if (meetingWatcher) {
+        console.log('[IceCubes] Restarting meeting watcher...');
+        meetingWatcher.start(
+          (meeting) => {
+            console.log('[Meeting] Detected:', meeting.provider);
+            currentMeeting = meeting;
+            updateTrayMenu();
+            
+            const notifSettings = store.get('notifSettings', {
+              scheduledMeetings: true,
+              autoDetectedMeetings: true,
+              mutedApps: []
+            });
+            
+            const appName = meeting.isBrowser ? 'Chrome' : meeting.provider;
+            const isMuted = notifSettings.mutedApps?.some((app: string) => 
+              meeting.title?.toLowerCase().includes(app.toLowerCase()) ||
+              meeting.provider?.toLowerCase().includes(app.toLowerCase())
+            );
+            
+            if (meeting.pid !== lastNotifiedMeetingPid && !isRecording && notifSettings.autoDetectedMeetings && !isMuted) {
+              lastNotifiedMeetingPid = meeting.pid;
+              showMeetingBar(meeting);
+            }
+          },
+          () => {
+            console.log('[Meeting] Ended');
+            currentMeeting = null;
+            updateTrayMenu();
+            closeMeetingBar();
+          }
+        );
+      }
+    }, 2000); // Wait 2 seconds for system to fully resume
+  });
+  
+  // 4. Create tray - this is the main UI
+  createTray();
+  
+  // 4.5 Show the main editor window on startup (so app is visible, not hidden)
+  openEditorWindow(true); // true = show home view
+  
+  // 5. Check permissions
+  const perms = await checkPermissions();
+  if (!perms.microphone || !perms.screenRecording || !perms.accessibility) {
+    console.log('[Ghost] Missing permissions, requesting...');
+    await requestPermissions();
+  }
+  
+  // 6. Initialize native module and meeting watcher
+  const native = getNativeModule();
+  if (native) {
+    meetingWatcher = new MeetingWatcher(native);
+    audioEngine = new AudioEngine(native);
+    
+    // Wait 5 seconds after app is fully loaded before starting meeting detection
+    console.log('[Ghost] Waiting 5 seconds before starting meeting detection...');
+    setTimeout(() => {
+      console.log('[Ghost] Starting meeting watcher...');
+      meetingWatcher?.start(
+      (meeting) => {
+        console.log('[Meeting] Detected:', meeting.provider);
+        currentMeeting = meeting;
+        updateTrayMenu();
+        
+        // Check notification settings for auto-detected meetings
+        const notifSettings = store.get('notifSettings', {
+          scheduledMeetings: true,
+          autoDetectedMeetings: true,
+          mutedApps: []
+        });
+        
+        // Check if this app is muted
+        const appName = meeting.isBrowser ? 'Chrome' : meeting.provider; // Simplified - could be improved
+        const isMuted = notifSettings.mutedApps?.some((app: string) => 
+          meeting.title?.toLowerCase().includes(app.toLowerCase()) ||
+          meeting.provider?.toLowerCase().includes(app.toLowerCase())
+        );
+        
+        // Only show bar for NEW meetings (different PID) and if notifications are enabled
+        if (meeting.pid !== lastNotifiedMeetingPid && !isRecording && notifSettings.autoDetectedMeetings && !isMuted) {
+          lastNotifiedMeetingPid = meeting.pid;
+          showMeetingBar(meeting);
+        }
+      },
+      () => {
+        console.log('[Meeting] Ended');
+        console.log('[Meeting] Ended');
+        if (isRecording) {
+          stopRecording();
+        }
+        currentMeeting = null;
+        lastNotifiedMeetingPid = null; // Reset so next meeting will show bar
+        updateTrayMenu();
+      }
+      );
+    }, 5000); // 5 second delay
+  }
+  
+  console.log('[Ghost] ✅ Ready - will start watching for meetings in 5 seconds');
+});
+
+app.on('window-all-closed', () => {
+  // Don't quit - we're a menu bar app
+});
+
+app.on('before-quit', (event) => {
+  // If not force quitting, hide to tray instead
+  if (!forceQuit) {
+    event.preventDefault();
+    // Hide all windows
+    editorWindow?.hide();
+    meetingBarWindow?.hide();
+    // Hide from dock
+    app.dock?.hide();
+    console.log('[App] Hiding to tray instead of quitting');
+    return;
+  }
+  
+  // Actually quitting - clean up
+  console.log('[App] Force quitting...');
+  meetingWatcher?.stop();
+  if (isRecording) {
+    audioEngine?.stopRecording();
+  }
+  
+  // Close database and save any pending changes
+  console.log('[Database] Saving and closing database...');
+  databaseService.close();
+});

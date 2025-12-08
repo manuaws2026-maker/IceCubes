@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IceCubes - Meeting Detected</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: transparent;
+      overflow: hidden;
+    }
+    
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      transform: translateX(100%);
+      animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      cursor: default;
+      -webkit-app-region: drag;
+    }
+    
+    @keyframes slideIn {
+      to {
+        transform: translateX(0);
+      }
+    }
+    
+    .bar.hiding {
+      animation: slideOut 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+    }
+    
+    @keyframes slideOut {
+      to {
+        transform: translateX(120%);
+      }
+    }
+    
+    .coco-icon {
+      font-size: 24px;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+    
+    .info {
+      flex: 1;
+    }
+    
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 2px;
+    }
+    
+    .subtitle {
+      font-size: 11px;
+      color: #666;
+    }
+    
+    .record-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      -webkit-app-region: no-drag;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+    
+    .record-btn:hover {
+      transform: scale(1.03);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+    
+    .record-btn:active {
+      transform: scale(0.98);
+    }
+    
+    .record-btn .dot {
+      width: 8px;
+      height: 8px;
+      background: white;
+      border-radius: 50%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .close-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.05);
+      border: none;
+      border-radius: 6px;
+      color: #999;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      -webkit-app-region: no-drag;
+    }
+    
+    .close-btn:hover {
+      background: rgba(0, 0, 0, 0.1);
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="bar" id="bar">
+    <div class="coco-icon">🧊</div>
+    <div class="info">
+      <div class="title" id="meetingTitle">Meeting Detected</div>
+      <div class="subtitle" id="meetingProvider">via Chrome</div>
+    </div>
+    <button class="record-btn" id="recordBtn">
+      <span class="dot"></span>
+      Record
+    </button>
+    <button class="close-btn" id="closeBtn">✕</button>
+  </div>
+  
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    const bar = document.getElementById('bar');
+    const titleEl = document.getElementById('meetingTitle');
+    const providerEl = document.getElementById('meetingProvider');
+    const recordBtn = document.getElementById('recordBtn');
+    const closeBtn = document.getElementById('closeBtn');
+    
+    // Set meeting info
+    ipcRenderer.on('set-meeting', (_, meeting) => {
+      // Format provider name nicely
+      const providerNames = {
+        'meet': 'Google Meet',
+        'zoom': 'Zoom',
+        'teams': 'Microsoft Teams',
+        'webex': 'Webex',
+        'slack': 'Slack Huddle',
+      };
+      const providerName = providerNames[meeting.provider] || meeting.provider;
+      
+      titleEl.textContent = `${providerName} meeting detected`;
+      providerEl.textContent = meeting.isBrowser ? `via ${meeting.appName || 'Browser'}` : `via ${providerName} app`;
+    });
+    
+    // Record button
+    recordBtn.addEventListener('click', () => {
+      ipcRenderer.send('start-recording-from-bar');
+      hideBar();
+    });
+    
+    // Close button
+    closeBtn.addEventListener('click', () => {
+      hideBar();
+    });
+    
+    function hideBar() {
+      bar.classList.add('hiding');
+      setTimeout(() => {
+        ipcRenderer.send('close-meeting-bar');
+      }, 300);
+    }
+    
+    // Auto-hide after 10 seconds if no action
+    setTimeout(() => {
+      if (!bar.classList.contains('hiding')) {
+        hideBar();
+      }
+    }, 10000);
+  </script>
+</body>
+</html>
+

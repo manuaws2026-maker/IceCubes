@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recording</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'JetBrains Mono', monospace;
+        background: transparent;
+      }
+      .indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: rgba(20, 20, 22, 0.92);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 59, 48, 0.3);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        cursor: pointer;
+        transition: all 0.2s;
+        -webkit-app-region: no-drag;
+      }
+      .indicator:hover {
+        background: rgba(40, 40, 45, 0.95);
+        border-color: rgba(255, 59, 48, 0.5);
+        transform: scale(1.02);
+      }
+      .indicator:hover .stop-hint {
+        opacity: 1;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        background: #ff3b30;
+        border-radius: 50%;
+        animation: pulse 1.5s ease-in-out infinite;
+        box-shadow: 0 0 12px rgba(255, 59, 48, 0.6);
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(0.9); }
+      }
+      .text {
+        font-size: 12px;
+        font-weight: 500;
+        color: #ff3b30;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      .timer {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-left: 4px;
+      }
+      .stop-hint {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-left: 8px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="indicator" id="indicator" title="Click to stop recording">
+      <div class="dot"></div>
+      <span class="text">REC</span>
+      <span class="timer" id="timer">00:00</span>
+      <span class="stop-hint">click to stop</span>
+    </div>
+    <script>
+      const { ipcRenderer } = require('electron');
+      
+      let startTime = Date.now();
+      setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const secs = (elapsed % 60).toString().padStart(2, '0');
+        document.getElementById('timer').textContent = `${mins}:${secs}`;
+      }, 1000);
+
+      // Click to stop recording
+      document.getElementById('indicator').addEventListener('click', () => {
+        ipcRenderer.send('stop-recording-from-indicator');
+      });
+    </script>
+  </body>
+</html>
