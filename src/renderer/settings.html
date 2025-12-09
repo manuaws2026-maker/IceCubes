@@ -1436,10 +1436,40 @@
     });
     
     // Calendar
-    document.getElementById('calendarConnectBtn')?.addEventListener('click', async () => {
-      await ipcRenderer.invoke('calendar-connect');
-      loadState();
+    const calendarStatus = document.getElementById('calendarStatus');
+    const calendarStatusText = document.getElementById('calendarStatusText');
+    const calendarConnectBtn = document.getElementById('calendarConnectBtn');
+    
+    async function checkCalendarStatus() {
+      try {
+        const connected = await ipcRenderer.invoke('calendar-is-connected');
+        if (connected) {
+          calendarStatus?.classList.add('connected');
+          calendarStatusText.textContent = 'Connected';
+          calendarConnectBtn.textContent = 'Reconnect Google Calendar';
+        } else {
+          calendarStatus?.classList.remove('connected');
+          calendarStatusText.textContent = 'Not connected';
+          calendarConnectBtn.textContent = 'Connect Google Calendar';
+        }
+      } catch (e) {
+        calendarStatus?.classList.remove('connected');
+        calendarStatusText.textContent = 'Error checking status';
+      }
+    }
+    
+    calendarConnectBtn?.addEventListener('click', async () => {
+      calendarStatusText.textContent = 'Connecting...';
+      try {
+        await ipcRenderer.invoke('calendar-connect');
+        await checkCalendarStatus();
+      } catch (e) {
+        calendarStatusText.textContent = 'Connection failed';
+      }
     });
+    
+    // Check calendar status on load
+    checkCalendarStatus();
     
     // Load settings on init
     loadState();
