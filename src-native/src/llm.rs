@@ -104,6 +104,42 @@ pub fn is_llm_ready() -> bool {
     LLM_STATE.lock().is_some()
 }
 
+/// Check if LLM model is downloaded (cached by HuggingFace Hub)
+#[napi]
+pub fn is_llm_downloaded() -> bool {
+    // HuggingFace Hub caches models at ~/.cache/huggingface/hub/
+    // The model directory name is based on the repo name with -- replacing /
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return false,
+    };
+    
+    let cache_dir = home.join(".cache/huggingface/hub");
+    let model_dir_name = format!("models--{}", GGUF_REPO.replace("/", "--"));
+    let model_dir = cache_dir.join(&model_dir_name);
+    
+    // Check if the snapshots directory exists and has content
+    let snapshots_dir = model_dir.join("snapshots");
+    if !snapshots_dir.exists() {
+        println!("[LLM] Model not downloaded: {} not found", snapshots_dir.display());
+        return false;
+    }
+    
+    // Check if any snapshot has the GGUF file
+    if let Ok(entries) = std::fs::read_dir(&snapshots_dir) {
+        for entry in entries.flatten() {
+            let gguf_path = entry.path().join(GGUF_FILE);
+            if gguf_path.exists() {
+                println!("[LLM] Model found at: {}", gguf_path.display());
+                return true;
+            }
+        }
+    }
+    
+    println!("[LLM] Model not downloaded: GGUF file not found in snapshots");
+    false
+}
+
 // ============================================================================
 // NAPI Exports - Model Loading
 // ============================================================================

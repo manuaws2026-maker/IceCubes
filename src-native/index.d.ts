@@ -64,6 +64,8 @@ export interface LlmResponse {
 export declare function getLlmModelInfo(): LlmModelInfo
 export declare function getLlmInitProgress(): LlmInitProgress
 export declare function isLlmReady(): boolean
+/** Check if LLM model is downloaded (cached by HuggingFace Hub) */
+export declare function isLlmDownloaded(): boolean
 /**
  * Initialize the LLM - downloads model from HuggingFace if not cached
  * This is handled automatically by mistral.rs

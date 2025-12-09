@@ -2568,6 +2568,15 @@ Answer:`;
     }
   });
 
+  // Check if LLM model is downloaded (but not necessarily loaded)
+  ipcMain.handle('llm-is-downloaded', async () => {
+    try {
+      return nativeModule?.isLlmDownloaded?.() ?? false;
+    } catch (e) {
+      return false;
+    }
+  });
+
   // Initialize LLM (async - starts download/load in background)
   ipcMain.handle('llm-init', async () => {
     console.log('[LLM] Starting initialization...');

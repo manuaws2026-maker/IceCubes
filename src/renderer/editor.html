@@ -8333,16 +8333,16 @@
     offlineSwitchBtn?.addEventListener('click', async () => {
       console.log('[Offline] User switching to local models');
       
-      // Check if local models are available
+      // Check if local models are downloaded
       const parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
-      const llmReady = await ipcRenderer.invoke('llm-is-ready');
+      const llmDownloaded = await ipcRenderer.invoke('llm-is-downloaded');
       
-      console.log(`[Offline] Local models ready: parakeet=${parakeetReady}, llm=${llmReady}`);
+      console.log(`[Offline] Local models: parakeet=${parakeetReady}, llm=${llmDownloaded}`);
       
-      if (!parakeetReady || !llmReady) {
+      if (!parakeetReady || !llmDownloaded) {
         const missing = [];
         if (!parakeetReady) missing.push('Parakeet (transcription)');
-        if (!llmReady) missing.push('Qwen (AI notes)');
+        if (!llmDownloaded) missing.push('Qwen (AI notes)');
         
         alert(`Please download the following local models first:\n• ${missing.join('\n• ')}\n\nOpen Settings to download them.`);
         showSettings();

@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, initLlm, initLlmSync, shutdownLlm, llmGenerate, llmChat, llmChatStream, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
+const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, initLlm, initLlmSync, shutdownLlm, llmGenerate, llmChat, llmChatStream, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
 
 module.exports.isParakeetDownloaded = isParakeetDownloaded
 module.exports.getParakeetModelInfo = getParakeetModelInfo
@@ -327,6 +327,7 @@ module.exports.shutdownParakeet = shutdownParakeet
 module.exports.getLlmModelInfo = getLlmModelInfo
 module.exports.getLlmInitProgress = getLlmInitProgress
 module.exports.isLlmReady = isLlmReady
+module.exports.isLlmDownloaded = isLlmDownloaded
 module.exports.initLlm = initLlm
 module.exports.initLlmSync = initLlmSync
 module.exports.shutdownLlm = shutdownLlm
