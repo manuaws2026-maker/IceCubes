@@ -623,14 +623,17 @@
         <button class="settings-nav-item active" data-tab="general">
           <span class="nav-icon">⚙️</span> General
         </button>
+        <button class="settings-nav-item" data-tab="transcription">
+          <span class="nav-icon">🎙️</span> Transcription
+        </button>
+        <button class="settings-nav-item" data-tab="ai">
+          <span class="nav-icon">🤖</span> AI Notes
+        </button>
         <button class="settings-nav-item" data-tab="calendar">
           <span class="nav-icon">📅</span> Calendar
         </button>
         <button class="settings-nav-item" data-tab="notifications">
           <span class="nav-icon">🔔</span> Notifications
-        </button>
-        <button class="settings-nav-item" data-tab="language">
-          <span class="nav-icon">🌐</span> Language
         </button>
       </div>
     </div>
@@ -656,11 +659,13 @@
             </button>
           </div>
         </div>
-        
-        <!-- Transcription Provider Section -->
+      </div>
+      
+      <!-- Transcription Tab -->
+      <div class="settings-tab" id="settingsTabTranscription">
         <div class="settings-section">
-          <h3>🎙️ Transcription</h3>
-          <p class="settings-desc">Choose your transcription provider</p>
+          <h3>🎙️ Transcription Provider</h3>
+          <p class="settings-desc">Choose how your meetings are transcribed</p>
           
           <div class="provider-toggle-group">
             <button class="provider-toggle-btn selected" id="transcriptionProviderDeepgram" data-provider="deepgram">
@@ -709,7 +714,7 @@
               </div>
             </div>
             <div id="parakeetNotDownloaded">
-              <p class="config-info">~670 MB download • 25 languages • 100% private</p>
+              <p class="config-info">~670 MB download • 25 European languages • 100% private</p>
               <button class="settings-btn-full" id="parakeetDownloadBtn">Download Model</button>
             </div>
             <div id="parakeetDownloading" class="hidden">
@@ -723,10 +728,29 @@
           </div>
         </div>
         
-        <!-- AI Notes Provider Section -->
+        <!-- Transcription Language -->
         <div class="settings-section">
-          <h3>🤖 AI Notes</h3>
-          <p class="settings-desc">Choose your AI provider for note enhancement</p>
+          <h3>🌐 Transcription Language</h3>
+          <p class="settings-desc">Language spoken in your meetings</p>
+          <select class="settings-select" id="transcriptionLangSelect">
+            <option value="en">English</option>
+          </select>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" id="transcriptionLangNote">
+            Languages available depend on selected provider.
+          </p>
+          
+          <div class="settings-checkbox-group" style="margin-top: 12px;">
+            <input type="checkbox" id="autoDetectLang">
+            <label for="autoDetectLang">Auto-detect language (may be slower)</label>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AI Notes Tab -->
+      <div class="settings-tab" id="settingsTabAi">
+        <div class="settings-section">
+          <h3>🤖 AI Provider</h3>
+          <p class="settings-desc">Choose how your notes are enhanced</p>
           
           <div class="provider-toggle-group">
             <button class="provider-toggle-btn selected" id="aiProviderOpenAI" data-provider="openai">
@@ -788,6 +812,18 @@
             </div>
           </div>
         </div>
+        
+        <!-- AI Notes Language -->
+        <div class="settings-section">
+          <h3>🌐 Output Language</h3>
+          <p class="settings-desc">Language for generated notes</p>
+          <select class="settings-select" id="aiNotesLangSelect">
+            <option value="same">Same as transcription</option>
+          </select>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" id="aiNotesLangNote">
+            Languages available depend on selected provider.
+          </p>
+        </div>
       </div>
       
       <!-- Calendar Tab -->
@@ -843,38 +879,6 @@
         </div>
       </div>
       
-      <!-- Language Tab -->
-      <div class="settings-tab" id="settingsTabLanguage">
-        <div class="settings-section">
-          <h3>🌐 Language Settings</h3>
-          <p class="settings-desc">Configure transcription and output languages</p>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 14px;">Transcription Language</label>
-            <select class="settings-select" id="transcriptionLangSelect">
-              <option value="en">English</option>
-            </select>
-            <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" id="transcriptionLangNote">
-              Languages will update based on selected provider.
-            </p>
-          </div>
-          
-          <div style="margin-bottom: 16px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 14px;">AI Notes Language</label>
-            <select class="settings-select" id="aiNotesLangSelect">
-              <option value="same">Same as transcription</option>
-            </select>
-            <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" id="aiNotesLangNote">
-              Languages will update based on selected provider.
-            </p>
-          </div>
-          
-          <div class="settings-checkbox-group">
-            <input type="checkbox" id="autoDetectLang">
-            <label for="autoDetectLang">Auto-detect language (slower but more accurate)</label>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
