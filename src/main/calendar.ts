@@ -44,6 +44,9 @@ export interface CalendarEvent {
   isUpcoming: boolean;
   attendees?: CalendarAttendee[];
   organizer?: { email: string; displayName?: string };
+  calendarId?: string;
+  calendarName?: string;
+  calendarColor?: string;
 }
 
 // Generate PKCE code verifier (random string)
@@ -64,9 +67,16 @@ export interface CalendarInfo {
   selected: boolean;
 }
 
+// Store interface for dependency injection
+interface SettingsStore {
+  get(key: string, defaultValue?: any): any;
+  set(key: string, value: any): void;
+}
+
 export class CalendarService {
   private oauth2Client: OAuth2Client | null = null;
   private calendar: calendar_v3.Calendar | null = null;
+  private store: SettingsStore | null = null;
   private isAuthenticated = false;
   private events: CalendarEvent[] = [];
   private refreshInterval: NodeJS.Timeout | null = null;
@@ -77,7 +87,8 @@ export class CalendarService {
   private codeVerifier: string = '';
   private authServer: http.Server | null = null;
 
-  constructor() {
+  constructor(store?: SettingsStore) {
+    this.store = store || null;
     this.initializeClient();
     this.loadSelectedCalendars();
     this.loadExistingToken();
@@ -558,80 +569,130 @@ export class CalendarService {
       endDate.setDate(endDate.getDate() + 7);
 
       console.log(`[Calendar] Fetching events from ${now.toISOString()} to ${endDate.toISOString()}`);
-
-      const response = await this.calendar.events.list({
-        calendarId: 'primary',
-        timeMin: now.toISOString(),
-        timeMax: endDate.toISOString(),
-        maxResults: 50,
-        singleEvents: true,
-        orderBy: 'startTime',
-      });
-
-      const items = response.data.items || [];
-      console.log(`[Calendar] Fetched ${items.length} raw events`);
       
-      this.events = items.map((event): CalendarEvent => {
-        const start = event.start?.dateTime 
-          ? new Date(event.start.dateTime) 
-          : new Date(event.start?.date || now);
-        const end = event.end?.dateTime 
-          ? new Date(event.end.dateTime) 
-          : new Date(event.end?.date || now);
-        
-        const isNow = now >= start && now <= end;
-        const minutesUntil = (start.getTime() - now.getTime()) / 60000;
-        const isUpcoming = minutesUntil > 0 && minutesUntil <= 60;
-
-        // Extract meeting link from various sources
-        let meetingLink = event.hangoutLink || undefined;
-        if (!meetingLink && event.conferenceData?.entryPoints) {
-          const videoEntry = event.conferenceData.entryPoints.find(
-            ep => ep.entryPointType === 'video'
-          );
-          meetingLink = videoEntry?.uri || undefined;
+      // Get list of calendars to fetch from (only selected ones)
+      const calendarsToFetch: { id: string; name: string; color: string }[] = [];
+      
+      // If calendarList is empty, fetch it first
+      if (this.calendarList.length === 0) {
+        await this.fetchCalendarList();
+      }
+      
+      // Filter to only selected calendars
+      for (const cal of this.calendarList) {
+        const isSelected = this.selectedCalendars.has(cal.id) || 
+                          (cal.primary && this.selectedCalendars.has('primary'));
+        if (isSelected) {
+          calendarsToFetch.push({
+            id: cal.id,
+            name: cal.summary,
+            color: cal.backgroundColor || '#4285f4'
+          });
         }
-        if (!meetingLink && event.location) {
-          if (event.location.startsWith('http')) {
-            meetingLink = event.location;
-          }
-        }
-        if (!meetingLink && event.description) {
-          // Try to extract meeting URL from description
-          const urlMatch = event.description.match(
-            /https?:\/\/[^\s<>"]*(?:meet|zoom|teams|webex)[^\s<>"]*/i
-          );
-          if (urlMatch) {
-            meetingLink = urlMatch[0];
-          }
-        }
+      }
+      
+      console.log(`[Calendar] Selected calendars: ${calendarsToFetch.length}`, calendarsToFetch.map(c => c.name));
+      
+      // If no calendars selected, return empty
+      if (calendarsToFetch.length === 0) {
+        console.log('[Calendar] No calendars selected, returning empty events');
+        this.events = [];
+        return [];
+      }
+      
+      // Fetch events from each selected calendar
+      const allEvents: CalendarEvent[] = [];
+      
+      for (const calInfo of calendarsToFetch) {
+        try {
+          const response = await this.calendar.events.list({
+            calendarId: calInfo.id,
+            timeMin: now.toISOString(),
+            timeMax: endDate.toISOString(),
+            maxResults: 50,
+            singleEvents: true,
+            orderBy: 'startTime',
+          });
 
-        // Extract attendees
-        const attendees: CalendarAttendee[] = (event.attendees || []).map(a => ({
-          email: a.email || '',
-          displayName: a.displayName || undefined,
-          self: a.self || false,
-          responseStatus: a.responseStatus as any,
-          organizer: a.organizer || false,
-        }));
+          const items = response.data.items || [];
+          console.log(`[Calendar] Fetched ${items.length} events from "${calInfo.name}"`);
+          
+          const calendarEvents = items.map((event): CalendarEvent => {
+            const start = event.start?.dateTime 
+              ? new Date(event.start.dateTime) 
+              : new Date(event.start?.date || now);
+            const end = event.end?.dateTime 
+              ? new Date(event.end.dateTime) 
+              : new Date(event.end?.date || now);
+            
+            const isNow = now >= start && now <= end;
+            const minutesUntil = (start.getTime() - now.getTime()) / 60000;
+            const isUpcoming = minutesUntil > 0 && minutesUntil <= 60;
 
-        return {
-          id: event.id || '',
-          title: event.summary || 'Untitled Event',
-          start,
-          end,
-          meetingLink,
-          location: event.location || undefined,
-          description: event.description || undefined,
-          isNow,
-          isUpcoming,
-          attendees: attendees.length > 0 ? attendees : undefined,
-          organizer: event.organizer ? {
-            email: event.organizer.email || '',
-            displayName: event.organizer.displayName || undefined,
-          } : undefined,
-        };
-      });
+            // Extract meeting link from various sources
+            let meetingLink = event.hangoutLink || undefined;
+            if (!meetingLink && event.conferenceData?.entryPoints) {
+              const videoEntry = event.conferenceData.entryPoints.find(
+                ep => ep.entryPointType === 'video'
+              );
+              meetingLink = videoEntry?.uri || undefined;
+            }
+            if (!meetingLink && event.location) {
+              if (event.location.startsWith('http')) {
+                meetingLink = event.location;
+              }
+            }
+            if (!meetingLink && event.description) {
+              // Try to extract meeting URL from description
+              const urlMatch = event.description.match(
+                /https?:\/\/[^\s<>"]*(?:meet|zoom|teams|webex)[^\s<>"]*/i
+              );
+              if (urlMatch) {
+                meetingLink = urlMatch[0];
+              }
+            }
+
+            // Extract attendees
+            const attendees: CalendarAttendee[] = (event.attendees || []).map(a => ({
+              email: a.email || '',
+              displayName: a.displayName || undefined,
+              self: a.self || false,
+              responseStatus: a.responseStatus as any,
+              organizer: a.organizer || false,
+            }));
+
+            return {
+              id: event.id || '',
+              title: event.summary || 'Untitled Event',
+              start,
+              end,
+              meetingLink,
+              location: event.location || undefined,
+              description: event.description || undefined,
+              isNow,
+              isUpcoming,
+              attendees: attendees.length > 0 ? attendees : undefined,
+              organizer: event.organizer ? {
+                email: event.organizer.email || '',
+                displayName: event.organizer.displayName || undefined,
+              } : undefined,
+              calendarId: calInfo.id,
+              calendarName: calInfo.name,
+              calendarColor: calInfo.color,
+            };
+          });
+          
+          allEvents.push(...calendarEvents);
+        } catch (calError) {
+          console.error(`[Calendar] Error fetching from "${calInfo.name}":`, calError);
+          // Continue with other calendars
+        }
+      }
+      
+      // Sort all events by start time
+      allEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
+      
+      this.events = allEvents;
 
       console.log(`[Calendar] Fetched ${this.events.length} events`);
       return this.events;
@@ -715,8 +776,15 @@ export class CalendarService {
 
   private saveSelectedCalendars(): void {
     try {
-      const selectedPath = path.join(app.getPath('userData'), 'selected-calendars.json');
-      fs.writeFileSync(selectedPath, JSON.stringify([...this.selectedCalendars]));
+      if (this.store) {
+        // Use the main settings store (preferred)
+        this.store.set('selectedCalendars', [...this.selectedCalendars]);
+        console.log('[Calendar] Saved selected calendars to store:', [...this.selectedCalendars]);
+      } else {
+        // Fallback to separate file (for backwards compatibility)
+        const selectedPath = path.join(app.getPath('userData'), 'selected-calendars.json');
+        fs.writeFileSync(selectedPath, JSON.stringify([...this.selectedCalendars]));
+      }
     } catch (e) {
       console.error('[Calendar] Error saving selected calendars:', e);
     }
@@ -724,10 +792,30 @@ export class CalendarService {
 
   private loadSelectedCalendars(): void {
     try {
-      const selectedPath = path.join(app.getPath('userData'), 'selected-calendars.json');
-      if (fs.existsSync(selectedPath)) {
-        const data = JSON.parse(fs.readFileSync(selectedPath, 'utf-8'));
-        this.selectedCalendars = new Set(data);
+      if (this.store) {
+        // Load from main settings store (preferred)
+        const saved = this.store.get('selectedCalendars', ['primary']);
+        this.selectedCalendars = new Set(saved);
+        console.log('[Calendar] Loaded selected calendars from store:', saved);
+        
+        // Migrate old file if it exists
+        const oldPath = path.join(app.getPath('userData'), 'selected-calendars.json');
+        if (fs.existsSync(oldPath)) {
+          console.log('[Calendar] Migrating old selected-calendars.json to store...');
+          const oldData = JSON.parse(fs.readFileSync(oldPath, 'utf-8'));
+          this.selectedCalendars = new Set(oldData);
+          this.saveSelectedCalendars();
+          // Delete old file after migration
+          fs.unlinkSync(oldPath);
+          console.log('[Calendar] Migration complete, old file deleted');
+        }
+      } else {
+        // Fallback to separate file
+        const selectedPath = path.join(app.getPath('userData'), 'selected-calendars.json');
+        if (fs.existsSync(selectedPath)) {
+          const data = JSON.parse(fs.readFileSync(selectedPath, 'utf-8'));
+          this.selectedCalendars = new Set(data);
+        }
       }
     } catch (e) {
       console.error('[Calendar] Error loading selected calendars:', e);

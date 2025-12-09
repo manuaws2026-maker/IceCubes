@@ -2778,7 +2778,7 @@ app.whenReady().then(async () => {
   
   // 3. Initialize services
   transcriptionService = transcriptionRouter.getDeepgramService(); // For backward compatibility
-  calendarService = new CalendarService();
+  calendarService = new CalendarService(store);
   openaiService = new OpenAIService();
   
   // Apply saved language settings to transcription router

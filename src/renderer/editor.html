@@ -3808,6 +3808,29 @@
       opacity: 1;
     }
     
+    .event-calendar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 4px;
+    }
+    
+    .event-calendar-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    
+    .event-calendar-name {
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 150px;
+    }
+    
     .no-events {
       text-align: center;
       padding: 40px;
@@ -14480,6 +14503,14 @@
         // Encode attendees as JSON for data attribute
         const attendeesJson = event.attendees ? encodeURIComponent(JSON.stringify(event.attendees)) : '';
         
+        // Calendar indicator (small colored dot + name)
+        const calendarIndicator = event.calendarName ? `
+          <div class="event-calendar">
+            <span class="event-calendar-dot" style="background: ${event.calendarColor || '#4285f4'}"></span>
+            <span class="event-calendar-name">${event.calendarName}</span>
+          </div>
+        ` : '';
+        
         return `
           <div class="calendar-event ${isNow ? 'now' : ''}" 
                data-link="${event.meetingLink || ''}"
@@ -14495,6 +14526,7 @@
             <div class="event-info">
               <div class="event-title">${event.title}</div>
               <div class="event-time">${timeDisplay}</div>
+              ${calendarIndicator}
             </div>
             ${event.meetingLink ? '<button class="event-join">Join</button>' : ''}
           </div>
