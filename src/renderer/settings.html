@@ -852,70 +852,10 @@
           <div style="margin-bottom: 16px;">
             <label style="display: block; margin-bottom: 8px; font-size: 14px;">Transcription Language</label>
             <select class="settings-select" id="transcriptionLangSelect">
-              <optgroup label="Popular">
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="zh">Chinese (Mandarin)</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="pt">Portuguese</option>
-                <option value="it">Italian</option>
-                <option value="hi">Hindi</option>
-                <option value="ar">Arabic</option>
-              </optgroup>
-              <optgroup label="European">
-                <option value="nl">Dutch</option>
-                <option value="pl">Polish</option>
-                <option value="ru">Russian</option>
-                <option value="uk">Ukrainian</option>
-                <option value="cs">Czech</option>
-                <option value="ro">Romanian</option>
-                <option value="hu">Hungarian</option>
-                <option value="el">Greek</option>
-                <option value="sv">Swedish</option>
-                <option value="da">Danish</option>
-                <option value="fi">Finnish</option>
-                <option value="no">Norwegian</option>
-                <option value="tr">Turkish</option>
-                <option value="bg">Bulgarian</option>
-                <option value="sk">Slovak</option>
-                <option value="hr">Croatian</option>
-                <option value="sl">Slovenian</option>
-                <option value="lt">Lithuanian</option>
-                <option value="lv">Latvian</option>
-                <option value="et">Estonian</option>
-              </optgroup>
-              <optgroup label="Asian">
-                <option value="zh-TW">Chinese (Traditional)</option>
-                <option value="vi">Vietnamese</option>
-                <option value="th">Thai</option>
-                <option value="id">Indonesian</option>
-                <option value="ms">Malay</option>
-                <option value="tl">Filipino/Tagalog</option>
-                <option value="ta">Tamil</option>
-                <option value="te">Telugu</option>
-                <option value="bn">Bengali</option>
-                <option value="mr">Marathi</option>
-                <option value="gu">Gujarati</option>
-                <option value="kn">Kannada</option>
-                <option value="ml">Malayalam</option>
-                <option value="pa">Punjabi</option>
-                <option value="ur">Urdu</option>
-              </optgroup>
-              <optgroup label="Other">
-                <option value="he">Hebrew</option>
-                <option value="fa">Persian</option>
-                <option value="sw">Swahili</option>
-                <option value="af">Afrikaans</option>
-                <option value="ca">Catalan</option>
-                <option value="gl">Galician</option>
-                <option value="eu">Basque</option>
-              </optgroup>
+              <option value="en">English</option>
             </select>
             <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" id="transcriptionLangNote">
-              Deepgram supports 30+ languages. Parakeet supports 25 European languages.
+              Languages will update based on selected provider.
             </p>
           </div>
           
@@ -923,59 +863,9 @@
             <label style="display: block; margin-bottom: 8px; font-size: 14px;">AI Notes Language</label>
             <select class="settings-select" id="aiNotesLangSelect">
               <option value="same">Same as transcription</option>
-              <optgroup label="Popular">
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="zh">Chinese (Simplified)</option>
-                <option value="ja">Japanese</option>
-                <option value="ko">Korean</option>
-                <option value="pt">Portuguese</option>
-                <option value="it">Italian</option>
-                <option value="hi">Hindi</option>
-                <option value="ar">Arabic</option>
-              </optgroup>
-              <optgroup label="European">
-                <option value="nl">Dutch</option>
-                <option value="pl">Polish</option>
-                <option value="ru">Russian</option>
-                <option value="uk">Ukrainian</option>
-                <option value="cs">Czech</option>
-                <option value="ro">Romanian</option>
-                <option value="hu">Hungarian</option>
-                <option value="el">Greek</option>
-                <option value="sv">Swedish</option>
-                <option value="da">Danish</option>
-                <option value="fi">Finnish</option>
-                <option value="no">Norwegian</option>
-                <option value="tr">Turkish</option>
-                <option value="bg">Bulgarian</option>
-                <option value="sk">Slovak</option>
-                <option value="hr">Croatian</option>
-                <option value="sl">Slovenian</option>
-              </optgroup>
-              <optgroup label="Asian">
-                <option value="zh-TW">Chinese (Traditional)</option>
-                <option value="vi">Vietnamese</option>
-                <option value="th">Thai</option>
-                <option value="id">Indonesian</option>
-                <option value="ms">Malay</option>
-                <option value="tl">Filipino/Tagalog</option>
-                <option value="ta">Tamil</option>
-                <option value="te">Telugu</option>
-                <option value="bn">Bengali</option>
-              </optgroup>
-              <optgroup label="Other">
-                <option value="he">Hebrew</option>
-                <option value="fa">Persian</option>
-                <option value="sw">Swahili</option>
-                <option value="af">Afrikaans</option>
-                <option value="ca">Catalan</option>
-              </optgroup>
             </select>
             <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" id="aiNotesLangNote">
-              OpenAI GPT-4 supports 90+ languages. Qwen supports 29 languages.
+              Languages will update based on selected provider.
             </p>
           </div>
           
@@ -1033,6 +923,223 @@
       localLLMReady: false,
     };
     
+    // Language definitions by provider
+    const LANGUAGES = {
+      // Deepgram supports 30+ languages
+      deepgram: [
+        { code: 'en', name: 'English' },
+        { code: 'en-US', name: 'English (US)' },
+        { code: 'en-GB', name: 'English (UK)' },
+        { code: 'en-AU', name: 'English (Australia)' },
+        { code: 'en-IN', name: 'English (India)' },
+        { code: 'es', name: 'Spanish' },
+        { code: 'es-419', name: 'Spanish (Latin America)' },
+        { code: 'fr', name: 'French' },
+        { code: 'fr-CA', name: 'French (Canada)' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'pt-BR', name: 'Portuguese (Brazil)' },
+        { code: 'nl', name: 'Dutch' },
+        { code: 'hi', name: 'Hindi' },
+        { code: 'ja', name: 'Japanese' },
+        { code: 'zh', name: 'Chinese (Mandarin)' },
+        { code: 'ko', name: 'Korean' },
+        { code: 'pl', name: 'Polish' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'uk', name: 'Ukrainian' },
+        { code: 'tr', name: 'Turkish' },
+        { code: 'sv', name: 'Swedish' },
+        { code: 'da', name: 'Danish' },
+        { code: 'no', name: 'Norwegian' },
+        { code: 'fi', name: 'Finnish' },
+        { code: 'id', name: 'Indonesian' },
+        { code: 'ms', name: 'Malay' },
+        { code: 'vi', name: 'Vietnamese' },
+        { code: 'th', name: 'Thai' },
+        { code: 'ta', name: 'Tamil' },
+        { code: 'te', name: 'Telugu' },
+        { code: 'tl', name: 'Filipino/Tagalog' },
+      ],
+      // Parakeet supports 25 European languages
+      parakeet: [
+        { code: 'en', name: 'English' },
+        { code: 'de', name: 'German' },
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'nl', name: 'Dutch' },
+        { code: 'pl', name: 'Polish' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'uk', name: 'Ukrainian' },
+        { code: 'cs', name: 'Czech' },
+        { code: 'ro', name: 'Romanian' },
+        { code: 'hu', name: 'Hungarian' },
+        { code: 'el', name: 'Greek' },
+        { code: 'sv', name: 'Swedish' },
+        { code: 'da', name: 'Danish' },
+        { code: 'fi', name: 'Finnish' },
+        { code: 'no', name: 'Norwegian' },
+        { code: 'sk', name: 'Slovak' },
+        { code: 'hr', name: 'Croatian' },
+        { code: 'sl', name: 'Slovenian' },
+        { code: 'lt', name: 'Lithuanian' },
+        { code: 'lv', name: 'Latvian' },
+        { code: 'et', name: 'Estonian' },
+        { code: 'bg', name: 'Bulgarian' },
+      ],
+      // OpenAI GPT-4 supports 90+ languages
+      openai: [
+        { code: 'en', name: 'English' },
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'nl', name: 'Dutch' },
+        { code: 'pl', name: 'Polish' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'uk', name: 'Ukrainian' },
+        { code: 'ja', name: 'Japanese' },
+        { code: 'ko', name: 'Korean' },
+        { code: 'zh', name: 'Chinese (Simplified)' },
+        { code: 'zh-TW', name: 'Chinese (Traditional)' },
+        { code: 'ar', name: 'Arabic' },
+        { code: 'hi', name: 'Hindi' },
+        { code: 'bn', name: 'Bengali' },
+        { code: 'ta', name: 'Tamil' },
+        { code: 'te', name: 'Telugu' },
+        { code: 'mr', name: 'Marathi' },
+        { code: 'gu', name: 'Gujarati' },
+        { code: 'kn', name: 'Kannada' },
+        { code: 'ml', name: 'Malayalam' },
+        { code: 'pa', name: 'Punjabi' },
+        { code: 'ur', name: 'Urdu' },
+        { code: 'vi', name: 'Vietnamese' },
+        { code: 'th', name: 'Thai' },
+        { code: 'id', name: 'Indonesian' },
+        { code: 'ms', name: 'Malay' },
+        { code: 'tl', name: 'Filipino/Tagalog' },
+        { code: 'tr', name: 'Turkish' },
+        { code: 'he', name: 'Hebrew' },
+        { code: 'fa', name: 'Persian' },
+        { code: 'sw', name: 'Swahili' },
+        { code: 'cs', name: 'Czech' },
+        { code: 'ro', name: 'Romanian' },
+        { code: 'hu', name: 'Hungarian' },
+        { code: 'el', name: 'Greek' },
+        { code: 'sv', name: 'Swedish' },
+        { code: 'da', name: 'Danish' },
+        { code: 'fi', name: 'Finnish' },
+        { code: 'no', name: 'Norwegian' },
+        { code: 'sk', name: 'Slovak' },
+        { code: 'hr', name: 'Croatian' },
+        { code: 'sl', name: 'Slovenian' },
+        { code: 'bg', name: 'Bulgarian' },
+        { code: 'lt', name: 'Lithuanian' },
+        { code: 'lv', name: 'Latvian' },
+        { code: 'et', name: 'Estonian' },
+        { code: 'ca', name: 'Catalan' },
+        { code: 'gl', name: 'Galician' },
+        { code: 'eu', name: 'Basque' },
+        { code: 'af', name: 'Afrikaans' },
+      ],
+      // Qwen2.5 supports 29 languages
+      qwen: [
+        { code: 'en', name: 'English' },
+        { code: 'zh', name: 'Chinese (Simplified)' },
+        { code: 'zh-TW', name: 'Chinese (Traditional)' },
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'nl', name: 'Dutch' },
+        { code: 'pl', name: 'Polish' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'ja', name: 'Japanese' },
+        { code: 'ko', name: 'Korean' },
+        { code: 'ar', name: 'Arabic' },
+        { code: 'vi', name: 'Vietnamese' },
+        { code: 'th', name: 'Thai' },
+        { code: 'id', name: 'Indonesian' },
+        { code: 'ms', name: 'Malay' },
+        { code: 'tr', name: 'Turkish' },
+        { code: 'cs', name: 'Czech' },
+        { code: 'ro', name: 'Romanian' },
+        { code: 'hu', name: 'Hungarian' },
+        { code: 'el', name: 'Greek' },
+        { code: 'sv', name: 'Swedish' },
+        { code: 'da', name: 'Danish' },
+        { code: 'fi', name: 'Finnish' },
+        { code: 'no', name: 'Norwegian' },
+        { code: 'he', name: 'Hebrew' },
+        { code: 'uk', name: 'Ukrainian' },
+      ],
+    };
+    
+    // Update language dropdown based on provider
+    function updateLanguageDropdowns() {
+      const transcriptionSelect = document.getElementById('transcriptionLangSelect');
+      const aiNotesSelect = document.getElementById('aiNotesLangSelect');
+      const transcriptionNote = document.getElementById('transcriptionLangNote');
+      const aiNotesNote = document.getElementById('aiNotesLangNote');
+      
+      // Get current selections to preserve them if possible
+      const currentTransLang = transcriptionSelect?.value || 'en';
+      const currentAILang = aiNotesSelect?.value || 'same';
+      
+      // Update transcription languages
+      const transProvider = settingsState.transcriptionEngine;
+      const transLangs = LANGUAGES[transProvider] || LANGUAGES.deepgram;
+      
+      if (transcriptionSelect) {
+        transcriptionSelect.innerHTML = transLangs.map(l => 
+          `<option value="${l.code}">${l.name}</option>`
+        ).join('');
+        
+        // Restore selection if available, else default to English
+        if (transLangs.some(l => l.code === currentTransLang)) {
+          transcriptionSelect.value = currentTransLang;
+        } else {
+          transcriptionSelect.value = 'en';
+        }
+      }
+      
+      if (transcriptionNote) {
+        if (transProvider === 'parakeet') {
+          transcriptionNote.textContent = 'Parakeet supports 25 European languages with auto-detection.';
+        } else {
+          transcriptionNote.textContent = 'Deepgram supports 30+ languages including regional variants.';
+        }
+      }
+      
+      // Update AI notes languages
+      const aiProvider = settingsState.aiEngine;
+      const aiLangs = aiProvider === 'local' ? LANGUAGES.qwen : LANGUAGES.openai;
+      
+      if (aiNotesSelect) {
+        aiNotesSelect.innerHTML = '<option value="same">Same as transcription</option>' +
+          aiLangs.map(l => `<option value="${l.code}">${l.name}</option>`).join('');
+        
+        // Restore selection if available
+        if (currentAILang === 'same' || aiLangs.some(l => l.code === currentAILang)) {
+          aiNotesSelect.value = currentAILang;
+        } else {
+          aiNotesSelect.value = 'same';
+        }
+      }
+      
+      if (aiNotesNote) {
+        if (aiProvider === 'local') {
+          aiNotesNote.textContent = 'Qwen2.5 supports 29 languages with strong multilingual capabilities.';
+        } else {
+          aiNotesNote.textContent = 'OpenAI GPT-4 supports 90+ languages with excellent quality.';
+        }
+      }
+    }
+    
     // Load state
     async function loadState() {
       try {
@@ -1044,6 +1151,7 @@
         settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
         
         updateUI();
+        updateLanguageDropdowns();
       } catch (e) {
         console.error('Error loading settings state:', e);
       }
@@ -1174,12 +1282,14 @@
       settingsState.transcriptionEngine = 'deepgram';
       await ipcRenderer.invoke('transcription-set-engine', 'deepgram');
       updateUI();
+      updateLanguageDropdowns();
     });
     
     document.getElementById('transcriptionProviderParakeet')?.addEventListener('click', async () => {
       settingsState.transcriptionEngine = 'parakeet';
       await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
       updateUI();
+      updateLanguageDropdowns();
     });
     
     // AI provider toggle
@@ -1187,12 +1297,14 @@
       settingsState.aiEngine = 'openai';
       await ipcRenderer.invoke('ai-set-engine', 'openai');
       updateUI();
+      updateLanguageDropdowns();
     });
     
     document.getElementById('aiProviderLocal')?.addEventListener('click', async () => {
       settingsState.aiEngine = 'local';
       await ipcRenderer.invoke('ai-set-engine', 'local');
       updateUI();
+      updateLanguageDropdowns();
     });
     
     // Save Deepgram key
