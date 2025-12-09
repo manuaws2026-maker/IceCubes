@@ -700,6 +700,12 @@ export class CalendarService {
       this.selectedCalendars.add(calendarId);
     } else {
       this.selectedCalendars.delete(calendarId);
+      
+      // Also remove 'primary' if this is the primary calendar being deselected
+      const primaryCal = this.calendarList.find(c => c.primary);
+      if (primaryCal && primaryCal.id === calendarId) {
+        this.selectedCalendars.delete('primary');
+      }
     }
     // Save to storage
     this.saveSelectedCalendars();
