@@ -9652,6 +9652,14 @@
         document.getElementById('parakeetSettingsNotDownloaded')?.classList.add('hidden');
         document.getElementById('parakeetSettingsDownloading')?.classList.add('hidden');
         document.getElementById('parakeetSettingsDownloaded')?.classList.remove('hidden');
+        
+        // Disable delete button if Deepgram key not configured
+        if (parakeetSettingsDeleteBtn) {
+          parakeetSettingsDeleteBtn.disabled = !settingsState.deepgramKey;
+          parakeetSettingsDeleteBtn.title = settingsState.deepgramKey 
+            ? 'Delete local Parakeet model' 
+            : 'Configure Deepgram API key first to enable deletion';
+        }
       } else {
         parakeetSettingsStatus?.querySelector('.status-dot')?.classList.remove('active');
         if (parakeetSettingsStatusText) parakeetSettingsStatusText.textContent = 'Not downloaded';
@@ -9669,6 +9677,14 @@
         document.getElementById('localLLMSettingsNotDownloaded')?.classList.add('hidden');
         document.getElementById('localLLMSettingsDownloading')?.classList.add('hidden');
         document.getElementById('localLLMSettingsDownloaded')?.classList.remove('hidden');
+        
+        // Disable delete button if OpenAI key not configured
+        if (localLLMSettingsDeleteBtn) {
+          localLLMSettingsDeleteBtn.disabled = !settingsState.openaiKey;
+          localLLMSettingsDeleteBtn.title = settingsState.openaiKey 
+            ? 'Delete local Llama model' 
+            : 'Configure OpenAI API key first to enable deletion';
+        }
       } else {
         localLLMSettingsStatus?.querySelector('.status-dot')?.classList.remove('active');
         if (localLLMSettingsStatusText) localLLMSettingsStatusText.textContent = 'Not downloaded';
@@ -9799,15 +9815,15 @@
     
     // Parakeet delete in settings
     parakeetSettingsDeleteBtn?.addEventListener('click', async () => {
-      // Don't allow delete if it's the only configured transcription
-      if (!settingsState.deepgramKey && settingsState.transcriptionEngine === 'parakeet') {
-        alert('Cannot delete Parakeet model - it is your only configured transcription provider. Configure Deepgram first.');
+      // Don't allow delete if Deepgram key isn't configured
+      if (!settingsState.deepgramKey) {
+        alert('Cannot delete Parakeet model - configure Deepgram API key first to ensure you have a transcription provider available.');
         return;
       }
       
       const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
         title: 'Delete Parakeet Model',
-        message: 'This will delete the local Parakeet model (~670 MB). You can download it again later. Continue?',
+        message: 'This will delete the local Parakeet model (~670 MB). Transcription will switch to Deepgram. Continue?',
         okLabel: 'Delete',
         cancelLabel: 'Cancel'
       });
@@ -9869,15 +9885,15 @@
     
     // Local LLM delete in settings
     localLLMSettingsDeleteBtn?.addEventListener('click', async () => {
-      // Don't allow delete if it's the only configured AI provider
-      if (!settingsState.openaiKey && settingsState.aiEngine === 'local') {
-        alert('Cannot delete local LLM model - it is your only configured AI provider. Configure OpenAI first.');
+      // Don't allow delete if OpenAI key isn't configured
+      if (!settingsState.openaiKey) {
+        alert('Cannot delete local LLM model - configure OpenAI API key first to ensure you have an AI provider available.');
         return;
       }
       
       const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
         title: 'Delete Local LLM Model',
-        message: 'This will delete the local Llama 3.2 model (~2 GB). You can download it again later. Continue?',
+        message: 'This will delete the local Llama 3.2 model (~2 GB). AI notes will switch to OpenAI. Continue?',
         okLabel: 'Delete',
         cancelLabel: 'Cancel'
       });
