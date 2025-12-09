@@ -72,7 +72,7 @@ export async function chatCompletion(
   const engine = getAIEngine();
   const { maxTokens = 2000, temperature = 0.7 } = options || {};
 
-  console.log(`[AIRouter] Chat completion using ${engine} engine`);
+  console.log(`[AIRouter] 🤖 Using AI engine: ${engine.toUpperCase()} for chat completion`);
 
   if (engine === 'local') {
     return localChatCompletion(messages, maxTokens, temperature);
@@ -173,7 +173,7 @@ export async function generateEnhancedNotesWithRouter(
 ): Promise<NoteGenerationResult | null> {
   const engine = getAIEngine();
   
-  console.log(`[AIRouter] Generating enhanced notes using ${engine} engine`);
+  console.log(`[AIRouter] 📝 Using AI engine: ${engine.toUpperCase()} for note generation`);
   
   if (engine === 'local') {
     return generateNotesWithLocalLLM(transcript, rawNotes, meetingTitle, meetingInfo, outputLanguage, template);
@@ -289,7 +289,7 @@ export async function askQuestionWithRouter(
 ): Promise<string | null> {
   const engine = getAIEngine();
   
-  console.log(`[AIRouter] Asking question using ${engine} engine`);
+  console.log(`[AIRouter] ❓ Using AI engine: ${engine.toUpperCase()} for Q&A - Question: "${question.substring(0, 50)}..."`);
   
   if (engine === 'local') {
     return askQuestionWithLocalLLM(question, transcript, notes, meetingTitle);
@@ -307,12 +307,16 @@ async function askQuestionWithLocalLLM(
   notes: string,
   meetingTitle: string
 ): Promise<string | null> {
-  if (!nativeModule?.isLlmReady?.()) {
-    console.error('[AIRouter] Local LLM not ready for Q&A');
+  const isReady = nativeModule?.isLlmReady?.();
+  console.log(`[AIRouter] Local LLM ready status: ${isReady}`);
+  
+  if (!isReady) {
+    console.error('[AIRouter] ❌ Local LLM not ready for Q&A');
     return null;
   }
 
   try {
+    console.log('[AIRouter] Generating Q&A response with local LLM...');
     const systemPrompt = `You are a helpful AI assistant that answers questions about meeting content.
 You have access to the meeting transcript and notes.
 Be concise and helpful. Use markdown formatting for clarity.`;
@@ -335,9 +339,10 @@ Question: ${question}`;
     const messagesJson = JSON.stringify(messages);
     const result = nativeModule.llmChat(messagesJson, 1000, 0.7);
     
+    console.log(`[AIRouter] ✅ Local LLM Q&A completed, response length: ${result?.text?.length || 0} chars`);
     return result?.text || null;
   } catch (e: any) {
-    console.error('[AIRouter] Local LLM Q&A error:', e);
+    console.error('[AIRouter] ❌ Local LLM Q&A error:', e);
     return null;
   }
 }
