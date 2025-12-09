@@ -1442,27 +1442,54 @@
     
     async function checkCalendarStatus() {
       try {
+        // First check if Google OAuth credentials are configured
+        const hasClientId = await ipcRenderer.invoke('calendar-has-client-id');
+        
+        if (!hasClientId) {
+          calendarStatus?.classList.add('error');
+          calendarStatus?.classList.remove('connected');
+          calendarStatusText.textContent = 'Not configured (requires Google OAuth credentials)';
+          calendarConnectBtn.textContent = 'Setup Required';
+          calendarConnectBtn.disabled = true;
+          calendarConnectBtn.style.opacity = '0.5';
+          calendarConnectBtn.style.cursor = 'not-allowed';
+          return;
+        }
+        
+        calendarConnectBtn.disabled = false;
+        calendarConnectBtn.style.opacity = '1';
+        calendarConnectBtn.style.cursor = 'pointer';
+        
         const connected = await ipcRenderer.invoke('calendar-is-connected');
         if (connected) {
           calendarStatus?.classList.add('connected');
+          calendarStatus?.classList.remove('error');
           calendarStatusText.textContent = 'Connected';
           calendarConnectBtn.textContent = 'Reconnect Google Calendar';
         } else {
           calendarStatus?.classList.remove('connected');
+          calendarStatus?.classList.remove('error');
           calendarStatusText.textContent = 'Not connected';
           calendarConnectBtn.textContent = 'Connect Google Calendar';
         }
       } catch (e) {
         calendarStatus?.classList.remove('connected');
+        calendarStatus?.classList.add('error');
         calendarStatusText.textContent = 'Error checking status';
       }
     }
     
     calendarConnectBtn?.addEventListener('click', async () => {
+      if (calendarConnectBtn.disabled) return;
+      
       calendarStatusText.textContent = 'Connecting...';
       try {
-        await ipcRenderer.invoke('calendar-connect');
-        await checkCalendarStatus();
+        const result = await ipcRenderer.invoke('calendar-connect');
+        if (result) {
+          await checkCalendarStatus();
+        } else {
+          calendarStatusText.textContent = 'Connection failed';
+        }
       } catch (e) {
         calendarStatusText.textContent = 'Connection failed';
       }
