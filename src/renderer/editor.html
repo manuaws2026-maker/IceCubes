@@ -4453,8 +4453,8 @@
       position: absolute;
       top: 16px;
       right: 16px;
-      width: 32px;
-      height: 32px;
+      width: 36px;
+      height: 36px;
       border: none;
       background: rgba(255,255,255,0.1);
       border-radius: 8px;
@@ -4464,11 +4464,17 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 10;
+      z-index: 1000;
+      pointer-events: auto;
     }
     
     .settings-close-btn:hover {
       background: rgba(255,255,255,0.2);
+    }
+    
+    .settings-close-btn:active {
+      background: rgba(255,255,255,0.3);
+      transform: scale(0.95);
     }
     
     .settings-main {
