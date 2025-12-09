@@ -11049,6 +11049,7 @@
         
         // STEP 2: Generate enhanced notes with the selected/suggested template
         console.log('[AI Notes] Step 2: Generating enhanced notes with template:', selectedTemplateId || 'default');
+        console.log('[AI Notes] Calling openai-generate-enhanced IPC...');
         const result = await ipcRenderer.invoke('openai-generate-enhanced', {
           transcript: transcriptText,
           rawNotes: rawNotesPlainText,
@@ -11056,6 +11057,11 @@
           meetingInfo: currentMeetingInfo,
           templateId: selectedTemplateId
         });
+        
+        console.log('[AI Notes] IPC result:', result ? 'Got result' : 'NULL/undefined result');
+        if (!result) {
+          console.error('[AI Notes] ❌ No result from AI - check if engine is configured and ready');
+        }
         
         // Update current template ID (from AI suggestion or manual selection)
         if (selectedTemplateId) {
@@ -14457,9 +14463,9 @@
       }
     }
     
-    // Disconnect Deepgram - tell main process to stop streaming
+    // Stop transcription streaming - tell main process to stop
     function disconnectDeepgram() {
-      console.log('[Editor] Disconnecting Deepgram via main process');
+      console.log('[Editor] Stopping transcription stream');
       ipcRenderer.send('stop-deepgram-stream');
     }
     
