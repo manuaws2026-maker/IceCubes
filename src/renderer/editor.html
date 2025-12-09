@@ -4724,6 +4724,169 @@
       text-decoration: underline;
     }
     
+    /* Provider Toggle Buttons */
+    .provider-toggle-group {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    
+    .provider-toggle-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 8px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .provider-toggle-btn:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.2);
+    }
+    
+    .provider-toggle-btn.selected {
+      background: rgba(76, 175, 80, 0.15);
+      border-color: #4CAF50;
+    }
+    
+    .provider-toggle-btn .provider-icon {
+      font-size: 20px;
+    }
+    
+    .provider-toggle-btn .provider-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-sidebar);
+    }
+    
+    .provider-toggle-btn .provider-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    
+    .provider-badge.cloud {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+    
+    .provider-badge.local {
+      background: rgba(76, 175, 80, 0.2);
+      color: #4CAF50;
+    }
+    
+    /* Active Provider Status */
+    .active-provider-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(76, 175, 80, 0.1);
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    
+    .active-provider-status .active-label {
+      font-size: 12px;
+      color: var(--text-sidebar-muted);
+    }
+    
+    .active-provider-status .active-provider-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #4CAF50;
+    }
+    
+    /* Provider Config Sections */
+    .provider-config {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+    
+    .provider-config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .provider-config-header .config-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-sidebar);
+    }
+    
+    .provider-config-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+    
+    .config-info {
+      font-size: 12px;
+      color: var(--text-sidebar-muted);
+      margin: 8px 0;
+    }
+    
+    .config-info.config-success {
+      color: #4CAF50;
+    }
+    
+    /* Danger Button */
+    .settings-btn-danger {
+      padding: 6px 12px;
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .settings-btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: rgba(239, 68, 68, 0.5);
+    }
+    
+    .settings-btn-danger:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    /* Settings Progress Bar */
+    .settings-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    
+    .settings-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s;
+      border-radius: 3px;
+    }
+    
+    .settings-progress-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    
     /* Notification Settings */
     .settings-tab-title {
       font-size: 18px;
@@ -7045,32 +7208,140 @@
               </div>
             </div>
             
+            <!-- Transcription Provider Section -->
             <div class="settings-section">
               <h3>🎙️ Transcription</h3>
-              <p class="settings-desc">Deepgram API key for real-time transcription</p>
-              <div class="settings-status" id="deepgramStatus">
-                <span class="status-dot"></span>
-                <span id="deepgramStatusText">Checking...</span>
+              <p class="settings-desc">Choose your transcription provider</p>
+              
+              <!-- Provider Toggle -->
+              <div class="provider-toggle-group">
+                <button class="provider-toggle-btn" id="transcriptionProviderDeepgram" data-provider="deepgram">
+                  <span class="provider-icon">☁️</span>
+                  <span class="provider-name">Deepgram</span>
+                  <span class="provider-badge cloud">Cloud</span>
+                </button>
+                <button class="provider-toggle-btn" id="transcriptionProviderParakeet" data-provider="parakeet">
+                  <span class="provider-icon">💻</span>
+                  <span class="provider-name">Parakeet</span>
+                  <span class="provider-badge local">Local</span>
+                </button>
               </div>
-              <div class="settings-input-group">
-                <input type="password" id="deepgramKeyInput" placeholder="Enter Deepgram API key">
-                <button class="settings-btn" id="deepgramSaveBtn">Save</button>
+              
+              <!-- Active Provider Status -->
+              <div class="active-provider-status" id="transcriptionActiveStatus">
+                <span class="active-label">Active:</span>
+                <span class="active-provider-name" id="transcriptionActiveName">Checking...</span>
               </div>
-              <a href="#" class="settings-link" id="deepgramLink">Get a free API key →</a>
+              
+              <!-- Deepgram Config -->
+              <div class="provider-config" id="deepgramConfig">
+                <div class="provider-config-header">
+                  <span class="config-title">Deepgram API Key</span>
+                  <div class="settings-status" id="deepgramStatus">
+                    <span class="status-dot"></span>
+                    <span id="deepgramStatusText">Not configured</span>
+                  </div>
+                </div>
+                <div class="settings-input-group">
+                  <input type="password" id="deepgramKeyInput" placeholder="Enter Deepgram API key">
+                  <button class="settings-btn" id="deepgramSaveBtn">Save</button>
+                </div>
+                <div class="provider-config-footer">
+                  <a href="#" class="settings-link" id="deepgramLink">Get a free API key →</a>
+                  <button class="settings-btn-danger hidden" id="deepgramClearBtn">Clear Key</button>
+                </div>
+              </div>
+              
+              <!-- Parakeet Config -->
+              <div class="provider-config hidden" id="parakeetConfig">
+                <div class="provider-config-header">
+                  <span class="config-title">Parakeet Local Model</span>
+                  <div class="settings-status" id="parakeetSettingsStatus">
+                    <span class="status-dot"></span>
+                    <span id="parakeetSettingsStatusText">Not downloaded</span>
+                  </div>
+                </div>
+                <div id="parakeetSettingsNotDownloaded">
+                  <p class="config-info">~670 MB download • 25 languages • 100% private</p>
+                  <button class="settings-btn-full" id="parakeetSettingsDownloadBtn">Download Model</button>
+                </div>
+                <div id="parakeetSettingsDownloading" class="hidden">
+                  <div class="settings-progress-bar"><div class="settings-progress-fill" id="parakeetSettingsProgressFill"></div></div>
+                  <p class="settings-progress-text" id="parakeetSettingsProgressText">Downloading...</p>
+                </div>
+                <div id="parakeetSettingsDownloaded" class="hidden">
+                  <p class="config-info config-success">✓ Model ready for local transcription</p>
+                  <button class="settings-btn-danger" id="parakeetSettingsDeleteBtn">Delete Model</button>
+                </div>
+              </div>
             </div>
             
+            <!-- AI Notes Provider Section -->
             <div class="settings-section">
               <h3>🤖 AI Notes</h3>
-              <p class="settings-desc">OpenAI API key for AI-generated meeting summaries</p>
-              <div class="settings-status" id="openaiStatus">
-                <span class="status-dot"></span>
-                <span id="openaiStatusText">Checking...</span>
+              <p class="settings-desc">Choose your AI provider for note enhancement</p>
+              
+              <!-- Provider Toggle -->
+              <div class="provider-toggle-group">
+                <button class="provider-toggle-btn" id="aiProviderOpenAI" data-provider="openai">
+                  <span class="provider-icon">☁️</span>
+                  <span class="provider-name">OpenAI</span>
+                  <span class="provider-badge cloud">Cloud</span>
+                </button>
+                <button class="provider-toggle-btn" id="aiProviderLocal" data-provider="local">
+                  <span class="provider-icon">💻</span>
+                  <span class="provider-name">Llama 3.2</span>
+                  <span class="provider-badge local">Local</span>
+                </button>
               </div>
-              <div class="settings-input-group">
-                <input type="password" id="openaiKeyInput" placeholder="Enter OpenAI API key">
-                <button class="settings-btn" id="openaiSaveBtn">Save</button>
+              
+              <!-- Active Provider Status -->
+              <div class="active-provider-status" id="aiActiveStatus">
+                <span class="active-label">Active:</span>
+                <span class="active-provider-name" id="aiActiveName">Checking...</span>
               </div>
-              <a href="#" class="settings-link" id="openaiLink">Get an API key →</a>
+              
+              <!-- OpenAI Config -->
+              <div class="provider-config" id="openaiConfig">
+                <div class="provider-config-header">
+                  <span class="config-title">OpenAI API Key</span>
+                  <div class="settings-status" id="openaiStatus">
+                    <span class="status-dot"></span>
+                    <span id="openaiStatusText">Not configured</span>
+                  </div>
+                </div>
+                <div class="settings-input-group">
+                  <input type="password" id="openaiKeyInput" placeholder="Enter OpenAI API key">
+                  <button class="settings-btn" id="openaiSaveBtn">Save</button>
+                </div>
+                <div class="provider-config-footer">
+                  <a href="#" class="settings-link" id="openaiLink">Get an API key →</a>
+                  <button class="settings-btn-danger hidden" id="openaiClearBtn">Clear Key</button>
+                </div>
+              </div>
+              
+              <!-- Local LLM Config -->
+              <div class="provider-config hidden" id="localLLMConfig">
+                <div class="provider-config-header">
+                  <span class="config-title">Llama 3.2 3B Local Model</span>
+                  <div class="settings-status" id="localLLMSettingsStatus">
+                    <span class="status-dot"></span>
+                    <span id="localLLMSettingsStatusText">Not downloaded</span>
+                  </div>
+                </div>
+                <div id="localLLMSettingsNotDownloaded">
+                  <p class="config-info">~2 GB download • Metal accelerated • 100% private</p>
+                  <button class="settings-btn-full" id="localLLMSettingsDownloadBtn">Download Model</button>
+                </div>
+                <div id="localLLMSettingsDownloading" class="hidden">
+                  <div class="settings-progress-bar"><div class="settings-progress-fill llm-progress-indeterminate" id="localLLMSettingsProgressFill"></div></div>
+                  <p class="settings-progress-text" id="localLLMSettingsProgressText">Downloading...</p>
+                </div>
+                <div id="localLLMSettingsDownloaded" class="hidden">
+                  <p class="config-info config-success">✓ Model ready for local AI notes</p>
+                  <button class="settings-btn-danger" id="localLLMSettingsDeleteBtn">Delete Model</button>
+                </div>
+              </div>
             </div>
             
           </div>
@@ -9239,6 +9510,388 @@
       loadSettingsStatus();
       checkSetup(); // Recheck setup status
     });
+    
+    // =========================================================================
+    // Provider Selection and Management (Settings Page)
+    // =========================================================================
+    
+    // Transcription Provider Toggle
+    const transcriptionProviderDeepgram = document.getElementById('transcriptionProviderDeepgram');
+    const transcriptionProviderParakeet = document.getElementById('transcriptionProviderParakeet');
+    const deepgramConfig = document.getElementById('deepgramConfig');
+    const parakeetConfig = document.getElementById('parakeetConfig');
+    const deepgramClearBtn = document.getElementById('deepgramClearBtn');
+    const parakeetSettingsDownloadBtn = document.getElementById('parakeetSettingsDownloadBtn');
+    const parakeetSettingsDeleteBtn = document.getElementById('parakeetSettingsDeleteBtn');
+    
+    // AI Provider Toggle
+    const aiProviderOpenAI = document.getElementById('aiProviderOpenAI');
+    const aiProviderLocal = document.getElementById('aiProviderLocal');
+    const openaiConfig = document.getElementById('openaiConfig');
+    const localLLMConfig = document.getElementById('localLLMConfig');
+    const openaiClearBtn = document.getElementById('openaiClearBtn');
+    const localLLMSettingsDownloadBtn = document.getElementById('localLLMSettingsDownloadBtn');
+    const localLLMSettingsDeleteBtn = document.getElementById('localLLMSettingsDeleteBtn');
+    
+    // Track settings state
+    let settingsState = {
+      transcriptionEngine: 'deepgram',
+      aiEngine: 'openai',
+      deepgramKey: false,
+      openaiKey: false,
+      parakeetReady: false,
+      localLLMReady: false
+    };
+    
+    // Select transcription provider in settings
+    async function selectTranscriptionProviderSettings(provider) {
+      settingsState.transcriptionEngine = provider;
+      
+      // Update toggle buttons
+      if (provider === 'deepgram') {
+        transcriptionProviderDeepgram?.classList.add('selected');
+        transcriptionProviderParakeet?.classList.remove('selected');
+        deepgramConfig?.classList.remove('hidden');
+        parakeetConfig?.classList.add('hidden');
+      } else {
+        transcriptionProviderDeepgram?.classList.remove('selected');
+        transcriptionProviderParakeet?.classList.add('selected');
+        deepgramConfig?.classList.add('hidden');
+        parakeetConfig?.classList.remove('hidden');
+      }
+      
+      // Save preference and switch engine
+      await ipcRenderer.invoke('transcription-set-engine', provider);
+      updateSettingsProviderStatus();
+    }
+    
+    // Select AI provider in settings
+    async function selectAIProviderSettings(provider) {
+      settingsState.aiEngine = provider;
+      
+      // Update toggle buttons
+      if (provider === 'openai') {
+        aiProviderOpenAI?.classList.add('selected');
+        aiProviderLocal?.classList.remove('selected');
+        openaiConfig?.classList.remove('hidden');
+        localLLMConfig?.classList.add('hidden');
+      } else {
+        aiProviderOpenAI?.classList.remove('selected');
+        aiProviderLocal?.classList.add('selected');
+        openaiConfig?.classList.add('hidden');
+        localLLMConfig?.classList.remove('hidden');
+      }
+      
+      // Save preference
+      await ipcRenderer.invoke('ai-set-engine', provider);
+      updateSettingsProviderStatus();
+    }
+    
+    // Update provider status displays
+    function updateSettingsProviderStatus() {
+      const transcriptionActiveName = document.getElementById('transcriptionActiveName');
+      const aiActiveName = document.getElementById('aiActiveName');
+      
+      // Transcription active status
+      if (settingsState.transcriptionEngine === 'deepgram' && settingsState.deepgramKey) {
+        transcriptionActiveName.textContent = 'Deepgram (Cloud)';
+      } else if (settingsState.transcriptionEngine === 'parakeet' && settingsState.parakeetReady) {
+        transcriptionActiveName.textContent = 'Parakeet (Local)';
+      } else {
+        transcriptionActiveName.textContent = 'Not configured';
+        transcriptionActiveName.style.color = '#ef4444';
+      }
+      
+      // AI active status
+      if (settingsState.aiEngine === 'openai' && settingsState.openaiKey) {
+        aiActiveName.textContent = 'OpenAI (Cloud)';
+      } else if (settingsState.aiEngine === 'local' && settingsState.localLLMReady) {
+        aiActiveName.textContent = 'Llama 3.2 (Local)';
+      } else {
+        aiActiveName.textContent = 'Not configured';
+        aiActiveName.style.color = '#ef4444';
+      }
+      
+      // Show/hide clear buttons based on whether local fallback is available
+      if (settingsState.deepgramKey) {
+        deepgramClearBtn?.classList.remove('hidden');
+        // Disable clear if Parakeet not ready
+        if (deepgramClearBtn) {
+          deepgramClearBtn.disabled = !settingsState.parakeetReady;
+          deepgramClearBtn.title = settingsState.parakeetReady 
+            ? 'Clear Deepgram API key' 
+            : 'Download Parakeet model first to enable clearing';
+        }
+      } else {
+        deepgramClearBtn?.classList.add('hidden');
+      }
+      
+      if (settingsState.openaiKey) {
+        openaiClearBtn?.classList.remove('hidden');
+        // Disable clear if local LLM not ready
+        if (openaiClearBtn) {
+          openaiClearBtn.disabled = !settingsState.localLLMReady;
+          openaiClearBtn.title = settingsState.localLLMReady 
+            ? 'Clear OpenAI API key' 
+            : 'Download local LLM model first to enable clearing';
+        }
+      } else {
+        openaiClearBtn?.classList.add('hidden');
+      }
+      
+      // Update Parakeet status in settings
+      const parakeetSettingsStatus = document.getElementById('parakeetSettingsStatus');
+      const parakeetSettingsStatusText = document.getElementById('parakeetSettingsStatusText');
+      if (settingsState.parakeetReady) {
+        parakeetSettingsStatus?.querySelector('.status-dot')?.classList.add('active');
+        if (parakeetSettingsStatusText) parakeetSettingsStatusText.textContent = 'Downloaded';
+        document.getElementById('parakeetSettingsNotDownloaded')?.classList.add('hidden');
+        document.getElementById('parakeetSettingsDownloading')?.classList.add('hidden');
+        document.getElementById('parakeetSettingsDownloaded')?.classList.remove('hidden');
+      } else {
+        parakeetSettingsStatus?.querySelector('.status-dot')?.classList.remove('active');
+        if (parakeetSettingsStatusText) parakeetSettingsStatusText.textContent = 'Not downloaded';
+        document.getElementById('parakeetSettingsNotDownloaded')?.classList.remove('hidden');
+        document.getElementById('parakeetSettingsDownloading')?.classList.add('hidden');
+        document.getElementById('parakeetSettingsDownloaded')?.classList.add('hidden');
+      }
+      
+      // Update Local LLM status in settings
+      const localLLMSettingsStatus = document.getElementById('localLLMSettingsStatus');
+      const localLLMSettingsStatusText = document.getElementById('localLLMSettingsStatusText');
+      if (settingsState.localLLMReady) {
+        localLLMSettingsStatus?.querySelector('.status-dot')?.classList.add('active');
+        if (localLLMSettingsStatusText) localLLMSettingsStatusText.textContent = 'Downloaded';
+        document.getElementById('localLLMSettingsNotDownloaded')?.classList.add('hidden');
+        document.getElementById('localLLMSettingsDownloading')?.classList.add('hidden');
+        document.getElementById('localLLMSettingsDownloaded')?.classList.remove('hidden');
+      } else {
+        localLLMSettingsStatus?.querySelector('.status-dot')?.classList.remove('active');
+        if (localLLMSettingsStatusText) localLLMSettingsStatusText.textContent = 'Not downloaded';
+        document.getElementById('localLLMSettingsNotDownloaded')?.classList.remove('hidden');
+        document.getElementById('localLLMSettingsDownloading')?.classList.add('hidden');
+        document.getElementById('localLLMSettingsDownloaded')?.classList.add('hidden');
+      }
+    }
+    
+    // Load settings state
+    async function loadSettingsProviderState() {
+      settingsState.transcriptionEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
+      settingsState.aiEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
+      settingsState.deepgramKey = await ipcRenderer.invoke('check-deepgram-key');
+      settingsState.openaiKey = await ipcRenderer.invoke('openai-has-key');
+      settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
+      settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-ready');
+      
+      // Update UI
+      selectTranscriptionProviderSettings(settingsState.transcriptionEngine);
+      selectAIProviderSettings(settingsState.aiEngine);
+      updateSettingsProviderStatus();
+    }
+    
+    // Provider toggle event listeners
+    transcriptionProviderDeepgram?.addEventListener('click', () => selectTranscriptionProviderSettings('deepgram'));
+    transcriptionProviderParakeet?.addEventListener('click', () => selectTranscriptionProviderSettings('parakeet'));
+    aiProviderOpenAI?.addEventListener('click', () => selectAIProviderSettings('openai'));
+    aiProviderLocal?.addEventListener('click', () => selectAIProviderSettings('local'));
+    
+    // Clear Deepgram key
+    deepgramClearBtn?.addEventListener('click', async () => {
+      if (!settingsState.parakeetReady) {
+        alert('Please download the Parakeet model first before clearing the Deepgram API key.');
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Clear Deepgram API Key',
+        message: 'This will remove your Deepgram API key. Transcription will switch to Parakeet (local). Continue?',
+        okLabel: 'Clear Key',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
+        await ipcRenderer.invoke('clear-deepgram-key');
+        await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
+        settingsState.deepgramKey = false;
+        settingsState.transcriptionEngine = 'parakeet';
+        loadSettingsStatus();
+        loadSettingsProviderState();
+        checkSetup();
+      }
+    });
+    
+    // Clear OpenAI key
+    openaiClearBtn?.addEventListener('click', async () => {
+      if (!settingsState.localLLMReady) {
+        alert('Please download the local LLM model first before clearing the OpenAI API key.');
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Clear OpenAI API Key',
+        message: 'This will remove your OpenAI API key. AI notes will use local Llama 3.2 model. Continue?',
+        okLabel: 'Clear Key',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
+        await ipcRenderer.invoke('openai-clear-key');
+        await ipcRenderer.invoke('ai-set-engine', 'local');
+        settingsState.openaiKey = false;
+        settingsState.aiEngine = 'local';
+        loadSettingsStatus();
+        loadSettingsProviderState();
+        checkSetup();
+      }
+    });
+    
+    // Parakeet download in settings
+    parakeetSettingsDownloadBtn?.addEventListener('click', async () => {
+      document.getElementById('parakeetSettingsNotDownloaded')?.classList.add('hidden');
+      document.getElementById('parakeetSettingsDownloading')?.classList.remove('hidden');
+      document.getElementById('parakeetSettingsDownloaded')?.classList.add('hidden');
+      
+      const progressText = document.getElementById('parakeetSettingsProgressText');
+      if (progressText) progressText.textContent = 'Starting download...';
+      
+      try {
+        await ipcRenderer.invoke('parakeet-download-model');
+        
+        // Poll for progress
+        const pollInterval = setInterval(async () => {
+          const progress = await ipcRenderer.invoke('parakeet-get-download-progress');
+          
+          if (progress.error) {
+            clearInterval(pollInterval);
+            if (progressText) progressText.textContent = 'Error: ' + progress.error;
+            document.getElementById('parakeetSettingsNotDownloaded')?.classList.remove('hidden');
+            document.getElementById('parakeetSettingsDownloading')?.classList.add('hidden');
+            return;
+          }
+          
+          if (progress.isDownloading) {
+            if (progressText) progressText.textContent = `Downloading ${progress.currentFile}... ${progress.percent}%`;
+          }
+          
+          // Check if done
+          const isReady = await ipcRenderer.invoke('parakeet-check-downloaded');
+          if (isReady) {
+            clearInterval(pollInterval);
+            settingsState.parakeetReady = true;
+            updateSettingsProviderStatus();
+            checkSetup();
+          }
+        }, 1000);
+      } catch (e) {
+        console.error('Parakeet download error:', e);
+        if (progressText) progressText.textContent = 'Download failed: ' + e.message;
+      }
+    });
+    
+    // Parakeet delete in settings
+    parakeetSettingsDeleteBtn?.addEventListener('click', async () => {
+      // Don't allow delete if it's the only configured transcription
+      if (!settingsState.deepgramKey && settingsState.transcriptionEngine === 'parakeet') {
+        alert('Cannot delete Parakeet model - it is your only configured transcription provider. Configure Deepgram first.');
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Delete Parakeet Model',
+        message: 'This will delete the local Parakeet model (~670 MB). You can download it again later. Continue?',
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
+        await ipcRenderer.invoke('parakeet-delete-model');
+        settingsState.parakeetReady = false;
+        if (settingsState.transcriptionEngine === 'parakeet') {
+          await ipcRenderer.invoke('transcription-set-engine', 'deepgram');
+          settingsState.transcriptionEngine = 'deepgram';
+        }
+        loadSettingsProviderState();
+        checkSetup();
+      }
+    });
+    
+    // Local LLM download in settings
+    localLLMSettingsDownloadBtn?.addEventListener('click', async () => {
+      document.getElementById('localLLMSettingsNotDownloaded')?.classList.add('hidden');
+      document.getElementById('localLLMSettingsDownloading')?.classList.remove('hidden');
+      document.getElementById('localLLMSettingsDownloaded')?.classList.add('hidden');
+      
+      const progressText = document.getElementById('localLLMSettingsProgressText');
+      if (progressText) progressText.textContent = 'Initializing download...';
+      
+      try {
+        await ipcRenderer.invoke('llm-init');
+        
+        // Poll for progress
+        const pollInterval = setInterval(async () => {
+          const progress = await ipcRenderer.invoke('llm-get-init-progress');
+          
+          if (progress.error) {
+            clearInterval(pollInterval);
+            if (progressText) progressText.textContent = 'Error: ' + progress.error;
+            document.getElementById('localLLMSettingsNotDownloaded')?.classList.remove('hidden');
+            document.getElementById('localLLMSettingsDownloading')?.classList.add('hidden');
+            return;
+          }
+          
+          if (progress.isLoading) {
+            if (progressText) progressText.textContent = progress.status || 'Downloading...';
+          }
+          
+          // Check if done
+          const isReady = await ipcRenderer.invoke('llm-is-ready');
+          if (isReady && !progress.isLoading) {
+            clearInterval(pollInterval);
+            settingsState.localLLMReady = true;
+            updateSettingsProviderStatus();
+            checkSetup();
+          }
+        }, 1000);
+      } catch (e) {
+        console.error('LLM init error:', e);
+        if (progressText) progressText.textContent = 'Download failed: ' + e.message;
+      }
+    });
+    
+    // Local LLM delete in settings
+    localLLMSettingsDeleteBtn?.addEventListener('click', async () => {
+      // Don't allow delete if it's the only configured AI provider
+      if (!settingsState.openaiKey && settingsState.aiEngine === 'local') {
+        alert('Cannot delete local LLM model - it is your only configured AI provider. Configure OpenAI first.');
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Delete Local LLM Model',
+        message: 'This will delete the local Llama 3.2 model (~2 GB). You can download it again later. Continue?',
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
+        await ipcRenderer.invoke('llm-shutdown');
+        // Note: We'd need to add a delete function for the LLM
+        settingsState.localLLMReady = false;
+        if (settingsState.aiEngine === 'local') {
+          await ipcRenderer.invoke('ai-set-engine', 'openai');
+          settingsState.aiEngine = 'openai';
+        }
+        loadSettingsProviderState();
+        checkSetup();
+      }
+    });
+    
+    // Load provider state when settings opened
+    const originalShowSettings = showSettings;
+    showSettings = function() {
+      originalShowSettings?.();
+      loadSettingsProviderState();
+    };
     
     // Calendar connect/disconnect
     calendarConnectBtn?.addEventListener('click', async () => {

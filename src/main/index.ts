@@ -1704,6 +1704,10 @@ function setupIPC() {
   ipcMain.handle('get-deepgram-key', () => transcriptionService?.getApiKey() ?? null);
   ipcMain.handle('save-deepgram-key', (_, key: string) => transcriptionService?.saveApiKey(key) ?? false);
   ipcMain.handle('has-deepgram-key', () => transcriptionService?.hasApiKey() ?? false);
+  ipcMain.handle('clear-deepgram-key', () => {
+    transcriptionService?.clearApiKey?.();
+    return true;
+  });
   
   // Permissions
   ipcMain.handle('check-permissions', checkPermissions);
