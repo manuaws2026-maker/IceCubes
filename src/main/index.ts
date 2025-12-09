@@ -32,6 +32,7 @@ import { TranscriptionService } from './transcription';
 import { getTranscriptionRouter } from './transcription/router';
 import { CalendarService } from './calendar';
 import { OpenAIService } from './openai';
+import { setNativeModuleForAI, getAIEngine, setAIEngine, isLocalLLMReady, generateEnhancedNotesWithRouter, askQuestionWithRouter, suggestTemplateWithRouter } from './ai-router';
 // Note: Folder service replaced with database service
 import { getVectorSearchService } from './vector-search';
 import { databaseService } from './database';
@@ -1111,6 +1112,10 @@ function getNativeModule() {
   try {
     nativeModule = require('ghost-native');
     console.log('[Native] Module loaded');
+    
+    // Set native module for AI router (for local LLM)
+    setNativeModuleForAI(nativeModule);
+    
     return nativeModule;
   } catch (e) {
     console.error('[Native] Failed to load:', e);
@@ -2200,9 +2205,26 @@ Answer:`;
   });
   
   // Enhanced notes (generated AFTER meeting ends)
+  // Uses AI router to choose between OpenAI and local LLM
   ipcMain.handle('openai-generate-enhanced', async (_, data: { transcript: string, rawNotes: string, meetingTitle: string, meetingInfo?: any, templateId?: string }) => {
-    if (!openaiService?.hasApiKey()) return null;
-    console.log('[IPC] Generating enhanced notes...');
+    const aiEngine = getAIEngine();
+    
+    // Check if we can generate notes
+    if (aiEngine === 'openai' && !openaiService?.hasApiKey()) {
+      console.log('[IPC] No OpenAI API key, checking local LLM...');
+      if (!isLocalLLMReady()) {
+        console.log('[IPC] No AI engine available');
+        return null;
+      }
+    } else if (aiEngine === 'local' && !isLocalLLMReady()) {
+      console.log('[IPC] Local LLM not ready, falling back to OpenAI...');
+      if (!openaiService?.hasApiKey()) {
+        console.log('[IPC] No AI engine available');
+        return null;
+      }
+    }
+    
+    console.log('[IPC] Generating enhanced notes with engine:', aiEngine);
     
     // Get language settings
     const langSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false }) as any;
@@ -2222,16 +2244,39 @@ Answer:`;
       console.log('[IPC] Using default template:', template?.name);
     }
     
-    return await openaiService.generateEnhancedNotes(data.transcript, data.rawNotes, data.meetingTitle, data.meetingInfo, outputLanguage, template);
+    // Use AI router which will choose between OpenAI and local LLM
+    return await generateEnhancedNotesWithRouter(
+      openaiService!,
+      data.transcript, 
+      data.rawNotes, 
+      data.meetingTitle, 
+      data.meetingInfo, 
+      outputLanguage, 
+      template
+    );
   });
   
   // AI Q&A - Ask questions about meeting
+  // Uses AI router to choose between OpenAI and local LLM
   ipcMain.handle('openai-ask-question', async (_, data: { question: string, transcript: string, notes: string, meetingTitle: string }) => {
-    if (!openaiService?.hasApiKey()) return { answer: null, error: 'No API key configured' };
-    console.log('[IPC] AI Q&A - Question:', data.question.substring(0, 50) + '...');
+    const aiEngine = getAIEngine();
+    const hasOpenAI = openaiService?.hasApiKey();
+    const hasLocalLLM = isLocalLLMReady();
+    
+    if (!hasOpenAI && !hasLocalLLM) {
+      return { answer: null, error: 'No AI engine configured. Set up OpenAI API key or download local LLM.' };
+    }
+    
+    console.log('[IPC] AI Q&A using engine:', aiEngine, '- Question:', data.question.substring(0, 50) + '...');
     
     try {
-      const answer = await openaiService.askQuestion(data.question, data.transcript, data.notes, data.meetingTitle);
+      const answer = await askQuestionWithRouter(
+        openaiService!,
+        data.question, 
+        data.transcript, 
+        data.notes, 
+        data.meetingTitle
+      );
       return { answer };
     } catch (err: any) {
       console.error('[IPC] AI Q&A Error:', err);
@@ -2270,8 +2315,13 @@ Answer:`;
   });
   
   // AI Template Suggestion
+  // Uses AI router to choose between OpenAI and local LLM
   ipcMain.handle('openai-suggest-template', async (_, data: { rawNotes: string, transcript: string, meetingTitle: string }) => {
-    if (!openaiService?.hasApiKey()) return null;
+    const hasOpenAI = openaiService?.hasApiKey();
+    const hasLocalLLM = isLocalLLMReady();
+    
+    if (!hasOpenAI && !hasLocalLLM) return null;
+    
     console.log('[IPC] Suggesting template for:', data.meetingTitle);
     
     try {
@@ -2285,10 +2335,11 @@ Answer:`;
       
       if (templates.length === 0) return null;
       
-      const suggestion = await openaiService.suggestTemplate(
+      const suggestion = await suggestTemplateWithRouter(
+        openaiService!,
+        data.meetingTitle,
         data.rawNotes,
         data.transcript,
-        data.meetingTitle,
         templates
       );
       
@@ -2475,6 +2526,116 @@ Answer:`;
       console.error('[Parakeet] Transcribe buffer error:', e);
       throw new Error(e.message || String(e));
     }
+  });
+
+  // ============================================================================
+  // LOCAL LLM (Llama 3.2 via mistral.rs)
+  // ============================================================================
+
+  // Get LLM model info
+  ipcMain.handle('llm-get-info', async () => {
+    try {
+      return nativeModule?.getLlmModelInfo?.() ?? {
+        ready: false,
+        modelName: 'Llama 3.2 3B Instruct',
+        modelRepo: 'bartowski/Llama-3.2-3B-Instruct-GGUF',
+        modelFile: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+        estimatedSize: 2019000000
+      };
+    } catch (e) {
+      console.error('[LLM] Get info error:', e);
+      return { ready: false, modelName: 'Unknown', modelRepo: '', modelFile: '', estimatedSize: 0 };
+    }
+  });
+
+  // Check if LLM is ready
+  ipcMain.handle('llm-is-ready', async () => {
+    try {
+      return nativeModule?.isLlmReady?.() ?? false;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Initialize LLM (async - starts download/load in background)
+  ipcMain.handle('llm-init', async () => {
+    console.log('[LLM] Starting initialization...');
+    try {
+      return nativeModule?.initLlm?.() ?? false;
+    } catch (e) {
+      console.error('[LLM] Init error:', e);
+      return false;
+    }
+  });
+
+  // Initialize LLM (sync - blocks until ready)
+  ipcMain.handle('llm-init-sync', async () => {
+    console.log('[LLM] Starting sync initialization...');
+    try {
+      return nativeModule?.initLlmSync?.() ?? false;
+    } catch (e: any) {
+      console.error('[LLM] Sync init error:', e);
+      throw new Error(e.message || String(e));
+    }
+  });
+
+  // Get initialization progress
+  ipcMain.handle('llm-get-init-progress', async () => {
+    try {
+      return nativeModule?.getLlmInitProgress?.() ?? {
+        isLoading: false,
+        status: '',
+        error: null
+      };
+    } catch (e) {
+      return { isLoading: false, status: '', error: String(e) };
+    }
+  });
+
+  // Chat completion (non-streaming)
+  ipcMain.handle('llm-chat', async (_, messagesJson: string, maxTokens?: number, temperature?: number) => {
+    console.log('[LLM] Chat request received');
+    try {
+      const result = nativeModule?.llmChat?.(messagesJson, maxTokens, temperature);
+      console.log('[LLM] Chat response:', result?.text?.substring(0, 50) + '...');
+      return result;
+    } catch (e: any) {
+      console.error('[LLM] Chat error:', e);
+      throw new Error(e.message || String(e));
+    }
+  });
+
+  // Simple text generation
+  ipcMain.handle('llm-generate', async (_, prompt: string, maxTokens?: number, temperature?: number) => {
+    console.log('[LLM] Generate request received');
+    try {
+      return nativeModule?.llmGenerate?.(prompt, maxTokens, temperature);
+    } catch (e: any) {
+      console.error('[LLM] Generate error:', e);
+      throw new Error(e.message || String(e));
+    }
+  });
+
+  // Shutdown LLM
+  ipcMain.handle('llm-shutdown', async () => {
+    try {
+      nativeModule?.shutdownLlm?.();
+      return true;
+    } catch (e) {
+      console.error('[LLM] Shutdown error:', e);
+      return false;
+    }
+  });
+
+  // Get/Set AI engine preference (openai or local)
+  ipcMain.handle('ai-get-engine', async () => {
+    return store.get('aiEngine', 'openai') as string;
+  });
+
+  ipcMain.handle('ai-set-engine', async (_, engine: 'openai' | 'local') => {
+    store.set('aiEngine', engine);
+    console.log('[AI] Engine set to:', engine);
+    return true;
   });
 }
 

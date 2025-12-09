@@ -43,6 +43,47 @@ export declare function transcribeAudioBufferWithTimestamps(audioData: Buffer, s
 export declare function deleteParakeetModel(): boolean
 export declare function getParakeetModelPath(): string
 export declare function shutdownParakeet(): void
+export interface LlmModelInfo {
+  ready: boolean
+  modelName: string
+  modelRepo: string
+  modelFile: string
+  estimatedSize: number
+}
+export interface LlmInitProgress {
+  isLoading: boolean
+  status: string
+  error?: string
+}
+export interface LlmResponse {
+  text: string
+  promptTokens: number
+  completionTokens: number
+  tokensPerSecond: number
+}
+export declare function getLlmModelInfo(): LlmModelInfo
+export declare function getLlmInitProgress(): LlmInitProgress
+export declare function isLlmReady(): boolean
+/**
+ * Initialize the LLM - downloads model from HuggingFace if not cached
+ * This is handled automatically by mistral.rs
+ */
+export declare function initLlm(): boolean
+/** Synchronous init that blocks until model is ready */
+export declare function initLlmSync(): boolean
+export declare function shutdownLlm(): void
+/** Generate text completion using the local LLM */
+export declare function llmGenerate(prompt: string, maxTokens?: number | undefined | null, temperature?: number | undefined | null): LlmResponse
+/**
+ * Chat completion - takes messages array and returns response
+ * Messages format: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+ */
+export declare function llmChat(messagesJson: string, maxTokens?: number | undefined | null, temperature?: number | undefined | null): LlmResponse
+/**
+ * Stream chat completion - returns chunks as they're generated
+ * This is useful for showing real-time responses
+ */
+export declare function llmChatStream(messagesJson: string, callback: (...args: any[]) => any): void
 /** Window information returned from native APIs */
 export interface WindowInfo {
   pid: number

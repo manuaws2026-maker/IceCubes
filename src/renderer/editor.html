@@ -4274,7 +4274,8 @@
     }
     
     /* Animated indeterminate progress bar */
-    .parakeet-progress-indeterminate .parakeet-progress-animated {
+    .parakeet-progress-indeterminate .parakeet-progress-animated,
+    .llm-progress-indeterminate {
       width: 30%;
       animation: indeterminate 1.5s infinite ease-in-out;
     }
@@ -4282,6 +4283,29 @@
     @keyframes indeterminate {
       0% { transform: translateX(-100%); }
       100% { transform: translateX(400%); }
+    }
+    
+    .setup-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    
+    .setup-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s;
+      border-radius: 3px;
+    }
+    
+    .setup-progress-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      text-align: center;
     }
     
     .parakeet-progress-text {
@@ -6230,29 +6254,68 @@
       <!-- Step 3: AI Configuration -->
       <div class="setup-screen hidden" id="setupScreen3">
         <div class="setup-screen-title">AI-Enhanced Notes</div>
-        <div class="setup-checklist">
+        <p class="setup-screen-desc" style="margin-bottom: 16px; color: #888;">Choose how to power your AI note enhancement</p>
+        
+        <!-- AI Engine Selection -->
+        <div class="setup-choice-buttons" id="aiEngineChoice">
+          <button class="setup-choice-button" id="setupChoiceOpenAI" data-engine="openai">
+            <div class="choice-icon">☁️</div>
+            <div class="choice-title">OpenAI (Cloud)</div>
+            <div class="choice-desc">Best quality, requires API key</div>
+          </button>
+          <button class="setup-choice-button" id="setupChoiceLocalLLM" data-engine="local">
+            <div class="choice-icon">💻</div>
+            <div class="choice-title">Local LLM</div>
+            <div class="choice-desc">Free & private, ~2GB download</div>
+          </button>
+        </div>
+        
+        <!-- OpenAI Configuration -->
+        <div class="setup-checklist hidden" id="setupOpenAIConfig">
           <div class="setup-item" id="setupOpenAI" style="flex-direction: column; align-items: stretch;">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <div class="setup-item-icon">🤖</div>
+              <div class="setup-item-icon">🔑</div>
               <div class="setup-item-text">
                 <div class="setup-item-title">OpenAI API Key</div>
-                <div class="setup-item-desc">Required for AI-powered note enhancement</div>
+                <div class="setup-item-desc">Required for cloud AI</div>
               </div>
+              <div class="setup-status" id="openaiKeyStatus"></div>
             </div>
-            <input 
-              type="password" 
-              id="openaiApiInput" 
-              class="setup-input" 
-              placeholder="Enter your OpenAI API key"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            <input type="password" id="openaiApiInput" class="setup-input" placeholder="sk-..." autocomplete="off" spellcheck="false"/>
             <a href="https://platform.openai.com/api-keys" target="_blank" class="setup-link">Get API key from OpenAI →</a>
           </div>
         </div>
+        
+        <!-- Local LLM Configuration -->
+        <div class="setup-checklist hidden" id="setupLocalLLMConfig">
+          <div class="setup-item" style="flex-direction: column; align-items: stretch;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <div class="setup-item-icon">🦙</div>
+              <div class="setup-item-text">
+                <div class="setup-item-title">Llama 3.2 3B</div>
+                <div class="setup-item-desc">Local AI model</div>
+              </div>
+              <div class="setup-status" id="localLLMStatus"></div>
+            </div>
+            <div id="localLLMNotDownloaded">
+              <div style="margin: 8px 0; font-size: 13px; color: #888;">
+                <strong>Size:</strong> ~2 GB &bull; <strong>Privacy:</strong> 100% local
+              </div>
+              <button class="setup-btn" id="setupLLMDownloadBtn">Download Model</button>
+            </div>
+            <div id="localLLMDownloading" class="hidden">
+              <div class="setup-progress-bar"><div class="setup-progress-fill llm-progress-indeterminate" id="llmProgressFill"></div></div>
+              <div class="setup-progress-text" id="llmProgressText">Downloading...</div>
+            </div>
+            <div id="localLLMDownloaded" class="hidden" style="color: #4CAF50; font-size: 13px; margin: 8px 0;">
+              ✓ Model ready! AI runs locally on your Mac.
+            </div>
+          </div>
+        </div>
+        
         <div class="setup-nav-buttons">
           <button class="setup-btn-secondary" id="setupBackBtn3">Back</button>
-          <button class="setup-btn" id="setupContinueBtn">Continue to IceCubes</button>
+          <button class="setup-btn" id="setupContinueBtn" disabled>Continue to IceCubes</button>
         </div>
       </div>
     </div>
@@ -7923,10 +7986,19 @@
       // Check Parakeet model
       setupState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
       
-      // Get current engine if not selected yet
+      // Get current transcription engine if not selected yet
       if (!setupState.selectedEngine) {
         setupState.selectedEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
         selectTranscriptionEngine(setupState.selectedEngine);
+      }
+      
+      // Check AI engine and local LLM state
+      setupState.selectedAIEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
+      setupState.localLLMReady = await ipcRenderer.invoke('llm-is-ready');
+      
+      // Select AI engine in UI if we have a preference
+      if (typeof selectAIEngine === 'function' && setupState.selectedAIEngine) {
+        await selectAIEngine(setupState.selectedAIEngine);
       }
       
       updateSetupUI();
@@ -7934,12 +8006,12 @@
       // Check if all requirements are met:
       // 1. Both permissions granted
       // 2. One transcription engine configured (Deepgram key OR Parakeet model)
-      // 3. OpenAI API key configured
+      // 3. AI engine configured (OpenAI key OR local LLM ready)
       const permissionsOk = setupState.microphone && setupState.screenRecording;
       const transcriptionOk = setupState.deepgramKey || setupState.parakeetReady;
-      const openaiOk = setupState.openaiKey;
+      const aiOk = setupState.openaiKey || setupState.localLLMReady;
       
-      const allSetupComplete = permissionsOk && transcriptionOk && openaiOk;
+      const allSetupComplete = permissionsOk && transcriptionOk && aiOk;
       
       if (allSetupComplete) {
         setupOverlay.classList.add('hidden');
@@ -8037,11 +8109,23 @@
         setupNextBtn2.textContent = 'Next';
       }
       
-      // Step 3: OpenAI key (REQUIRED for AI-enhanced notes)
-      const step3Complete = setupState.openaiKey;
+      // Step 3: AI Engine selected and configured? (REQUIRED for AI-enhanced notes)
+      let step3Complete = false;
+      if (setupState.selectedAIEngine === 'openai') {
+        step3Complete = setupState.openaiKey; // Must have OpenAI API key
+      } else if (setupState.selectedAIEngine === 'local') {
+        step3Complete = setupState.localLLMReady; // Must have model downloaded
+      }
+      // Also allow if OpenAI key is set regardless (backward compatibility)
+      if (setupState.openaiKey) step3Complete = true;
+      
       setupContinueBtn.disabled = !step3Complete;
-      if (!step3Complete) {
-        setupContinueBtn.textContent = 'Enter OpenAI API key to continue';
+      if (!setupState.selectedAIEngine) {
+        setupContinueBtn.textContent = 'Choose AI engine';
+      } else if (!step3Complete) {
+        setupContinueBtn.textContent = setupState.selectedAIEngine === 'openai' 
+          ? 'Enter API key to continue' 
+          : 'Download model to continue';
       } else {
         setupContinueBtn.textContent = 'Continue to IceCubes';
       }
@@ -8111,6 +8195,111 @@
         setupState.openaiKey = false;
         setupOpenAI.classList.remove('complete');
         updateSetupUI();
+      }
+    });
+    
+    // AI Engine selection (OpenAI vs Local LLM)
+    let selectedAIEngine = null;
+    const setupChoiceOpenAI = document.getElementById('setupChoiceOpenAI');
+    const setupChoiceLocalLLM = document.getElementById('setupChoiceLocalLLM');
+    const setupOpenAIConfig = document.getElementById('setupOpenAIConfig');
+    const setupLocalLLMConfig = document.getElementById('setupLocalLLMConfig');
+    const localLLMNotDownloaded = document.getElementById('localLLMNotDownloaded');
+    const localLLMDownloading = document.getElementById('localLLMDownloading');
+    const localLLMDownloaded = document.getElementById('localLLMDownloaded');
+    const setupLLMDownloadBtn = document.getElementById('setupLLMDownloadBtn');
+    const llmProgressFill = document.getElementById('llmProgressFill');
+    const llmProgressText = document.getElementById('llmProgressText');
+    
+    setupState.selectedAIEngine = null;
+    setupState.localLLMReady = false;
+    
+    async function selectAIEngine(engine) {
+      selectedAIEngine = engine;
+      setupState.selectedAIEngine = engine;
+      
+      // Update button states
+      if (engine === 'openai') {
+        setupChoiceOpenAI?.classList.add('selected');
+        setupChoiceLocalLLM?.classList.remove('selected');
+        setupOpenAIConfig?.classList.remove('hidden');
+        setupLocalLLMConfig?.classList.add('hidden');
+      } else if (engine === 'local') {
+        setupChoiceOpenAI?.classList.remove('selected');
+        setupChoiceLocalLLM?.classList.add('selected');
+        setupOpenAIConfig?.classList.add('hidden');
+        setupLocalLLMConfig?.classList.remove('hidden');
+        
+        // Check if local LLM is ready
+        const isReady = await ipcRenderer.invoke('llm-is-ready');
+        setupState.localLLMReady = isReady;
+        updateLocalLLMUI(isReady);
+      }
+      
+      // Save engine preference
+      await ipcRenderer.invoke('ai-set-engine', engine);
+      updateSetupUI();
+    }
+    
+    function updateLocalLLMUI(isReady) {
+      if (isReady) {
+        localLLMNotDownloaded?.classList.add('hidden');
+        localLLMDownloading?.classList.add('hidden');
+        localLLMDownloaded?.classList.remove('hidden');
+      } else {
+        localLLMNotDownloaded?.classList.remove('hidden');
+        localLLMDownloading?.classList.add('hidden');
+        localLLMDownloaded?.classList.add('hidden');
+      }
+    }
+    
+    setupChoiceOpenAI?.addEventListener('click', () => selectAIEngine('openai'));
+    setupChoiceLocalLLM?.addEventListener('click', () => selectAIEngine('local'));
+    
+    // LLM Download button
+    setupLLMDownloadBtn?.addEventListener('click', async () => {
+      // Show downloading state
+      localLLMNotDownloaded?.classList.add('hidden');
+      localLLMDownloading?.classList.remove('hidden');
+      localLLMDownloaded?.classList.add('hidden');
+      llmProgressText.textContent = 'Initializing download...';
+      llmProgressFill.style.width = '0%';
+      
+      try {
+        // Start the LLM init (downloads model from HuggingFace if not cached)
+        const started = await ipcRenderer.invoke('llm-init');
+        
+        if (started) {
+          // Poll for progress
+          const pollProgress = setInterval(async () => {
+            const progress = await ipcRenderer.invoke('llm-get-init-progress');
+            
+            if (progress.error) {
+              clearInterval(pollProgress);
+              llmProgressText.textContent = 'Download failed: ' + progress.error;
+              localLLMNotDownloaded?.classList.remove('hidden');
+              localLLMDownloading?.classList.add('hidden');
+              return;
+            }
+            
+            llmProgressText.textContent = progress.status || 'Downloading...';
+            
+            if (!progress.isLoading) {
+              clearInterval(pollProgress);
+              
+              // Check if ready
+              const isReady = await ipcRenderer.invoke('llm-is-ready');
+              setupState.localLLMReady = isReady;
+              updateLocalLLMUI(isReady);
+              updateSetupUI();
+            }
+          }, 1000);
+        }
+      } catch (e) {
+        console.error('[Setup] LLM init error:', e);
+        llmProgressText.textContent = 'Error: ' + e.message;
+        localLLMNotDownloaded?.classList.remove('hidden');
+        localLLMDownloading?.classList.add('hidden');
       }
     });
     
