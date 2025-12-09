@@ -9193,6 +9193,10 @@
     function showSettings() {
       settingsOverlay?.classList.remove('hidden');
       loadSettingsStatus();
+      // Load provider states for transcription/AI toggles
+      if (typeof loadSettingsProviderState === 'function') {
+        loadSettingsProviderState();
+      }
     }
     
     function hideSettings() {
@@ -9676,12 +9680,17 @@
     
     // Load settings state
     async function loadSettingsProviderState() {
-      settingsState.transcriptionEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
-      settingsState.aiEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
-      settingsState.deepgramKey = await ipcRenderer.invoke('check-deepgram-key');
-      settingsState.openaiKey = await ipcRenderer.invoke('openai-has-key');
-      settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
-      settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-ready');
+      try {
+        settingsState.transcriptionEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
+        settingsState.aiEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
+        settingsState.deepgramKey = await ipcRenderer.invoke('has-deepgram-key');
+        settingsState.openaiKey = await ipcRenderer.invoke('openai-has-key');
+        settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
+        settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-ready');
+        console.log('[Settings] Provider state loaded:', settingsState);
+      } catch (e) {
+        console.error('[Settings] Error loading provider state:', e);
+      }
       
       // Update UI
       selectTranscriptionProviderSettings(settingsState.transcriptionEngine);
@@ -9885,13 +9894,6 @@
         checkSetup();
       }
     });
-    
-    // Load provider state when settings opened
-    const originalShowSettings = showSettings;
-    showSettings = function() {
-      originalShowSettings?.();
-      loadSettingsProviderState();
-    };
     
     // Calendar connect/disconnect
     calendarConnectBtn?.addEventListener('click', async () => {
