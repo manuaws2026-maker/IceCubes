@@ -32,7 +32,7 @@ export interface TranscriptSegment {
 }
 
 /**
- * TranscriptionService - GRANOLA APPROACH
+ * TranscriptionService
  * 
  * Instead of relying on stereo channel separation (which doesn't work well),
  * we use MONO audio with DIARIZATION:
@@ -157,7 +157,7 @@ export class TranscriptionService {
   
   /**
    * Start streaming audio to Deepgram
-   * GRANOLA APPROACH: MONO audio with diarization
+   * Uses MONO audio with diarization
    */
   public startStreaming(): boolean {
     if (!this.apiKey) {
@@ -178,7 +178,7 @@ export class TranscriptionService {
     // Reset speaker learning for new session
     this.resetSpeakerLearning();
     
-    console.log('[Transcription] Starting Deepgram streaming (MONO + diarization - Granola approach)...');
+    console.log('[Transcription] Starting Deepgram streaming (MONO + diarization)...');
     
     // Use Nova-3 for auto-detect (better multilingual), Nova-2 for fixed language
     const modelToUse = this.autoDetect ? 'nova-3' : 'nova-2';

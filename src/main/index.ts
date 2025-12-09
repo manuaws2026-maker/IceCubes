@@ -23,12 +23,13 @@ if (typeof (globalThis as any).FormData === 'undefined') {
   };
 }
 
-import { app, BrowserWindow, ipcMain, systemPreferences, shell, Tray, Menu, Notification, nativeImage, screen, powerMonitor } from 'electron';
+import { app, BrowserWindow, ipcMain, systemPreferences, shell, Tray, Menu, Notification, nativeImage, screen, powerMonitor, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { MeetingWatcher, MeetingInfo } from './meeting-watcher';
 import { AudioEngine } from './audio-engine';
 import { TranscriptionService } from './transcription';
+import { getTranscriptionRouter } from './transcription/router';
 import { CalendarService } from './calendar';
 import { OpenAIService } from './openai';
 // Note: Folder service replaced with database service
@@ -89,6 +90,7 @@ let settingsWindow: BrowserWindow | null = null;
 let meetingWatcher: MeetingWatcher | null = null;
 let audioEngine: AudioEngine | null = null;
 let transcriptionService: TranscriptionService | null = null;
+let transcriptionRouter = getTranscriptionRouter();
 let calendarService: CalendarService | null = null;
 let openaiService: OpenAIService | null = null;
 let currentMeeting: MeetingInfo | null = null;
@@ -839,12 +841,12 @@ async function startRecording() {
     
     // Start streaming to Deepgram from main process (multichannel audio)
     setTimeout(() => {
-      if (transcriptionService) {
-        // Pass native module to transcription service
-        transcriptionService.setNativeModule(getNativeModule());
+      if (transcriptionRouter) {
+        // Pass native module to transcription router
+        transcriptionRouter.setNativeModule(getNativeModule());
         
         // Set up callback to forward transcripts to renderer
-        transcriptionService.setOnTranscript((segment) => {
+        transcriptionRouter.setOnTranscript((segment) => {
           // Simple labels: You vs Them (based on audio channel)
           const label = segment.isYou ? '[You]' : '[Them]';
           
@@ -867,7 +869,7 @@ async function startRecording() {
         });
         
         // Start streaming
-        transcriptionService.startStreaming();
+        transcriptionRouter.startStreaming();
         console.log('[Recording] Transcription streaming started');
       }
       
@@ -891,8 +893,8 @@ async function stopRecording(): Promise<string | null> {
   
   try {
     // Stop transcription streaming first
-    if (transcriptionService) {
-      transcriptionService.stopStreaming();
+    if (transcriptionRouter) {
+      transcriptionRouter.stopStreaming();
       console.log('[Recording] Transcription streaming stopped');
     }
     
@@ -1027,8 +1029,8 @@ function openEditorWindow(showHome = true) {
   editorWindow.webContents.on('did-finish-load', () => {
     console.log('[Editor] Page loaded successfully');
     
-    // DevTools - uncomment for debugging
-    // editorWindow?.webContents.openDevTools({ mode: 'detach' });
+    // DevTools - open for debugging
+    editorWindow?.webContents.openDevTools({ mode: 'detach' });
     
     // Small delay to ensure all JS event listeners are registered
     setTimeout(() => {
@@ -1307,8 +1309,8 @@ function setupIPC() {
   // Stop Deepgram streaming (called from renderer)
   ipcMain.on('stop-deepgram-stream', () => {
     console.log('[IPC] stop-deepgram-stream received');
-    if (transcriptionService) {
-      transcriptionService.stopStreaming();
+    if (transcriptionRouter) {
+      transcriptionRouter.stopStreaming();
     }
   });
   
@@ -1341,9 +1343,9 @@ function setupIPC() {
       updateTrayMenu();
       
       // Start transcription streaming to Deepgram
-      if (transcriptionService) {
-        transcriptionService.setNativeModule(getNativeModule());
-        transcriptionService.setOnTranscript((segment) => {
+      if (transcriptionRouter) {
+        transcriptionRouter.setNativeModule(getNativeModule());
+        transcriptionRouter.setOnTranscript((segment) => {
           try {
             if (editorWindow && !editorWindow.isDestroyed() && editorWindow.webContents && !editorWindow.webContents.isDestroyed()) {
               editorWindow.webContents.send('transcript-segment', segment);
@@ -1354,7 +1356,7 @@ function setupIPC() {
           const label = segment.isYou ? '[You]' : (segment.speaker !== null ? `[Speaker ${segment.speaker + 1}]` : '');
           currentTranscript.push(label ? `${label} ${segment.text}` : segment.text);
         });
-        transcriptionService.startStreaming();
+        transcriptionRouter.startStreaming();
         console.log('[Ghost] Transcription streaming started');
       }
       
@@ -2134,9 +2136,9 @@ Answer:`;
   
   ipcMain.handle('lang-save-settings', (_, settings: any) => {
     store.set('langSettings', settings);
-    // Notify transcription service of language change
-    if (transcriptionService) {
-      transcriptionService.setLanguage(settings.transcriptionLang, settings.autoDetect);
+    // Notify transcription router of language change (only applies to Deepgram)
+    if (transcriptionRouter) {
+      transcriptionRouter.setLanguage(settings.transcriptionLang, settings.autoDetect);
     }
     return true;
   });
@@ -2197,7 +2199,7 @@ Answer:`;
     );
   });
   
-  // Granola-style enhanced notes (generated AFTER meeting ends)
+  // Enhanced notes (generated AFTER meeting ends)
   ipcMain.handle('openai-generate-enhanced', async (_, data: { transcript: string, rawNotes: string, meetingTitle: string, meetingInfo?: any, templateId?: string }) => {
     if (!openaiService?.hasApiKey()) return null;
     console.log('[IPC] Generating enhanced notes...');
@@ -2296,6 +2298,184 @@ Answer:`;
       return null;
     }
   });
+  
+  // ============================================================================
+  // PARAKEET (RUST) - Native module transcription
+  // ============================================================================
+  
+  ipcMain.handle('parakeet-check-downloaded', async () => {
+    try {
+      return nativeModule?.isParakeetDownloaded?.() ?? false;
+    } catch (e) {
+      console.error('[Parakeet] Check downloaded error:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('parakeet-get-info', async () => {
+    try {
+      return nativeModule?.getParakeetModelInfo?.() ?? {
+        downloaded: false,
+        version: 'v3',
+        size: 0,
+        path: ''
+      };
+    } catch (e) {
+      console.error('[Parakeet] Get info error:', e);
+      return { downloaded: false, version: 'v3', size: 0, path: '' };
+    }
+  });
+
+  ipcMain.handle('parakeet-check-requirements', async () => {
+    // Rust handles this - just check if native module is available
+    return {
+      hasOnnxRuntime: !!nativeModule,
+      hasGpuSupport: true, // ONNX Runtime handles GPU automatically
+      availableMemory: 4000000000,
+      meetsRequirements: !!nativeModule,
+      missingRequirements: nativeModule ? [] : ['Native module not loaded']
+    };
+  });
+
+  ipcMain.handle('parakeet-download-model', async () => {
+    console.log('[Parakeet] Starting download via Rust (background thread)...');
+    
+    try {
+      // This now spawns a background thread and returns immediately
+      const started = nativeModule?.downloadParakeetModel?.();
+      console.log('[Parakeet] Download started:', started);
+      return { success: true, started: !!started };
+    } catch (error: any) {
+      console.error('[Parakeet] Download start error:', error);
+      return { success: false, started: false, error: error.message || String(error) };
+    }
+  });
+
+  ipcMain.handle('parakeet-cancel-download', async () => {
+    // HuggingFace downloads are atomic - can't cancel mid-download
+    return true;
+  });
+
+  ipcMain.handle('parakeet-test-model', async () => {
+    try {
+      // Try to initialize the model - if it works, the model is valid
+      return nativeModule?.initParakeet?.() ?? false;
+    } catch (e) {
+      console.error('[Parakeet] Test model error:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('parakeet-delete-model', async () => {
+    try {
+      nativeModule?.shutdownParakeet?.();
+      return nativeModule?.deleteParakeetModel?.() ?? false;
+    } catch (e) {
+      console.error('[Parakeet] Delete model error:', e);
+      return false;
+    }
+  });
+
+  // Show confirm dialog with app icon
+  ipcMain.handle('show-confirm-dialog', async (_, options: { title: string; message: string; okLabel?: string; cancelLabel?: string }) => {
+    const iconPath = path.join(__dirname, '../renderer/assets/logo.png');
+    const result = await dialog.showMessageBox({
+      type: 'question',
+      buttons: [options.cancelLabel || 'Cancel', options.okLabel || 'OK'],
+      defaultId: 1,
+      cancelId: 0,
+      title: options.title,
+      message: options.message,
+      icon: nativeImage.createFromPath(iconPath),
+    });
+    return result.response === 1; // true if OK was clicked
+  });
+
+  // Get download progress (polled by UI)
+  ipcMain.handle('parakeet-get-download-progress', async () => {
+    try {
+      return nativeModule?.getParakeetDownloadProgress?.() ?? {
+        isDownloading: false,
+        currentFile: '',
+        currentFileIndex: 0,
+        totalFiles: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        percent: 0,
+        error: null
+      };
+    } catch (e) {
+      console.error('[Parakeet] Get progress error:', e);
+      return {
+        isDownloading: false,
+        currentFile: '',
+        currentFileIndex: 0,
+        totalFiles: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        percent: 0,
+        error: String(e)
+      };
+    }
+  });
+
+  ipcMain.handle('parakeet-get-languages', async () => {
+    try {
+      const codes = nativeModule?.getParakeetLanguages?.() ?? [];
+      const names = ['English', 'German', 'Spanish', 'French', 'Italian', 'Portuguese', 'Dutch', 'Polish', 'Russian', 'Ukrainian', 'Czech', 'Slovak', 'Hungarian', 'Romanian', 'Bulgarian', 'Croatian', 'Slovenian', 'Serbian', 'Danish', 'Finnish', 'Norwegian', 'Swedish', 'Greek', 'Turkish', 'Vietnamese'];
+      return { codes, names };
+    } catch (e) {
+      return { codes: [], names: [] };
+    }
+  });
+
+  // Transcription Engine Selection
+  ipcMain.handle('transcription-get-engine', async () => {
+    return transcriptionRouter.getEngine();
+  });
+
+  ipcMain.handle('transcription-set-engine', async (_, engine: 'deepgram' | 'parakeet') => {
+    transcriptionRouter.setEngine(engine);
+    return true;
+  });
+
+  ipcMain.handle('transcription-is-parakeet-ready', async () => {
+    try {
+      return nativeModule?.isParakeetReady?.() ?? false;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Initialize Parakeet
+  ipcMain.handle('parakeet-init', async () => {
+    try {
+      return nativeModule?.initParakeet?.() ?? false;
+    } catch (e) {
+      console.error('[Parakeet] Init error:', e);
+      return false;
+    }
+  });
+
+  // Transcribe audio file using Parakeet
+  ipcMain.handle('parakeet-transcribe-file', async (_, audioPath: string) => {
+    try {
+      return nativeModule?.transcribeAudioFile?.(audioPath) ?? '';
+    } catch (e: any) {
+      console.error('[Parakeet] Transcribe file error:', e);
+      throw new Error(e.message || String(e));
+    }
+  });
+
+  // Transcribe audio buffer using Parakeet
+  ipcMain.handle('parakeet-transcribe-buffer', async (_, audioData: Buffer, sampleRate?: number, channels?: number) => {
+    try {
+      return nativeModule?.transcribeAudioBuffer?.(audioData, sampleRate, channels) ?? '';
+    } catch (e: any) {
+      console.error('[Parakeet] Transcribe buffer error:', e);
+      throw new Error(e.message || String(e));
+    }
+  });
 }
 
 // ============================================================================
@@ -2328,14 +2508,14 @@ app.whenReady().then(async () => {
   setupIPC();
   
   // 3. Initialize services
-  transcriptionService = new TranscriptionService();
+  transcriptionService = transcriptionRouter.getDeepgramService(); // For backward compatibility
   calendarService = new CalendarService();
   openaiService = new OpenAIService();
   
-  // Apply saved language settings to transcription service
+  // Apply saved language settings to transcription router
   const savedLangSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false }) as any;
-  if (transcriptionService) {
-    transcriptionService.setLanguage(savedLangSettings.transcriptionLang, savedLangSettings.autoDetect);
+  if (transcriptionRouter) {
+    transcriptionRouter.setLanguage(savedLangSettings.transcriptionLang, savedLangSettings.autoDetect);
     console.log('[App] Applied saved language settings:', savedLangSettings);
   }
   

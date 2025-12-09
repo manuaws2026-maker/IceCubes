@@ -310,8 +310,20 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
+const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
 
+module.exports.isParakeetDownloaded = isParakeetDownloaded
+module.exports.getParakeetModelInfo = getParakeetModelInfo
+module.exports.getParakeetLanguages = getParakeetLanguages
+module.exports.getParakeetDownloadProgress = getParakeetDownloadProgress
+module.exports.downloadParakeetModel = downloadParakeetModel
+module.exports.initParakeet = initParakeet
+module.exports.isParakeetReady = isParakeetReady
+module.exports.transcribeAudioBuffer = transcribeAudioBuffer
+module.exports.transcribeAudioBufferWithTimestamps = transcribeAudioBufferWithTimestamps
+module.exports.deleteParakeetModel = deleteParakeetModel
+module.exports.getParakeetModelPath = getParakeetModelPath
+module.exports.shutdownParakeet = shutdownParakeet
 module.exports.getActiveWindows = getActiveWindows
 module.exports.checkAccessibilityPermission = checkAccessibilityPermission
 module.exports.requestAccessibilityPermission = requestAccessibilityPermission

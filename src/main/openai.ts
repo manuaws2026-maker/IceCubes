@@ -9,6 +9,7 @@ export interface NoteGenerationResult {
   keyPoints: string[];
   actionItems: string[];
   decisions: string[];
+  templateId?: string;  // ID of template used for generation
 }
 
 export class OpenAIService {
@@ -297,8 +298,7 @@ Generate comprehensive final meeting notes in JSON format:`,
   }
 
   // ============================================================================
-  // GRANOLA-STYLE ENHANCED NOTES
-  // Based on: https://help.granola.ai/article/ai-enhanced-notes
+  // ENHANCED NOTES
   // Generated AFTER meeting ends using: transcript + raw notes + meeting info
   // ============================================================================
   async generateEnhancedNotes(
@@ -379,7 +379,7 @@ ${template && template.sections && template.sections.length > 0 ?
 `YOU MUST USE THE TEMPLATE SECTIONS SPECIFIED ABOVE. The "enhancedNotes" field MUST contain markdown with those section headers (## Section Name) - TRANSLATED to ${this.getLanguageName(outputLanguage)}. Do NOT use generic sections like "Summary", "Key Points" - use the TEMPLATE sections but translate them.` : 
 `Use standard meeting note sections translated to ${this.getLanguageName(outputLanguage)}: Summary, Key Points, Action Items, Decisions (translate these headers!).`}
 
-FORMATTING REQUIREMENTS - Granola-style notes:
+FORMATTING REQUIREMENTS:
 - Use ## for main topic sections (group by themes/topics from the meeting)
 - Use **bold** for emphasis on important terms, names, decisions
 - Use bullet points (-) with sub-bullets for details (indent with 2 spaces)
@@ -448,7 +448,12 @@ Generate AI-enhanced meeting notes in JSON format:`,
       const content = data.choices[0]?.message?.content;
       const result = JSON.parse(content);
       
-      console.log('[OpenAI] Granola-style enhanced notes generated successfully');
+      // Add template ID to result if template was used
+      if (template && template.id) {
+        result.templateId = template.id;
+      }
+      
+      console.log('[OpenAI] Enhanced notes generated successfully');
       return result;
 
     } catch (error: any) {

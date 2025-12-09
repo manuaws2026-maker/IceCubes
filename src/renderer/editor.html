@@ -103,7 +103,7 @@
       height: 100%;
     }
     
-    /* Left Sidebar - Navigation only (Granola style) */
+    /* Left Sidebar - Navigation */
     .sidebar {
       width: 240px;
       background: var(--bg-sidebar);
@@ -303,7 +303,7 @@
     }
     
     
-    /* Entity list view (People/Companies list) - Granola style table */
+    /* Entity list view (People/Companies list) */
     
     .entity-list-search {
       padding: 12px 0;
@@ -2682,7 +2682,7 @@
       transform: translateY(0);
     }
     
-    /* Granola-style Editor content */
+    /* Editor content */
     .editor-content {
       flex: 1;
       display: flex;
@@ -2702,7 +2702,7 @@
     
     .editor-inner {
       width: 100%;
-      max-width: 900px; /* Wider editor like Granola */
+      max-width: 900px;
       padding: 32px 40px 40px;
     }
     
@@ -3526,7 +3526,7 @@
       text-align: center;
     }
     
-    /* Calendar section - Granola-style "Coming up" area */
+    /* Calendar section - "Coming up" area */
     .calendar-section {
       margin-bottom: 24px;
       padding: 20px 24px;
@@ -3892,15 +3892,17 @@
     }
     
     .setup-container {
-      max-width: 480px;
-      padding: 40px;
+      max-width: 520px;
+      padding: 24px;
       text-align: center;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     
     .setup-icon {
-      width: 80px;
-      height: 80px;
-      margin-bottom: 24px;
+      width: 60px;
+      height: 60px;
+      margin-bottom: 16px;
       filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
     }
     
@@ -3911,33 +3913,166 @@
     }
     
     .setup-title {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     
     .setup-subtitle {
-      font-size: 15px;
+      font-size: 13px;
       color: var(--text-secondary);
-      margin-bottom: 32px;
-      line-height: 1.6;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    
+    /* Step indicator */
+    .setup-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      gap: 0;
+    }
+    
+    .setup-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .setup-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    
+    .setup-step.active .setup-step-number {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    
+    .setup-step.complete .setup-step-number {
+      background: #4caf50;
+      border-color: #4caf50;
+      color: white;
+    }
+    
+    .setup-step-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    
+    .setup-step.active .setup-step-label {
+      color: var(--text);
+      font-weight: 600;
+    }
+    
+    .setup-step-line {
+      width: 40px;
+      height: 2px;
+      background: var(--border);
+      margin: 0 8px;
+      margin-bottom: 20px;
+    }
+    
+    /* Setup screens */
+    .setup-screen {
+      text-align: left;
+    }
+    
+    .setup-screen-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    
+    .setup-nav-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    
+    .setup-btn-secondary {
+      flex: 1;
+      padding: 12px 32px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .setup-btn-secondary:hover {
+      background: var(--bg-hover);
+    }
+    
+    .setup-input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'SF Mono', Monaco, monospace;
+      transition: all 0.2s;
+    }
+    
+    .setup-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--bg-secondary);
+    }
+    
+    .setup-input::placeholder {
+      color: var(--text-muted);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .setup-link {
+      font-size: 11px;
+      color: var(--accent);
+      text-decoration: none;
+      margin-top: 6px;
+      display: inline-block;
+      transition: opacity 0.2s;
+    }
+    
+    .setup-link:hover {
+      opacity: 0.8;
     }
     
     .setup-checklist {
       text-align: left;
-      margin-bottom: 32px;
+      margin-bottom: 20px;
     }
     
     .setup-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px;
+      gap: 10px;
+      padding: 12px 14px;
       background: var(--bg-secondary);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-bottom: 12px;
+      border-radius: 10px;
+      margin-bottom: 10px;
       transition: all 0.2s;
     }
     
@@ -3952,13 +4087,13 @@
     }
     
     .setup-item-icon {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 16px;
       background: var(--bg-hover);
       color: var(--text-secondary);
       flex-shrink: 0;
@@ -3982,9 +4117,9 @@
     
     .setup-item-title {
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       color: var(--text);
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     
     .setup-item.complete .setup-item-title {
@@ -3992,20 +4127,21 @@
     }
     
     .setup-item-desc {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-secondary);
     }
     
     .setup-item-action {
-      padding: 8px 18px;
+      padding: 7px 16px;
       background: var(--accent);
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 13px;
+      border-radius: 7px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.15s;
+      white-space: nowrap;
     }
     
     .setup-item-action:hover {
@@ -4019,13 +4155,165 @@
       color: var(--accent);
     }
     
+    /* Transcription Choice Styles */
+    .setup-item-choice {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+    
+    .setup-choice-buttons {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+    
+    .setup-choice-btn {
+      flex: 1;
+      padding: 12px;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+    
+    .setup-choice-btn:hover {
+      border-color: var(--accent);
+      background: rgba(76, 158, 255, 0.05);
+    }
+    
+    .setup-choice-btn.selected {
+      border-color: var(--accent);
+      background: rgba(76, 158, 255, 0.1);
+    }
+    
+    .setup-choice-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    
+    .setup-choice-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+    }
+    
+    .setup-choice-badge {
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    
+    .setup-badge-cloud {
+      background: rgba(76, 158, 255, 0.2);
+      color: var(--accent);
+    }
+    
+    .setup-badge-local {
+      background: rgba(76, 175, 80, 0.2);
+      color: #4caf50;
+    }
+    
+    .setup-badge-beta {
+      background: rgba(255, 152, 0, 0.2);
+      color: #ff9800;
+    }
+    
+    .setup-choice-benefit {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+    
+    /* Parakeet inline download */
+    .parakeet-download-inline {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    
+    .parakeet-info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 12px;
+      font-size: 11px;
+      margin-bottom: 12px;
+    }
+    
+    .parakeet-info-label {
+      color: var(--text-muted);
+    }
+    
+    .parakeet-info-value {
+      color: var(--text);
+      font-weight: 500;
+    }
+    
+    .parakeet-progress {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    
+    .parakeet-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s;
+      border-radius: 3px;
+    }
+    
+    /* Animated indeterminate progress bar */
+    .parakeet-progress-indeterminate .parakeet-progress-animated {
+      width: 30%;
+      animation: indeterminate 1.5s infinite ease-in-out;
+    }
+    
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(400%); }
+    }
+    
+    .parakeet-progress-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      text-align: center;
+    }
+    
+    .setup-btn-danger {
+      padding: 8px 16px;
+      background: transparent;
+      color: #ef4444;
+      border: 1px solid #ef4444;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    
+    .setup-btn-danger:hover {
+      background: #ef4444;
+      color: white;
+    }
+    
     .setup-btn {
-      padding: 14px 40px;
+      padding: 12px 32px;
       background: var(--accent);
       color: white;
       border: none;
-      border-radius: 10px;
-      font-size: 16px;
+      border-radius: 8px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.15s;
@@ -4764,7 +5052,7 @@
       animation: spin 0.8s linear infinite;
     }
     
-    /* Integrated Transcript Section - subtle, Granola-style */
+    /* Integrated Transcript Section */
     .transcript-section {
       margin-top: 32px;
       margin-bottom: 8px; /* Reduced from 24px to bring closer to bottom bar when collapsed */
@@ -4854,7 +5142,18 @@
       background: var(--surface);
       border-radius: 12px;
       margin-bottom: 10px;
-      border: 1px solid var(--border);
+      border-left: 3px solid var(--speaker-color);
+    }
+    
+    /* Timestamp without speaker label */
+    .transcript-timestamp-only {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-muted);
+      opacity: 0.6;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     
     /* Speaker label styling */
@@ -5029,7 +5328,7 @@
       flex-shrink: 0;
     }
     
-    /* Granola-style footer - flex child at bottom */
+    /* Footer - flex child at bottom */
     .editor-footer {
       display: flex;
       align-items: center;
@@ -5775,6 +6074,27 @@
         IceCubes needs a few things set up before it can record and transcribe your meetings.
       </div>
       
+      <!-- Step indicator -->
+      <div class="setup-steps">
+        <div class="setup-step active" id="stepIndicator1">
+          <div class="setup-step-number">1</div>
+          <div class="setup-step-label">Permissions</div>
+        </div>
+        <div class="setup-step-line"></div>
+        <div class="setup-step" id="stepIndicator2">
+          <div class="setup-step-number">2</div>
+          <div class="setup-step-label">Transcription</div>
+        </div>
+        <div class="setup-step-line"></div>
+        <div class="setup-step" id="stepIndicator3">
+          <div class="setup-step-number">3</div>
+          <div class="setup-step-label">AI Setup</div>
+        </div>
+      </div>
+      
+      <!-- Step 1: Permissions -->
+      <div class="setup-screen" id="setupScreen1">
+        <div class="setup-screen-title">Grant Permissions</div>
       <div class="setup-checklist">
         <div class="setup-item" id="setupMic">
           <div class="setup-item-icon">🎤</div>
@@ -5792,28 +6112,149 @@
             <div class="setup-item-desc">Required to detect meetings</div>
           </div>
           <button class="setup-item-action" id="setupScreenBtn">Grant</button>
+          </div>
+        </div>
+        <button class="setup-btn" id="setupNextBtn1" disabled>Next</button>
         </div>
         
-        <div class="setup-item" id="setupDeepgram">
+      <!-- Step 2: Transcription Engine -->
+      <div class="setup-screen hidden" id="setupScreen2">
+        <div class="setup-screen-title">Choose Transcription</div>
+        <div class="setup-checklist">
+          <div class="setup-item setup-item-choice" id="setupTranscription">
           <div class="setup-item-icon">🎙️</div>
+            <div class="setup-item-text">
+              <div class="setup-item-title">Transcription Engine</div>
+              <div class="setup-item-desc">Choose how to transcribe your meetings</div>
+            </div>
+            <div class="setup-choice-buttons">
+              <button class="setup-choice-btn" id="setupChoiceDeepgram" data-engine="deepgram">
+                <div class="setup-choice-header">
+                  <span class="setup-choice-title">Deepgram</span>
+                  <span class="setup-choice-badge setup-badge-cloud">Cloud</span>
+                </div>
+                <div class="setup-choice-benefit">Fast, accurate transcription with speaker detection in 35+ languages</div>
+              </button>
+              <button class="setup-choice-btn" id="setupChoiceParakeet" data-engine="parakeet">
+                <div class="setup-choice-header">
+                  <span class="setup-choice-title">Parakeet</span>
+                  <span class="setup-choice-badge setup-badge-local">Local</span>
+                  <span class="setup-choice-badge setup-badge-beta">Beta</span>
+                </div>
+                <div class="setup-choice-benefit">100% private offline transcription - free after ~670MB download</div>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Deepgram API Key (shown when Deepgram selected) -->
+          <div class="setup-item hidden" id="setupDeepgram" style="margin-top: 12px; flex-direction: column; align-items: stretch;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <div class="setup-item-icon">🔑</div>
           <div class="setup-item-text">
             <div class="setup-item-title">Deepgram API Key</div>
-            <div class="setup-item-desc">Required for transcription</div>
+                <div class="setup-item-desc">Required for cloud transcription</div>
           </div>
-          <button class="setup-item-action" id="setupDeepgramBtn">Configure</button>
+            </div>
+            <input 
+              type="password" 
+              id="deepgramApiInput" 
+              class="setup-input" 
+              placeholder="Enter your Deepgram API key"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <a href="https://console.deepgram.com/" target="_blank" class="setup-link">Get API key from Deepgram →</a>
         </div>
         
-        <div class="setup-item" id="setupOpenAI">
-          <div class="setup-item-icon">🤖</div>
-          <div class="setup-item-text">
-            <div class="setup-item-title">OpenAI API Key</div>
-            <div class="setup-item-desc">Required for AI-enhanced notes</div>
+          <!-- Parakeet Model Download (shown when Parakeet selected) -->
+          <div class="setup-item hidden" id="setupParakeet" style="margin-top: 12px; flex-direction: column; align-items: stretch;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="setup-item-icon">📦</div>
+              <div class="setup-item-text">
+                <div class="setup-item-title">Parakeet Model</div>
+                <div class="setup-item-desc">Download for local transcription</div>
+              </div>
+            </div>
+            
+            <!-- Parakeet download UI -->
+            <div class="parakeet-download-inline" id="parakeetDownloadUI">
+              <div id="parakeetNotDownloaded">
+                <div class="parakeet-info-grid">
+                  <span class="parakeet-info-label">Status:</span>
+                  <span class="parakeet-info-value" style="color: #ef4444;">Model not downloaded</span>
+                  
+                  <span class="parakeet-info-label">Size:</span>
+                  <span class="parakeet-info-value">~670 MB</span>
+                  
+                  <span class="parakeet-info-label">Languages:</span>
+                  <span class="parakeet-info-value">25 European</span>
+                </div>
+                <button class="setup-item-action" id="setupParakeetDownloadBtn" style="width: 100%;">
+                  Download Model (~670 MB)
+                </button>
+              </div>
+              
+              <div id="parakeetDownloading" class="hidden">
+                <div class="parakeet-progress parakeet-progress-indeterminate">
+                  <div class="parakeet-progress-fill parakeet-progress-animated" id="parakeetProgressFill"></div>
+                </div>
+                <div class="parakeet-progress-text" id="parakeetProgressText">
+                  Downloading ~670 MB... This may take a few minutes
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
+                  Model downloads from HuggingFace in the background
+                </p>
+              </div>
+              
+              <div id="parakeetDownloaded" class="hidden">
+                <div class="parakeet-info-grid">
+                  <span class="parakeet-info-label">Status:</span>
+                  <span class="parakeet-info-value" style="color: #4caf50;">✓ Model ready</span>
+                  
+                  <span class="parakeet-info-label">Size:</span>
+                  <span class="parakeet-info-value" id="parakeetModelSize">~670 MB</span>
+                </div>
+                <button class="setup-btn-danger" id="setupParakeetDeleteBtn" style="width: 100%; margin-top: 8px;">
+                  🗑️ Delete Model
+                </button>
+              </div>
+            </div>
           </div>
-          <button class="setup-item-action" id="setupOpenAIBtn">Configure</button>
+        </div>
+        <div class="setup-nav-buttons">
+          <button class="setup-btn-secondary" id="setupBackBtn2">Back</button>
+          <button class="setup-btn" id="setupNextBtn2" disabled>Next</button>
         </div>
       </div>
       
-      <button class="setup-btn" id="setupContinueBtn" disabled>Continue to IceCubes</button>
+      <!-- Step 3: AI Configuration -->
+      <div class="setup-screen hidden" id="setupScreen3">
+        <div class="setup-screen-title">AI-Enhanced Notes</div>
+        <div class="setup-checklist">
+          <div class="setup-item" id="setupOpenAI" style="flex-direction: column; align-items: stretch;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <div class="setup-item-icon">🤖</div>
+              <div class="setup-item-text">
+                <div class="setup-item-title">OpenAI API Key</div>
+                <div class="setup-item-desc">Required for AI-powered note enhancement</div>
+              </div>
+            </div>
+            <input 
+              type="password" 
+              id="openaiApiInput" 
+              class="setup-input" 
+              placeholder="Enter your OpenAI API key"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <a href="https://platform.openai.com/api-keys" target="_blank" class="setup-link">Get API key from OpenAI →</a>
+          </div>
+        </div>
+        <div class="setup-nav-buttons">
+          <button class="setup-btn-secondary" id="setupBackBtn3">Back</button>
+          <button class="setup-btn" id="setupContinueBtn">Continue to IceCubes</button>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -6400,7 +6841,7 @@
   </div>
   
   <div class="app">
-    <!-- Left Sidebar - Navigation (Granola style) -->
+    <!-- Left Sidebar - Navigation -->
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title"><img src="assets/logo.png" alt="IceCubes"> IceCubes</div>
@@ -6990,7 +7431,7 @@
           </div>
         </div>
         
-        <!-- Granola-style footer -->
+        <!-- Footer -->
         <div class="editor-footer hidden" id="editorFooter">
           <div class="footer-left">
             <div class="mic-control" id="micControl">
@@ -7407,18 +7848,56 @@
     const setupMic = document.getElementById('setupMic');
     const setupScreen = document.getElementById('setupScreen');
     const setupDeepgram = document.getElementById('setupDeepgram');
+    const setupParakeetItem = document.getElementById('setupParakeet');
     const setupOpenAI = document.getElementById('setupOpenAI');
     const setupMicBtn = document.getElementById('setupMicBtn');
     const setupScreenBtn = document.getElementById('setupScreenBtn');
     const setupDeepgramBtn = document.getElementById('setupDeepgramBtn');
-    const setupOpenAIBtn = document.getElementById('setupOpenAIBtn');
+    const setupParakeetDownloadBtn = document.getElementById('setupParakeetDownloadBtn');
+    const setupParakeetCancelBtn = document.getElementById('setupParakeetCancelBtn');
+    const deepgramApiInput = document.getElementById('deepgramApiInput');
+    const openaiApiInput = document.getElementById('openaiApiInput');
     const setupContinueBtn = document.getElementById('setupContinueBtn');
+    const setupNextBtn1 = document.getElementById('setupNextBtn1');
+    const setupNextBtn2 = document.getElementById('setupNextBtn2');
+    const setupBackBtn2 = document.getElementById('setupBackBtn2');
+    const setupBackBtn3 = document.getElementById('setupBackBtn3');
+    
+    let currentStep = 1;
+    
+    function showStep(step) {
+      currentStep = step;
+      
+      // Hide all screens
+      document.getElementById('setupScreen1').classList.add('hidden');
+      document.getElementById('setupScreen2').classList.add('hidden');
+      document.getElementById('setupScreen3').classList.add('hidden');
+      
+      // Show current screen
+      document.getElementById(`setupScreen${step}`).classList.remove('hidden');
+      
+      // Update step indicators
+      for (let i = 1; i <= 3; i++) {
+        const indicator = document.getElementById(`stepIndicator${i}`);
+        if (i < step) {
+          indicator.classList.add('complete');
+          indicator.classList.remove('active');
+        } else if (i === step) {
+          indicator.classList.add('active');
+          indicator.classList.remove('complete');
+        } else {
+          indicator.classList.remove('active', 'complete');
+        }
+      }
+    }
     
     let setupState = {
       microphone: false,
       screenRecording: false,
       deepgramKey: false,
-      openaiKey: false
+      openaiKey: false,
+      parakeetReady: false,
+      selectedEngine: null
     };
     
     async function checkSetup() {
@@ -7431,11 +7910,38 @@
       setupState.deepgramKey = await ipcRenderer.invoke('has-deepgram-key');
       setupState.openaiKey = await ipcRenderer.invoke('openai-has-key');
       
+      // Populate input fields if keys exist
+      if (setupState.deepgramKey && deepgramApiInput) {
+        deepgramApiInput.value = '••••••••••••••••'; // Show masked value
+        deepgramApiInput.disabled = true; // Disable editing once set
+      }
+      if (setupState.openaiKey && openaiApiInput) {
+        openaiApiInput.value = '••••••••••••••••'; // Show masked value
+        openaiApiInput.disabled = true; // Disable editing once set
+      }
+      
+      // Check Parakeet model
+      setupState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
+      
+      // Get current engine if not selected yet
+      if (!setupState.selectedEngine) {
+        setupState.selectedEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
+        selectTranscriptionEngine(setupState.selectedEngine);
+      }
+      
       updateSetupUI();
       
-      // If all good, hide overlay (OpenAI is optional but recommended)
-      const required = setupState.microphone && setupState.screenRecording && setupState.deepgramKey;
-      if (required) {
+      // Check if all requirements are met:
+      // 1. Both permissions granted
+      // 2. One transcription engine configured (Deepgram key OR Parakeet model)
+      // 3. OpenAI API key configured
+      const permissionsOk = setupState.microphone && setupState.screenRecording;
+      const transcriptionOk = setupState.deepgramKey || setupState.parakeetReady;
+      const openaiOk = setupState.openaiKey;
+      
+      const allSetupComplete = permissionsOk && transcriptionOk && openaiOk;
+      
+      if (allSetupComplete) {
         setupOverlay.classList.add('hidden');
         return true;
       } else {
@@ -7476,12 +7982,22 @@
         setupDeepgram.classList.add('complete');
         setupDeepgram.classList.remove('error');
         setupDeepgram.querySelector('.setup-item-icon').textContent = '✓';
-        setupDeepgramBtn.textContent = 'Configured';
-        setupDeepgramBtn.disabled = true;
       } else {
         setupDeepgram.classList.remove('complete');
-        setupDeepgramBtn.textContent = 'Configure';
-        setupDeepgramBtn.disabled = false;
+        setupDeepgram.querySelector('.setup-item-icon').textContent = '🔑';
+      }
+      
+      // Parakeet
+      if (setupState.parakeetReady) {
+        document.getElementById('parakeetNotDownloaded').classList.add('hidden');
+        document.getElementById('parakeetDownloading').classList.add('hidden');
+        document.getElementById('parakeetDownloaded').classList.remove('hidden');
+        setupParakeetItem.classList.add('complete');
+      } else {
+        document.getElementById('parakeetNotDownloaded').classList.remove('hidden');
+        document.getElementById('parakeetDownloading').classList.add('hidden');
+        document.getElementById('parakeetDownloaded').classList.add('hidden');
+        setupParakeetItem.classList.remove('complete');
       }
       
       // OpenAI
@@ -7489,21 +8005,123 @@
         setupOpenAI.classList.add('complete');
         setupOpenAI.classList.remove('error');
         setupOpenAI.querySelector('.setup-item-icon').textContent = '✓';
-        setupOpenAIBtn.textContent = 'Configured';
-        setupOpenAIBtn.disabled = true;
       } else {
         setupOpenAI.classList.remove('complete');
-        setupOpenAIBtn.textContent = 'Configure';
-        setupOpenAIBtn.disabled = false;
+        setupOpenAI.querySelector('.setup-item-icon').textContent = '🤖';
       }
       
-      // Continue button - requires permissions and Deepgram, OpenAI is optional
-      const requiredOk = setupState.microphone && setupState.screenRecording && setupState.deepgramKey;
-      setupContinueBtn.disabled = !requiredOk;
-      setupContinueBtn.textContent = requiredOk 
-        ? (setupState.openaiKey ? 'Continue to IceCubes' : 'Continue (AI notes won\'t work)')
-        : 'Complete setup above';
+      // Step 1: Permissions complete? (REQUIRED)
+      const step1Complete = setupState.microphone && setupState.screenRecording;
+      setupNextBtn1.disabled = !step1Complete;
+      if (!step1Complete) {
+        setupNextBtn1.textContent = 'Grant permissions to continue';
+      } else {
+        setupNextBtn1.textContent = 'Next';
+      }
+      
+      // Step 2: Engine selected and configured? (REQUIRED)
+      let step2Complete = false;
+      if (setupState.selectedEngine === 'deepgram') {
+        step2Complete = setupState.deepgramKey; // Must have API key
+      } else if (setupState.selectedEngine === 'parakeet') {
+        step2Complete = setupState.parakeetReady; // Must have model downloaded
+      }
+      setupNextBtn2.disabled = !step2Complete;
+      if (!setupState.selectedEngine) {
+        setupNextBtn2.textContent = 'Choose transcription engine';
+      } else if (!step2Complete) {
+        setupNextBtn2.textContent = setupState.selectedEngine === 'deepgram' 
+          ? 'Enter Deepgram API key' 
+          : 'Download model to continue';
+      } else {
+        setupNextBtn2.textContent = 'Next';
+      }
+      
+      // Step 3: OpenAI key (REQUIRED for AI-enhanced notes)
+      const step3Complete = setupState.openaiKey;
+      setupContinueBtn.disabled = !step3Complete;
+      if (!step3Complete) {
+        setupContinueBtn.textContent = 'Enter OpenAI API key to continue';
+      } else {
+        setupContinueBtn.textContent = 'Continue to IceCubes';
+      }
     }
+    
+    // Transcription engine selection
+    let selectedEngine = null;
+    const setupChoiceDeepgram = document.getElementById('setupChoiceDeepgram');
+    const setupChoiceParakeet = document.getElementById('setupChoiceParakeet');
+    const setupDeepgramItem = document.getElementById('setupDeepgram');
+    // setupParakeetItem already declared at the top
+    
+    function selectTranscriptionEngine(engine) {
+      selectedEngine = engine;
+      setupState.selectedEngine = engine;
+      
+      // Update button states
+      if (engine === 'deepgram') {
+        setupChoiceDeepgram.classList.add('selected');
+        setupChoiceParakeet.classList.remove('selected');
+        // Show Deepgram config, hide Parakeet
+        setupDeepgramItem.classList.remove('hidden');
+        setupParakeetItem.classList.add('hidden');
+      } else if (engine === 'parakeet') {
+        setupChoiceDeepgram.classList.remove('selected');
+        setupChoiceParakeet.classList.add('selected');
+        // Show Parakeet config, hide Deepgram
+        setupDeepgramItem.classList.add('hidden');
+        setupParakeetItem.classList.remove('hidden');
+      }
+      
+      updateSetupUI();
+    }
+    
+    setupChoiceDeepgram?.addEventListener('click', () => selectTranscriptionEngine('deepgram'));
+    setupChoiceParakeet?.addEventListener('click', () => selectTranscriptionEngine('parakeet'));
+    
+    // API key input handlers
+    deepgramApiInput?.addEventListener('input', async (e) => {
+      const apiKey = e.target.value.trim();
+      if (apiKey.length > 10) { // Basic validation
+        // Save the API key
+        const saved = await ipcRenderer.invoke('save-deepgram-key', apiKey);
+        if (saved) {
+          setupState.deepgramKey = true;
+          setupDeepgram.classList.add('complete');
+          updateSetupUI();
+        }
+      } else {
+        setupState.deepgramKey = false;
+        setupDeepgram.classList.remove('complete');
+        updateSetupUI();
+      }
+    });
+    
+    openaiApiInput?.addEventListener('input', async (e) => {
+      const apiKey = e.target.value.trim();
+      if (apiKey.length > 10) { // Basic validation
+        // Save the API key
+        const saved = await ipcRenderer.invoke('openai-save-key', apiKey);
+        if (saved) {
+          setupState.openaiKey = true;
+          setupOpenAI.classList.add('complete');
+          updateSetupUI();
+        }
+      } else {
+        setupState.openaiKey = false;
+        setupOpenAI.classList.remove('complete');
+        updateSetupUI();
+      }
+    });
+    
+    // Navigation buttons
+    setupNextBtn1?.addEventListener('click', () => showStep(2));
+    setupNextBtn2?.addEventListener('click', () => {
+      showStep(3);
+      updateSetupUI(); // Refresh to show correct config items
+    });
+    setupBackBtn2?.addEventListener('click', () => showStep(1));
+    setupBackBtn3?.addEventListener('click', () => showStep(2));
     
     setupMicBtn?.addEventListener('click', async () => {
       // Open System Settings to Microphone permissions
@@ -7531,22 +8149,165 @@
       }, 2000);
     });
     
-    setupDeepgramBtn?.addEventListener('click', () => {
-      setupOverlay.classList.add('hidden');
-      showSettings();
+    let downloadProgressInterval = null;
+    
+    setupParakeetDownloadBtn?.addEventListener('click', async () => {
+      // Show downloading state immediately with real progress bar
+      document.getElementById('parakeetNotDownloaded').classList.add('hidden');
+      document.getElementById('parakeetDownloading').classList.remove('hidden');
+      
+      // Switch to determinate progress bar
+      const progressBar = document.querySelector('.parakeet-progress');
+      const progressFill = document.getElementById('parakeetProgressFill');
+      progressBar.classList.remove('parakeet-progress-indeterminate');
+      progressFill.classList.remove('parakeet-progress-animated');
+      progressFill.style.width = '0%';
+      document.getElementById('parakeetProgressText').textContent = 'Starting download...';
+      
+      // Start download first (returns immediately, runs in background thread)
+      try {
+        const result = await ipcRenderer.invoke('parakeet-download-model');
+        console.log('[Parakeet] Download started:', result);
+        
+        if (!result.success || !result.started) {
+          document.getElementById('parakeetDownloading').classList.add('hidden');
+          document.getElementById('parakeetNotDownloaded').classList.remove('hidden');
+          alert(`Failed to start download: ${result.error || 'Unknown error'}`);
+          return;
+        }
+      } catch (e) {
+        console.error('[Parakeet] Download start error:', e);
+        document.getElementById('parakeetDownloading').classList.add('hidden');
+        document.getElementById('parakeetNotDownloaded').classList.remove('hidden');
+        alert(`Failed to start download: ${e.message || e}`);
+        return;
+      }
+      
+      // Start polling for progress (download runs in background thread)
+      downloadProgressInterval = setInterval(async () => {
+        try {
+          const progress = await ipcRenderer.invoke('parakeet-get-download-progress');
+          console.log('[Parakeet] Progress:', progress);
+          
+          if (progress.isDownloading) {
+            // Update progress bar
+            progressFill.style.width = `${progress.percent}%`;
+            
+            // Update text with current file and percentage
+            const downloadedMB = (progress.bytesDownloaded / (1024 * 1024)).toFixed(1);
+            const totalMB = (progress.totalBytes / (1024 * 1024)).toFixed(0);
+            const fileInfo = progress.currentFile ? `${progress.currentFile} (${progress.currentFileIndex + 1}/${progress.totalFiles})` : 'Starting...';
+            document.getElementById('parakeetProgressText').textContent = 
+              `Downloading ${fileInfo} - ${downloadedMB}/${totalMB} MB (${progress.percent}%)`;
+          } else if (progress.error) {
+            // Download failed
+            clearInterval(downloadProgressInterval);
+            downloadProgressInterval = null;
+            document.getElementById('parakeetDownloading').classList.add('hidden');
+            document.getElementById('parakeetNotDownloaded').classList.remove('hidden');
+            alert(`Download failed: ${progress.error}`);
+          } else if (!progress.isDownloading && progress.percent >= 100) {
+            // Download complete
+            clearInterval(downloadProgressInterval);
+            downloadProgressInterval = null;
+            handleParakeetDownloadComplete();
+          }
+        } catch (e) {
+          console.error('[Parakeet] Progress poll error:', e);
+        }
+      }, 500); // Poll every 500ms
     });
     
-    setupOpenAIBtn?.addEventListener('click', () => {
-      setupOverlay.classList.add('hidden');
-      showSettings();
+    async function handleParakeetDownloadComplete() {
+      document.getElementById('parakeetDownloading').classList.add('hidden');
+      document.getElementById('parakeetDownloaded').classList.remove('hidden');
+      
+      setupState.parakeetReady = true;
+      setupParakeetItem.classList.add('complete');
+      setupParakeetItem.querySelector('.setup-item-icon').textContent = '✓';
+      
+      // Get model size
+      const info = await ipcRenderer.invoke('parakeet-get-info');
+      document.getElementById('parakeetModelSize').textContent = formatBytes(info.size);
+      
+      updateSetupUI();
+    }
+    
+    // Listen for Parakeet download events (backup to polling)
+    ipcRenderer.on('parakeet-download-complete', async () => {
+      if (downloadProgressInterval) {
+        clearInterval(downloadProgressInterval);
+        downloadProgressInterval = null;
+      }
+      handleParakeetDownloadComplete();
     });
     
-    setupContinueBtn?.addEventListener('click', () => {
+    ipcRenderer.on('parakeet-download-error', (event, error) => {
+      if (downloadProgressInterval) {
+        clearInterval(downloadProgressInterval);
+        downloadProgressInterval = null;
+      }
+      document.getElementById('parakeetDownloading').classList.add('hidden');
+      document.getElementById('parakeetNotDownloaded').classList.remove('hidden');
+      alert(`Download failed: ${error}`);
+    });
+    
+    // Delete model button
+    const setupParakeetDeleteBtn = document.getElementById('setupParakeetDeleteBtn');
+    setupParakeetDeleteBtn?.addEventListener('click', async () => {
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Delete Parakeet Model',
+        message: 'Are you sure you want to delete the Parakeet model (~670 MB)?\n\nYou will need to download it again to use local transcription.',
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      try {
+        const result = await ipcRenderer.invoke('parakeet-delete-model');
+        if (result) {
+          // Reset UI
+          document.getElementById('parakeetDownloaded').classList.add('hidden');
+          document.getElementById('parakeetNotDownloaded').classList.remove('hidden');
+          
+          setupState.parakeetReady = false;
+          setupParakeetItem.classList.remove('complete');
+          setupParakeetItem.querySelector('.setup-item-icon').textContent = '🦜';
+          
+          updateSetupUI();
+        } else {
+          alert('Failed to delete model');
+        }
+      } catch (e) {
+        console.error('[Parakeet] Delete error:', e);
+        alert(`Failed to delete model: ${e.message || e}`);
+      }
+    });
+    
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    setupContinueBtn?.addEventListener('click', async () => {
+      // Save selected transcription engine
+      if (selectedEngine) {
+        await ipcRenderer.invoke('transcription-set-engine', selectedEngine);
+      }
       setupOverlay.classList.add('hidden');
     });
     
     // Check setup on load
     checkSetup();
+    
+    // Initialize wizard to step 1
+    showStep(1);
     
     // Initialize theme on load
     (async () => {
@@ -7906,13 +8667,39 @@
     function showEditor() {
       if (notesHome) notesHome.style.display = 'none';
       if (editorContent) editorContent.classList.remove('hidden');
+      // Always show footer (it contains the mic control)
       if (editorFooter) editorFooter.classList.remove('hidden');
+      // Update visibility of the ask input based on recording state and content
+      updateAskInputVisibility();
       // Add class to body to hide sidebar when viewing a note
       document.body.classList.add('viewing-note');
       // Hide toggle wrapper until we know if this note has AI notes
       const toggleWrapper = document.getElementById('notesViewToggleWrapper');
       if (toggleWrapper) toggleWrapper.classList.remove('visible');
       updateFloatingIndicator(); // Update floating indicator when switching views
+    }
+    
+    // Update ask input visibility based on recording state and content
+    function updateAskInputVisibility() {
+      const askInputWrapper = document.getElementById('askInputWrapper');
+      if (!askInputWrapper) return;
+      
+      // Hide ask input if recording is in progress
+      if (isRecording || isMicActive) {
+        askInputWrapper.style.visibility = 'hidden';
+        return;
+      }
+      
+      // Show ask input only if there's content available (transcript, notes, or AI notes)
+      const hasTranscript = transcript && transcript.length > 0;
+      const hasNotes = getEditorContent && getEditorContent().trim().length > 0;
+      const hasAINotes = !!currentAINotes;
+      
+      if (hasTranscript || hasNotes || hasAINotes) {
+        askInputWrapper.style.visibility = 'visible';
+      } else {
+        askInputWrapper.style.visibility = 'hidden';
+      }
     }
     
     // Back button - return to All Notes from People/Companies/Folders
@@ -8511,6 +9298,8 @@
         if (transcriptStatus) transcriptStatus.textContent = transcript.length > 0 ? 'Transcript Paused' : 'Click Start to begin transcribing';
         if (transcriptEmpty) transcriptEmpty.style.display = transcript.length > 0 ? 'none' : 'flex';
       }
+      // Update ask input visibility whenever recording state changes
+      updateAskInputVisibility();
     }
     
     // Speaker colors for diarization
@@ -8560,6 +9349,7 @@
         const timestamp = typeof item === 'object' ? item.timestamp : null;
         const speaker = typeof item === 'object' ? item.speaker : null;
         const speechFinal = typeof item === 'object' ? item.speechFinal : false;
+        const formattedTime = typeof item === 'object' ? item.formattedTime : null; // Pre-formatted timestamp from Parakeet
         
         // Group by speaker ID if available, otherwise by channel
         const groupKey = speaker !== null ? `speaker-${speaker}` : (isYou ? 'you' : `ch${channel}`);
@@ -8585,7 +9375,8 @@
             texts: [text], 
             timestamp,
             lastTimestamp: timestamp,
-            speechFinal: speechFinal  // Track if this segment ends the utterance
+            speechFinal: speechFinal,  // Track if this segment ends the utterance
+            formattedTime: formattedTime  // Pre-formatted timestamp from Parakeet
           };
           grouped.push(currentGroup);
         }
@@ -8600,28 +9391,29 @@
       let html = grouped.map((group, index) => {
         const combinedText = group.texts.join(' ');
         
-        // Get speaker info
+        // Get speaker info - use colors to differentiate, no labels
+        const isYouSpeaker = group.isYou;
         const speakerId = group.speaker !== undefined && group.speaker !== null ? group.speaker : null;
-        const speakerColor = speakerId !== null ? SPEAKER_COLORS[speakerId % SPEAKER_COLORS.length] : '#888';
-        const speakerLabel = speakerId !== null ? `Speaker ${speakerId + 1}` : 'Unknown';
+        const speakerColor = isYouSpeaker ? '#3b82f6' : (speakerId !== null ? SPEAKER_COLORS[speakerId % SPEAKER_COLORS.length] : '#888');
         
         // Calculate timestamp relative to first segment (recording start)
+        // Use pre-formatted time from Parakeet if available, otherwise calculate from recordingStartTime
         let timestampStr = '';
-        if (group.timestamp && recordingStartTime) {
+        if (group.formattedTime) {
+          // Parakeet provides pre-formatted time like "0:15", "1:30"
+          timestampStr = group.formattedTime;
+        } else if (group.timestamp && recordingStartTime) {
           const elapsedMs = group.timestamp - recordingStartTime;
           const minutes = Math.floor(elapsedMs / 60000);
           const seconds = Math.floor((elapsedMs % 60000) / 1000);
-          timestampStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          timestampStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         } else if (index === 0) {
-          timestampStr = '00:00';
+          timestampStr = '0:00';
         }
         
         return `
           <div class="transcript-turn" data-speaker="${speakerId}" style="--speaker-color: ${speakerColor}">
-            <div class="transcript-speaker">
-              <span>${speakerLabel}</span>
-              ${timestampStr ? `<span class="transcript-timestamp">${timestampStr}</span>` : ''}
-            </div>
+            ${timestampStr ? `<div class="transcript-timestamp-only">${timestampStr}</div>` : ''}
             <div class="transcript-text">${combinedText}</div>
           </div>
         `;
@@ -8726,7 +9518,7 @@
       }
     }
     
-    // Mic control click handler (Granola-style)
+    // Mic control click handler
     micControl?.addEventListener('click', async () => {
       if (isMicActive || isRecording) {
         stopTranscription();
@@ -8736,9 +9528,8 @@
     });
     
     // ============================================================================
-    // AI-ENHANCED NOTES (Granola-style: generated AFTER meeting ends)
+    // AI-ENHANCED NOTES (generated AFTER meeting ends)
     // ============================================================================
-    // Based on: https://help.granola.ai/article/ai-enhanced-notes
     // AI notes are generated when:
     // 1. Meeting ends (call detected as ended or user clicks stop)
     // 2. Using: transcript + user's raw notes + meeting info
@@ -9010,8 +9801,8 @@
         const aiBtn = document.getElementById('aiNotesBtn');
         rawBtn?.classList.remove('active');
         aiBtn?.classList.add('active');
-        // Update current template display
-        updateCurrentTemplateDisplay();
+        // Note: updateCurrentTemplateDisplay() should be called BEFORE showNotesViewToggle()
+        // to ensure the template dropdown shows the correct template
       }
     }
     
@@ -9301,7 +10092,7 @@
       return tmp.textContent || tmp.innerText || '';
     }
     
-    // Called when recording stops - generate AI-enhanced notes (Granola-style)
+    // Called when recording stops - generate AI-enhanced notes
     async function generateEnhancedNotes() {
       if (!hasOpenAIKey) {
         console.log('[AI Notes] No OpenAI key configured');
@@ -9329,7 +10120,7 @@
         return;
       }
       
-      console.log('[AI Notes] Generating enhanced notes (Granola-style)...');
+      console.log('[AI Notes] Generating enhanced notes...');
       isGeneratingAINotes = true;
       
       // Show generating indicator in the editor
@@ -9338,7 +10129,7 @@
       generatingBanner.className = 'ai-generating-banner';
       generatingBanner.innerHTML = `
         <div class="generating-spinner"></div>
-        <span>✨ Generating AI notes from transcript...</span>
+        <span>✨ Analyzing meeting and selecting best template...</span>
       `;
       notesEditor.parentElement.insertBefore(generatingBanner, notesEditor);
       
@@ -9347,21 +10138,51 @@
       
       try {
         // Convert transcript to string (handle both old and new format)
+        // Don't include speaker labels - just the text
         const transcriptText = transcript.map(item => {
           if (typeof item === 'string') return item;
-          const speaker = item.speaker !== null ? `Speaker ${item.speaker + 1}` : '';
-          return speaker ? `${speaker}: ${item.text}` : item.text;
+          return item.text;
         }).join('\n');
         
-        // Granola uses: transcript + raw notes + meeting info
+        // Uses: transcript + raw notes + meeting info
         // Send plain text, not HTML, for better AI processing
         const rawNotesPlainText = stripHtml(rawNotesAtStart);
         console.log('[AI Notes] Sending raw notes to AI:', rawNotesPlainText.substring(0, 100));
         
-        // Get selected template (prefer currentTemplateId from dropdown, fall back to selector)
-        const templateSelector = document.getElementById('templateSelector');
-        const selectedTemplateId = currentTemplateId || templateSelector?.value || null;
+        // STEP 1: Ask AI to suggest the best template first
+        let selectedTemplateId = currentTemplateId;
         
+        // Only auto-suggest if no template was manually selected
+        if (!selectedTemplateId) {
+          console.log('[AI Notes] Step 1: Asking AI to suggest best template...');
+          const templateSuggestion = await ipcRenderer.invoke('openai-suggest-template', {
+            rawNotes: rawNotesPlainText,
+            transcript: transcriptText,
+            meetingTitle: meetingTitle.textContent || 'Meeting'
+          });
+          
+          if (templateSuggestion && templateSuggestion.templateId) {
+            selectedTemplateId = templateSuggestion.templateId;
+            console.log('[AI Notes] AI suggested template:', selectedTemplateId, 'with', templateSuggestion.confidence, 'confidence');
+            console.log('[AI Notes] Reason:', templateSuggestion.reason);
+            
+            // Update the banner to show template selection
+            if (generatingBanner) {
+              generatingBanner.innerHTML = `
+                <div class="generating-spinner"></div>
+                <span>✨ Generating notes with AI-selected template...</span>
+              `;
+            }
+          } else {
+            console.log('[AI Notes] No strong template match, using default template');
+            // Will fall back to default in the backend
+          }
+        } else {
+          console.log('[AI Notes] Using pre-selected template:', selectedTemplateId);
+        }
+        
+        // STEP 2: Generate enhanced notes with the selected/suggested template
+        console.log('[AI Notes] Step 2: Generating enhanced notes with template:', selectedTemplateId || 'default');
         const result = await ipcRenderer.invoke('openai-generate-enhanced', {
           transcript: transcriptText,
           rawNotes: rawNotesPlainText,
@@ -9370,23 +10191,34 @@
           templateId: selectedTemplateId
         });
         
-        // Update current template ID for the toggle dropdown
+        // Update current template ID (from AI suggestion or manual selection)
         if (selectedTemplateId) {
           currentTemplateId = selectedTemplateId;
         }
         
         if (result) {
+          // If AI returned a template ID, use that (it confirms which template was actually used)
+          if (result.templateId) {
+            currentTemplateId = result.templateId;
+            console.log('[AI Notes] Template used for generation:', result.templateId);
+          }
+          
           currentAINotes = result;
-          // Put AI notes directly in the main editor (Granola-style)
+          // Put AI notes directly in the main editor
           putAINotesInEditor(result);
           console.log('[AI Notes] Enhanced notes generated and added to editor');
           
           // Hide generate button and show toggle
           hideGenerateNotesButton();
+          
+          // Update template display BEFORE showing toggle (so toggle shows correct template)
+          await updateCurrentTemplateDisplay();
+          
+          // Now show the toggle with updated template display
           showNotesViewToggle();
           
-          // Update template display
-          await updateCurrentTemplateDisplay();
+          // Update ask input visibility now that AI notes are available
+          updateAskInputVisibility();
           
           // Clear any cached folder suggestion since content changed
           currentSuggestedFolder = null;
@@ -9413,7 +10245,7 @@
       await generateEnhancedNotes();
     }
     
-    // Put AI notes directly in the main editor (Granola-style)
+    // Put AI notes directly in the main editor
     // Uses HTML format that TipTap can render properly
     function putAINotesInEditor(result) {
       // Build HTML content for TipTap - AI notes ONLY (no raw notes mixed in)
@@ -9836,7 +10668,7 @@
                    value="${section.title}" placeholder="Section title"
                    data-section-index="${index}" data-field="title" ${isBuiltIn ? 'readonly' : ''}>
             <textarea class="template-section-instructions-input" 
-                      placeholder="Instructions for Granola..."
+                      placeholder="Instructions for AI..."
                       data-section-index="${index}" data-field="instructions" ${isBuiltIn ? 'readonly' : ''}>${section.instructions}</textarea>
           </div>
           ${!isBuiltIn ? `
@@ -12022,7 +12854,7 @@
       // Reset folder button for new note
       updateAddToFolderButton(null);
       
-      // GRANOLA-STYLE: Don't show AI panel during meeting
+      // Don't show AI panel during meeting
       // Notes will be generated after meeting ends
       onRecordingStart();
       
@@ -12048,7 +12880,7 @@
       
       // Just check if we have OpenAI key for later
       checkOpenAIKey().then(() => {
-        // AI notes will be generated when meeting ends (Granola-style)
+        // AI notes will be generated when meeting ends
       });
     });
     
@@ -12173,6 +13005,11 @@
       
       lastTranscriptTime = Date.now();
       renderTranscript();
+      
+      // Update ask input visibility when transcript content arrives
+      if (segment.isFinal && transcript.length > 0) {
+        updateAskInputVisibility();
+      }
     });
     
     // Receive transcript text (legacy - from widget)
@@ -12193,12 +13030,15 @@
       updateMicUI();
       micLabel.textContent = 'Start';
       
-      // Auto-generate AI notes if we have enough transcript (Granola-style)
+      // Update ask input visibility now that recording has stopped
+      updateAskInputVisibility();
+      
+      // Auto-generate AI notes if we have enough transcript
       const transcriptText = transcript.map(t => typeof t === 'object' ? t.text : t).join(' ');
       const hasEnoughContent = transcriptText.length > 100;
       
       if (transcript.length > 0 && hasEnoughContent && !currentAINotes) {
-        console.log('[Granola] Meeting ended - auto-generating AI notes...');
+        console.log('[App] Meeting ended - auto-generating AI notes...');
         // Small delay to let final transcript segments arrive
         setTimeout(() => {
           if (!currentAINotes) {
@@ -12585,7 +13425,7 @@
       }
     }
     
-    // Open note editor for upcoming/current meeting (Granola-style)
+    // Open note editor for upcoming/current meeting
     async function openMeetingNote(meetingInfo) {
       // Clear any existing scheduled start
       if (scheduledStartTimer) {
@@ -12647,12 +13487,12 @@
         });
         if (micLabel) micLabel.textContent = `Starts ${timeStr}`;
         
-        // GRANOLA-STYLE: Schedule auto-start at meeting time
+        // Schedule auto-start at meeting time
         const msUntilStart = startTimeDate.getTime() - now.getTime();
         if (msUntilStart > 0 && msUntilStart < 24 * 60 * 60 * 1000) { // Within 24 hours
-          console.log(`[Granola] Scheduling auto-start in ${Math.round(msUntilStart / 1000 / 60)} minutes`);
+          console.log(`[App] Scheduling auto-start in ${Math.round(msUntilStart / 1000 / 60)} minutes`);
           scheduledStartTimer = setTimeout(() => {
-            console.log('[Granola] Auto-starting transcription at scheduled time');
+            console.log('[App] Auto-starting transcription at scheduled time');
             startTranscription();
           }, msUntilStart);
         }
@@ -12666,11 +13506,11 @@
       renderNotesList();
     }
     
-    // Start transcription (Granola-style)
+    // Start transcription
     function startTranscription() {
       if (isRecording || isMicActive) return;
       
-      console.log('[Granola] Starting transcription');
+      console.log('[App] Starting transcription');
       isMicActive = true;
       isRecording = true;
       recordingStartTime = Date.now();
@@ -12712,7 +13552,7 @@
     
     // Stop transcription
     function stopTranscription() {
-      console.log('[Granola] Stopping transcription');
+      console.log('[App] Stopping transcription');
       isMicActive = false;
       isRecording = false;
       
@@ -12762,7 +13602,7 @@
       stopSilenceDetection();
       silenceTimer = setInterval(() => {
         if (lastTranscriptTime && Date.now() - lastTranscriptTime > SILENCE_TIMEOUT) {
-          console.log('[Granola] Auto-stopping due to 15 min silence');
+          console.log('[App] Auto-stopping due to 15 min silence');
           stopTranscription();
         }
       }, 60000); // Check every minute
@@ -13369,10 +14209,10 @@
       
       try {
         // Build context from transcript and notes
+        // Don't include speaker labels - just the text
         const transcriptText = transcript.map(item => {
           if (typeof item === 'string') return item;
-          const speaker = item.speaker !== null ? `Speaker ${item.speaker + 1}` : '';
-          return speaker ? `${speaker}: ${item.text}` : item.text;
+          return item.text;
         }).join('\n');
         
         const notesContent = getEditorContent();

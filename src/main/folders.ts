@@ -1,6 +1,5 @@
 /**
  * Folder Service - Manages folders for organizing notes
- * Similar to Granola's folder functionality
  */
 
 import * as fs from 'fs';

@@ -1,6 +1,6 @@
 //! macOS audio capture using ScreenCaptureKit + AVFoundation microphone
 //!
-//! NEW APPROACH (Granola-style):
+//! Audio capture approach:
 //! - System audio via ScreenCaptureKit loopback (all audio output)
 //! - Microphone audio via AVFoundation (user's voice)
 //! - Package as STEREO: Left = System, Right = Mic
