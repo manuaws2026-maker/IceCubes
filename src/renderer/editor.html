@@ -4451,10 +4451,10 @@
     
     .settings-close-btn {
       position: absolute;
-      top: 16px;
-      right: 16px;
-      width: 36px;
-      height: 36px;
+      top: 12px;
+      right: 12px;
+      width: 40px;
+      height: 40px;
       border: none;
       background: rgba(255,255,255,0.1);
       border-radius: 8px;
@@ -4464,8 +4464,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
-      pointer-events: auto;
+      z-index: 10000;
+      pointer-events: auto !important;
     }
     
     .settings-close-btn:hover {
@@ -8334,7 +8334,7 @@
       console.log('[Offline] User switching to local models');
       
       // Check if local models are available
-      const parakeetReady = await ipcRenderer.invoke('parakeet-is-downloaded');
+      const parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
       const llmReady = await ipcRenderer.invoke('llm-is-ready');
       
       console.log(`[Offline] Local models ready: parakeet=${parakeetReady}, llm=${llmReady}`);
