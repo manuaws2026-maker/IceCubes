@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - IceCubes</title>
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-sidebar: #0f0f1a;
+      --text-primary: #e8e8e8;
+      --text-secondary: #a0a0a0;
+      --accent: #4ade80;
+      --accent-hover: #22c55e;
+      --border: rgba(255, 255, 255, 0.1);
+      --danger: #ef4444;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+    
+    .settings-container {
+      display: flex;
+      height: 100vh;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .settings-sidebar {
+      width: 200px;
+      background: var(--bg-sidebar);
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
+      -webkit-app-region: drag;
+    }
+    
+    .settings-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      padding: 0 8px;
+      padding-top: 24px;
+    }
+    
+    .settings-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+    }
+    
+    .settings-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      text-align: left;
+      transition: all 0.2s;
+    }
+    
+    .settings-nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+    
+    .settings-nav-item.active {
+      background: var(--accent);
+      color: #000;
+    }
+    
+    .nav-icon {
+      font-size: 16px;
+    }
+    
+    .settings-main {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      -webkit-app-region: no-drag;
+      padding-top: 48px;
+    }
+    
+    .settings-close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      -webkit-app-region: no-drag;
+      transition: all 0.2s;
+    }
+    
+    .settings-close-btn:hover {
+      background: rgba(255,255,255,0.2);
+      color: var(--text-primary);
+    }
+    
+    .settings-tab {
+      display: none;
+    }
+    
+    .settings-tab.active {
+      display: block;
+    }
+    
+    .settings-section {
+      margin-bottom: 32px;
+    }
+    
+    .settings-section h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .settings-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    
+    /* Theme Selector */
+    .theme-selector {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .theme-option {
+      flex: 1;
+      padding: 16px;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-primary);
+      transition: all 0.2s;
+    }
+    
+    .theme-option:hover {
+      border-color: var(--accent);
+    }
+    
+    .theme-option.active {
+      border-color: var(--accent);
+      background: rgba(74, 222, 128, 0.1);
+    }
+    
+    .theme-icon {
+      font-size: 24px;
+    }
+    
+    /* Provider Toggle */
+    .provider-toggle-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .provider-toggle-btn {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-primary);
+      transition: all 0.2s;
+    }
+    
+    .provider-toggle-btn:hover {
+      border-color: rgba(74, 222, 128, 0.5);
+    }
+    
+    .provider-toggle-btn.selected {
+      border-color: var(--accent);
+      background: rgba(74, 222, 128, 0.1);
+    }
+    
+    .provider-icon {
+      font-size: 20px;
+    }
+    
+    .provider-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .provider-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    
+    .provider-badge.cloud {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+    
+    .provider-badge.local {
+      background: rgba(74, 222, 128, 0.2);
+      color: #4ade80;
+    }
+    
+    /* Active Status */
+    .active-provider-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(74, 222, 128, 0.1);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    
+    .active-label {
+      color: var(--text-secondary);
+    }
+    
+    .active-provider-name {
+      color: var(--accent);
+      font-weight: 500;
+    }
+    
+    /* Provider Config */
+    .provider-config {
+      background: var(--bg-secondary);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    
+    .provider-config.hidden {
+      display: none;
+    }
+    
+    .provider-config-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .config-title {
+      font-weight: 500;
+      font-size: 14px;
+    }
+    
+    .config-info {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+    
+    .config-success {
+      color: var(--accent);
+    }
+    
+    /* Status */
+    .settings-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+    }
+    
+    .settings-status.connected .status-dot {
+      background: var(--accent);
+    }
+    
+    .settings-status.error .status-dot {
+      background: var(--danger);
+    }
+    
+    /* Input Group */
+    .settings-input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .settings-input-group input {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+    
+    .settings-input-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    /* Buttons */
+    .settings-btn {
+      padding: 10px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .settings-btn:hover {
+      background: var(--accent-hover);
+    }
+    
+    .settings-btn-full {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .settings-btn-full:hover {
+      background: var(--accent-hover);
+    }
+    
+    .settings-btn-danger {
+      padding: 8px 12px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 6px;
+      color: var(--danger);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .settings-btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+    
+    .settings-btn-danger.hidden {
+      display: none;
+    }
+    
+    .provider-config-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .settings-link {
+      color: var(--accent);
+      font-size: 12px;
+      text-decoration: none;
+    }
+    
+    .settings-link:hover {
+      text-decoration: underline;
+    }
+    
+    /* Progress Bar */
+    .settings-progress-bar {
+      height: 6px;
+      background: var(--bg-primary);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    
+    .settings-progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    
+    .settings-progress-fill.llm-progress-indeterminate {
+      width: 30%;
+      animation: indeterminate 1.5s infinite ease-in-out;
+    }
+    
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(400%); }
+    }
+    
+    .settings-progress-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Calendar section */
+    .section-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .reset-btn {
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    
+    .reset-btn:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    
+    .calendars-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .calendar-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+    }
+    
+    .calendar-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+    
+    .calendar-name {
+      flex: 1;
+      font-size: 13px;
+    }
+    
+    .calendar-toggle {
+      width: 36px;
+      height: 20px;
+      background: var(--bg-primary);
+      border-radius: 10px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+    
+    .calendar-toggle.active {
+      background: var(--accent);
+    }
+    
+    .calendar-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    
+    .calendar-toggle.active::after {
+      left: 18px;
+    }
+    
+    /* Language selects */
+    .settings-select {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    
+    .settings-select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    
+    .settings-checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    
+    .settings-checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+    
+    .settings-checkbox-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    
+    /* Notification settings */
+    .notification-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .notification-toggle:last-child {
+      border-bottom: none;
+    }
+    
+    .notification-info h4 {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    
+    .notification-info p {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    
+    .toggle-switch {
+      width: 44px;
+      height: 24px;
+      background: var(--bg-primary);
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+    
+    .toggle-switch.active {
+      background: var(--accent);
+    }
+    
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    
+    .toggle-switch.active::after {
+      left: 22px;
+    }
+  </style>
+</head>
+<body>
+  <div class="settings-container">
+    <button class="settings-close-btn" id="settingsCloseBtn">✕</button>
+    
+    <div class="settings-sidebar">
+      <div class="settings-title">Settings</div>
+      <div class="settings-nav">
+        <button class="settings-nav-item active" data-tab="general">
+          <span class="nav-icon">⚙️</span> General
+        </button>
+        <button class="settings-nav-item" data-tab="calendar">
+          <span class="nav-icon">📅</span> Calendar
+        </button>
+        <button class="settings-nav-item" data-tab="notifications">
+          <span class="nav-icon">🔔</span> Notifications
+        </button>
+        <button class="settings-nav-item" data-tab="language">
+          <span class="nav-icon">🌐</span> Language
+        </button>
+      </div>
+    </div>
+    
+    <div class="settings-main">
+      <!-- General Tab -->
+      <div class="settings-tab active" id="settingsTabGeneral">
+        <div class="settings-section">
+          <h3>🎨 Appearance</h3>
+          <p class="settings-desc">Choose your preferred theme</p>
+          <div class="theme-selector" id="themeSelector">
+            <button class="theme-option" data-theme="light">
+              <span class="theme-icon">☀️</span>
+              <span>Light</span>
+            </button>
+            <button class="theme-option active" data-theme="system">
+              <span class="theme-icon">💻</span>
+              <span>System</span>
+            </button>
+            <button class="theme-option" data-theme="dark">
+              <span class="theme-icon">🌙</span>
+              <span>Dark</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Transcription Provider Section -->
+        <div class="settings-section">
+          <h3>🎙️ Transcription</h3>
+          <p class="settings-desc">Choose your transcription provider</p>
+          
+          <div class="provider-toggle-group">
+            <button class="provider-toggle-btn selected" id="transcriptionProviderDeepgram" data-provider="deepgram">
+              <span class="provider-icon">☁️</span>
+              <span class="provider-name">Deepgram</span>
+              <span class="provider-badge cloud">Cloud</span>
+            </button>
+            <button class="provider-toggle-btn" id="transcriptionProviderParakeet" data-provider="parakeet">
+              <span class="provider-icon">💻</span>
+              <span class="provider-name">Parakeet</span>
+              <span class="provider-badge local">Local</span>
+            </button>
+          </div>
+          
+          <div class="active-provider-status" id="transcriptionActiveStatus">
+            <span class="active-label">Active:</span>
+            <span class="active-provider-name" id="transcriptionActiveName">Checking...</span>
+          </div>
+          
+          <!-- Deepgram Config -->
+          <div class="provider-config" id="deepgramConfig">
+            <div class="provider-config-header">
+              <span class="config-title">Deepgram API Key</span>
+              <div class="settings-status" id="deepgramStatus">
+                <span class="status-dot"></span>
+                <span id="deepgramStatusText">Not configured</span>
+              </div>
+            </div>
+            <div class="settings-input-group">
+              <input type="password" id="deepgramKeyInput" placeholder="Enter Deepgram API key">
+              <button class="settings-btn" id="deepgramSaveBtn">Save</button>
+            </div>
+            <div class="provider-config-footer">
+              <a href="#" class="settings-link" id="deepgramLink">Get a free API key →</a>
+              <button class="settings-btn-danger hidden" id="deepgramClearBtn">Clear Key</button>
+            </div>
+          </div>
+          
+          <!-- Parakeet Config -->
+          <div class="provider-config hidden" id="parakeetConfig">
+            <div class="provider-config-header">
+              <span class="config-title">Parakeet Local Model</span>
+              <div class="settings-status" id="parakeetStatus">
+                <span class="status-dot"></span>
+                <span id="parakeetStatusText">Not downloaded</span>
+              </div>
+            </div>
+            <div id="parakeetNotDownloaded">
+              <p class="config-info">~670 MB download • 25 languages • 100% private</p>
+              <button class="settings-btn-full" id="parakeetDownloadBtn">Download Model</button>
+            </div>
+            <div id="parakeetDownloading" class="hidden">
+              <div class="settings-progress-bar"><div class="settings-progress-fill" id="parakeetProgressFill"></div></div>
+              <p class="settings-progress-text" id="parakeetProgressText">Downloading...</p>
+            </div>
+            <div id="parakeetDownloaded" class="hidden">
+              <p class="config-info config-success">✓ Model ready for local transcription</p>
+              <button class="settings-btn-danger" id="parakeetDeleteBtn">Delete Model</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- AI Notes Provider Section -->
+        <div class="settings-section">
+          <h3>🤖 AI Notes</h3>
+          <p class="settings-desc">Choose your AI provider for note enhancement</p>
+          
+          <div class="provider-toggle-group">
+            <button class="provider-toggle-btn selected" id="aiProviderOpenAI" data-provider="openai">
+              <span class="provider-icon">☁️</span>
+              <span class="provider-name">OpenAI</span>
+              <span class="provider-badge cloud">Cloud</span>
+            </button>
+            <button class="provider-toggle-btn" id="aiProviderLocal" data-provider="local">
+              <span class="provider-icon">💻</span>
+              <span class="provider-name">Qwen2.5</span>
+              <span class="provider-badge local">Local</span>
+            </button>
+          </div>
+          
+          <div class="active-provider-status" id="aiActiveStatus">
+            <span class="active-label">Active:</span>
+            <span class="active-provider-name" id="aiActiveName">Checking...</span>
+          </div>
+          
+          <!-- OpenAI Config -->
+          <div class="provider-config" id="openaiConfig">
+            <div class="provider-config-header">
+              <span class="config-title">OpenAI API Key</span>
+              <div class="settings-status" id="openaiStatus">
+                <span class="status-dot"></span>
+                <span id="openaiStatusText">Not configured</span>
+              </div>
+            </div>
+            <div class="settings-input-group">
+              <input type="password" id="openaiKeyInput" placeholder="Enter OpenAI API key">
+              <button class="settings-btn" id="openaiSaveBtn">Save</button>
+            </div>
+            <div class="provider-config-footer">
+              <a href="#" class="settings-link" id="openaiLink">Get an API key →</a>
+              <button class="settings-btn-danger hidden" id="openaiClearBtn">Clear Key</button>
+            </div>
+          </div>
+          
+          <!-- Local LLM Config -->
+          <div class="provider-config hidden" id="localLLMConfig">
+            <div class="provider-config-header">
+              <span class="config-title">Qwen2.5 3B Local Model</span>
+              <div class="settings-status" id="localLLMStatus">
+                <span class="status-dot"></span>
+                <span id="localLLMStatusText">Not downloaded</span>
+              </div>
+            </div>
+            <div id="localLLMNotDownloaded">
+              <p class="config-info">~2 GB download • Metal accelerated • 100% private</p>
+              <button class="settings-btn-full" id="localLLMDownloadBtn">Download Model</button>
+            </div>
+            <div id="localLLMDownloading" class="hidden">
+              <div class="settings-progress-bar"><div class="settings-progress-fill llm-progress-indeterminate" id="localLLMProgressFill"></div></div>
+              <p class="settings-progress-text" id="localLLMProgressText">Downloading...</p>
+            </div>
+            <div id="localLLMDownloaded" class="hidden">
+              <p class="config-info config-success">✓ Model ready for local AI notes</p>
+              <button class="settings-btn-danger" id="localLLMDeleteBtn">Delete Model</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Calendar Tab -->
+      <div class="settings-tab" id="settingsTabCalendar">
+        <div class="settings-section">
+          <h3>📅 Google Calendar</h3>
+          <p class="settings-desc">Connect your calendar to see upcoming meetings</p>
+          <div class="settings-status" id="calendarStatus">
+            <span class="status-dot"></span>
+            <span id="calendarStatusText">Checking...</span>
+          </div>
+          <button class="settings-btn-full" id="calendarConnectBtn" style="margin-top: 12px;">Connect Google Calendar</button>
+        </div>
+        
+        <div class="settings-section hidden" id="visibleCalendarsSection">
+          <div class="section-header-row">
+            <h3>Visible Calendars</h3>
+            <button class="reset-btn" id="resetCalendarsBtn">Reset</button>
+          </div>
+          <div class="calendars-list" id="calendarsList"></div>
+        </div>
+      </div>
+      
+      <!-- Notifications Tab -->
+      <div class="settings-tab" id="settingsTabNotifications">
+        <div class="settings-section">
+          <h3>🔔 Notification Settings</h3>
+          <p class="settings-desc">Configure when you receive notifications</p>
+          
+          <div class="notification-toggle">
+            <div class="notification-info">
+              <h4>Meeting Reminders</h4>
+              <p>Get notified before meetings start</p>
+            </div>
+            <div class="toggle-switch active" id="toggleMeetingReminders"></div>
+          </div>
+          
+          <div class="notification-toggle">
+            <div class="notification-info">
+              <h4>Recording Complete</h4>
+              <p>Notification when transcription is ready</p>
+            </div>
+            <div class="toggle-switch active" id="toggleRecordingComplete"></div>
+          </div>
+          
+          <div class="notification-toggle">
+            <div class="notification-info">
+              <h4>Auto-start Recording</h4>
+              <p>Automatically start recording when meetings begin</p>
+            </div>
+            <div class="toggle-switch" id="toggleAutoRecord"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Language Tab -->
+      <div class="settings-tab" id="settingsTabLanguage">
+        <div class="settings-section">
+          <h3>🌐 Language Settings</h3>
+          <p class="settings-desc">Configure transcription and output languages</p>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 14px;">Transcription Language</label>
+            <select class="settings-select" id="transcriptionLangSelect">
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+              <option value="nl">Dutch</option>
+              <option value="ja">Japanese</option>
+              <option value="ko">Korean</option>
+              <option value="zh">Chinese</option>
+            </select>
+          </div>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="display: block; margin-bottom: 8px; font-size: 14px;">AI Notes Language</label>
+            <select class="settings-select" id="aiNotesLangSelect">
+              <option value="same">Same as transcription</option>
+              <option value="en">English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+            </select>
+          </div>
+          
+          <div class="settings-checkbox-group">
+            <input type="checkbox" id="autoDetectLang">
+            <label for="autoDetectLang">Auto-detect language (slower but more accurate)</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer, shell } = require('electron');
+    
+    // Close button
+    document.getElementById('settingsCloseBtn').addEventListener('click', () => {
+      ipcRenderer.send('close-settings-window');
+    });
+    
+    // Tab navigation
+    document.querySelectorAll('.settings-nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const tab = item.dataset.tab;
+        if (!tab) return;
+        
+        document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(`settingsTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+      });
+    });
+    
+    // Theme selector
+    const themeSelector = document.getElementById('themeSelector');
+    themeSelector?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.theme-option');
+      if (!btn) return;
+      
+      const theme = btn.dataset.theme;
+      document.querySelectorAll('.theme-option').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      
+      await ipcRenderer.invoke('set-theme', theme);
+    });
+    
+    // State
+    let settingsState = {
+      transcriptionEngine: 'deepgram',
+      aiEngine: 'openai',
+      deepgramKey: false,
+      openaiKey: false,
+      parakeetReady: false,
+      localLLMReady: false,
+    };
+    
+    // Load state
+    async function loadState() {
+      try {
+        settingsState.transcriptionEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
+        settingsState.aiEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
+        settingsState.deepgramKey = await ipcRenderer.invoke('has-deepgram-key');
+        settingsState.openaiKey = await ipcRenderer.invoke('openai-has-key');
+        settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
+        settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
+        
+        updateUI();
+      } catch (e) {
+        console.error('Error loading settings state:', e);
+      }
+    }
+    
+    function updateUI() {
+      // Transcription toggle
+      const deepgramBtn = document.getElementById('transcriptionProviderDeepgram');
+      const parakeetBtn = document.getElementById('transcriptionProviderParakeet');
+      const deepgramConfig = document.getElementById('deepgramConfig');
+      const parakeetConfig = document.getElementById('parakeetConfig');
+      
+      if (settingsState.transcriptionEngine === 'deepgram') {
+        deepgramBtn?.classList.add('selected');
+        parakeetBtn?.classList.remove('selected');
+        deepgramConfig?.classList.remove('hidden');
+        parakeetConfig?.classList.add('hidden');
+      } else {
+        deepgramBtn?.classList.remove('selected');
+        parakeetBtn?.classList.add('selected');
+        deepgramConfig?.classList.add('hidden');
+        parakeetConfig?.classList.remove('hidden');
+      }
+      
+      // AI toggle
+      const openaiBtn = document.getElementById('aiProviderOpenAI');
+      const localBtn = document.getElementById('aiProviderLocal');
+      const openaiConfig = document.getElementById('openaiConfig');
+      const localLLMConfig = document.getElementById('localLLMConfig');
+      
+      if (settingsState.aiEngine === 'openai') {
+        openaiBtn?.classList.add('selected');
+        localBtn?.classList.remove('selected');
+        openaiConfig?.classList.remove('hidden');
+        localLLMConfig?.classList.add('hidden');
+      } else {
+        openaiBtn?.classList.remove('selected');
+        localBtn?.classList.add('selected');
+        openaiConfig?.classList.add('hidden');
+        localLLMConfig?.classList.remove('hidden');
+      }
+      
+      // Transcription status
+      const transcriptionActiveName = document.getElementById('transcriptionActiveName');
+      if (settingsState.transcriptionEngine === 'deepgram' && settingsState.deepgramKey) {
+        transcriptionActiveName.textContent = 'Deepgram (Cloud)';
+      } else if (settingsState.transcriptionEngine === 'parakeet' && settingsState.parakeetReady) {
+        transcriptionActiveName.textContent = 'Parakeet (Local)';
+      } else {
+        transcriptionActiveName.textContent = 'Not configured';
+      }
+      
+      // AI status
+      const aiActiveName = document.getElementById('aiActiveName');
+      if (settingsState.aiEngine === 'openai' && settingsState.openaiKey) {
+        aiActiveName.textContent = 'OpenAI (Cloud)';
+      } else if (settingsState.aiEngine === 'local' && settingsState.localLLMReady) {
+        aiActiveName.textContent = 'Qwen2.5 (Local)';
+      } else {
+        aiActiveName.textContent = 'Not configured';
+      }
+      
+      // Deepgram status
+      const deepgramStatus = document.getElementById('deepgramStatus');
+      const deepgramStatusText = document.getElementById('deepgramStatusText');
+      const deepgramClearBtn = document.getElementById('deepgramClearBtn');
+      if (settingsState.deepgramKey) {
+        deepgramStatus?.classList.add('connected');
+        deepgramStatusText.textContent = 'Connected';
+        deepgramClearBtn?.classList.remove('hidden');
+      } else {
+        deepgramStatus?.classList.remove('connected');
+        deepgramStatusText.textContent = 'Not configured';
+        deepgramClearBtn?.classList.add('hidden');
+      }
+      
+      // OpenAI status
+      const openaiStatus = document.getElementById('openaiStatus');
+      const openaiStatusText = document.getElementById('openaiStatusText');
+      const openaiClearBtn = document.getElementById('openaiClearBtn');
+      if (settingsState.openaiKey) {
+        openaiStatus?.classList.add('connected');
+        openaiStatusText.textContent = 'Connected';
+        openaiClearBtn?.classList.remove('hidden');
+      } else {
+        openaiStatus?.classList.remove('connected');
+        openaiStatusText.textContent = 'Not configured';
+        openaiClearBtn?.classList.add('hidden');
+      }
+      
+      // Parakeet status
+      const parakeetStatus = document.getElementById('parakeetStatus');
+      const parakeetStatusText = document.getElementById('parakeetStatusText');
+      const parakeetNotDownloaded = document.getElementById('parakeetNotDownloaded');
+      const parakeetDownloaded = document.getElementById('parakeetDownloaded');
+      if (settingsState.parakeetReady) {
+        parakeetStatus?.classList.add('connected');
+        parakeetStatusText.textContent = 'Ready';
+        parakeetNotDownloaded?.classList.add('hidden');
+        parakeetDownloaded?.classList.remove('hidden');
+      } else {
+        parakeetStatus?.classList.remove('connected');
+        parakeetStatusText.textContent = 'Not downloaded';
+        parakeetNotDownloaded?.classList.remove('hidden');
+        parakeetDownloaded?.classList.add('hidden');
+      }
+      
+      // Local LLM status
+      const localLLMStatus = document.getElementById('localLLMStatus');
+      const localLLMStatusText = document.getElementById('localLLMStatusText');
+      const localLLMNotDownloaded = document.getElementById('localLLMNotDownloaded');
+      const localLLMDownloaded = document.getElementById('localLLMDownloaded');
+      if (settingsState.localLLMReady) {
+        localLLMStatus?.classList.add('connected');
+        localLLMStatusText.textContent = 'Ready';
+        localLLMNotDownloaded?.classList.add('hidden');
+        localLLMDownloaded?.classList.remove('hidden');
+      } else {
+        localLLMStatus?.classList.remove('connected');
+        localLLMStatusText.textContent = 'Not downloaded';
+        localLLMNotDownloaded?.classList.remove('hidden');
+        localLLMDownloaded?.classList.add('hidden');
+      }
+    }
+    
+    // Transcription provider toggle
+    document.getElementById('transcriptionProviderDeepgram')?.addEventListener('click', async () => {
+      settingsState.transcriptionEngine = 'deepgram';
+      await ipcRenderer.invoke('transcription-set-engine', 'deepgram');
+      updateUI();
+    });
+    
+    document.getElementById('transcriptionProviderParakeet')?.addEventListener('click', async () => {
+      settingsState.transcriptionEngine = 'parakeet';
+      await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
+      updateUI();
+    });
+    
+    // AI provider toggle
+    document.getElementById('aiProviderOpenAI')?.addEventListener('click', async () => {
+      settingsState.aiEngine = 'openai';
+      await ipcRenderer.invoke('ai-set-engine', 'openai');
+      updateUI();
+    });
+    
+    document.getElementById('aiProviderLocal')?.addEventListener('click', async () => {
+      settingsState.aiEngine = 'local';
+      await ipcRenderer.invoke('ai-set-engine', 'local');
+      updateUI();
+    });
+    
+    // Save Deepgram key
+    document.getElementById('deepgramSaveBtn')?.addEventListener('click', async () => {
+      const input = document.getElementById('deepgramKeyInput');
+      const key = input.value.trim();
+      if (key) {
+        await ipcRenderer.invoke('save-deepgram-key', key);
+        input.value = '';
+        settingsState.deepgramKey = true;
+        updateUI();
+      }
+    });
+    
+    // Save OpenAI key
+    document.getElementById('openaiSaveBtn')?.addEventListener('click', async () => {
+      const input = document.getElementById('openaiKeyInput');
+      const key = input.value.trim();
+      if (key) {
+        await ipcRenderer.invoke('save-openai-key', key);
+        input.value = '';
+        settingsState.openaiKey = true;
+        updateUI();
+      }
+    });
+    
+    // Clear keys
+    document.getElementById('deepgramClearBtn')?.addEventListener('click', async () => {
+      if (confirm('Clear Deepgram API key?')) {
+        await ipcRenderer.invoke('clear-deepgram-key');
+        settingsState.deepgramKey = false;
+        updateUI();
+      }
+    });
+    
+    document.getElementById('openaiClearBtn')?.addEventListener('click', async () => {
+      if (confirm('Clear OpenAI API key?')) {
+        await ipcRenderer.invoke('clear-openai-key');
+        settingsState.openaiKey = false;
+        updateUI();
+      }
+    });
+    
+    // Download Parakeet
+    document.getElementById('parakeetDownloadBtn')?.addEventListener('click', async () => {
+      document.getElementById('parakeetNotDownloaded')?.classList.add('hidden');
+      document.getElementById('parakeetDownloading')?.classList.remove('hidden');
+      
+      try {
+        await ipcRenderer.invoke('parakeet-download-model');
+        // Poll for completion
+        const checkProgress = setInterval(async () => {
+          const progress = await ipcRenderer.invoke('parakeet-get-download-progress');
+          if (progress.status === 'completed') {
+            clearInterval(checkProgress);
+            settingsState.parakeetReady = true;
+            document.getElementById('parakeetDownloading')?.classList.add('hidden');
+            updateUI();
+          } else if (progress.status === 'error') {
+            clearInterval(checkProgress);
+            alert('Download failed: ' + progress.error);
+            document.getElementById('parakeetDownloading')?.classList.add('hidden');
+            document.getElementById('parakeetNotDownloaded')?.classList.remove('hidden');
+          }
+        }, 1000);
+      } catch (e) {
+        alert('Download failed: ' + e.message);
+        document.getElementById('parakeetDownloading')?.classList.add('hidden');
+        document.getElementById('parakeetNotDownloaded')?.classList.remove('hidden');
+      }
+    });
+    
+    // Delete Parakeet
+    document.getElementById('parakeetDeleteBtn')?.addEventListener('click', async () => {
+      if (confirm('Delete Parakeet model?')) {
+        await ipcRenderer.invoke('parakeet-delete-model');
+        settingsState.parakeetReady = false;
+        updateUI();
+      }
+    });
+    
+    // Download Local LLM
+    document.getElementById('localLLMDownloadBtn')?.addEventListener('click', async () => {
+      document.getElementById('localLLMNotDownloaded')?.classList.add('hidden');
+      document.getElementById('localLLMDownloading')?.classList.remove('hidden');
+      
+      try {
+        await ipcRenderer.invoke('llm-init');
+        // Poll for completion
+        const checkProgress = setInterval(async () => {
+          const progress = await ipcRenderer.invoke('llm-get-init-progress');
+          if (progress.status === 'Model ready' || !progress.is_loading) {
+            clearInterval(checkProgress);
+            settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
+            document.getElementById('localLLMDownloading')?.classList.add('hidden');
+            updateUI();
+          } else if (progress.error) {
+            clearInterval(checkProgress);
+            alert('Download failed: ' + progress.error);
+            document.getElementById('localLLMDownloading')?.classList.add('hidden');
+            document.getElementById('localLLMNotDownloaded')?.classList.remove('hidden');
+          }
+        }, 1000);
+      } catch (e) {
+        alert('Download failed: ' + e.message);
+        document.getElementById('localLLMDownloading')?.classList.add('hidden');
+        document.getElementById('localLLMNotDownloaded')?.classList.remove('hidden');
+      }
+    });
+    
+    // Delete Local LLM - TODO: Implement in backend
+    document.getElementById('localLLMDeleteBtn')?.addEventListener('click', async () => {
+      alert('To delete the Qwen model, manually remove:\n~/.cache/huggingface/hub/models--Qwen--Qwen2.5-3B-Instruct-GGUF');
+    });
+    
+    // External links
+    document.getElementById('deepgramLink')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      shell.openExternal('https://console.deepgram.com/signup');
+    });
+    
+    document.getElementById('openaiLink')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      shell.openExternal('https://platform.openai.com/api-keys');
+    });
+    
+    // Calendar
+    document.getElementById('calendarConnectBtn')?.addEventListener('click', async () => {
+      await ipcRenderer.invoke('calendar-connect');
+      loadState();
+    });
+    
+    // Load settings on init
+    loadState();
+    
+    // Load saved theme
+    (async () => {
+      const theme = await ipcRenderer.invoke('get-theme');
+      if (theme) {
+        document.querySelectorAll('.theme-option').forEach(t => {
+          t.classList.toggle('active', t.dataset.theme === theme);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
+

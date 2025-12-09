@@ -9436,16 +9436,12 @@
     });
     
     function showSettings() {
-      settingsOverlay?.classList.remove('hidden');
-      loadSettingsStatus();
-      // Load provider states for transcription/AI toggles
-      if (typeof loadSettingsProviderState === 'function') {
-        loadSettingsProviderState();
-      }
+      // Open settings in a separate window
+      ipcRenderer.send('open-settings-window');
     }
     
     function hideSettings() {
-      settingsOverlay?.classList.add('hidden');
+      // Settings is now in separate window - this is a no-op
     }
     
     async function loadSettingsStatus() {

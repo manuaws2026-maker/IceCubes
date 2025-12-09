@@ -1251,6 +1251,55 @@ function setupIPC() {
     shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
   });
   
+  // Open Settings in a separate window
+  ipcMain.on('open-settings-window', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.focus();
+      return;
+    }
+    
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    
+    settingsWindow = new BrowserWindow({
+      width: 700,
+      height: 600,
+      minWidth: 600,
+      minHeight: 500,
+      x: Math.floor((screenWidth - 700) / 2),
+      y: Math.floor((screenHeight - 600) / 2),
+      frame: false,
+      titleBarStyle: 'hidden',
+      trafficLightPosition: { x: 16, y: 16 },
+      vibrancy: 'under-window',
+      visualEffectState: 'active',
+      transparent: true,
+      backgroundColor: '#00000000',
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+      },
+    });
+    
+    // Load settings page
+    if (process.env.NODE_ENV === 'development') {
+      settingsWindow.loadFile(path.join(__dirname, '../renderer/settings.html'));
+    } else {
+      settingsWindow.loadFile(path.join(__dirname, '../renderer/settings.html'));
+    }
+    
+    settingsWindow.on('closed', () => {
+      settingsWindow = null;
+    });
+  });
+  
+  // Close settings window
+  ipcMain.on('close-settings-window', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close();
+    }
+  });
+  
   // Reposition window for recording mode (right side of screen)
   ipcMain.on('enter-recording-mode', () => {
     console.log('[IPC] enter-recording-mode received');

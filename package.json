@@ -13,7 +13,7 @@
     "build:native": "cd src-native && npm run build",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
-    "copy:assets": "cp src/renderer/indicator.html src/renderer/meeting-bar.html src/renderer/editor.html dist/renderer/ && cp assets/logo.png dist/renderer/assets/ && mkdir -p dist/renderer/assets/wasm && cp assets/wasm/sql-wasm.wasm dist/renderer/assets/wasm/",
+    "copy:assets": "cp src/renderer/indicator.html src/renderer/meeting-bar.html src/renderer/editor.html src/renderer/settings.html dist/renderer/ && cp assets/logo.png dist/renderer/assets/ && mkdir -p dist/renderer/assets/wasm && cp assets/wasm/sql-wasm.wasm dist/renderer/assets/wasm/",
     "rebuild": "npm run build:native && npm rebuild ghost-native",
     "start": "electron .",
     "start:dev": "NODE_ENV=development electron .",
