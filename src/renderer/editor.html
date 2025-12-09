@@ -8339,12 +8339,24 @@
       
       console.log(`[Offline] Local models: parakeet=${parakeetReady}, llm=${llmDownloaded}`);
       
-      if (!parakeetReady || !llmDownloaded) {
-        const missing = [];
-        if (!parakeetReady) missing.push('Parakeet (transcription)');
-        if (!llmDownloaded) missing.push('Qwen (AI notes)');
-        
+      // Build list of missing models
+      const missing = [];
+      if (!parakeetReady) missing.push('Parakeet (transcription)');
+      if (!llmDownloaded) missing.push('Qwen (AI notes)');
+      
+      if (missing.length > 0) {
         alert(`Please download the following local models first:\n• ${missing.join('\n• ')}\n\nOpen Settings to download them.`);
+        showSettings();
+        return;
+      }
+      
+      // Double-check both models are really available before switching
+      const parakeetDoubleCheck = await ipcRenderer.invoke('parakeet-check-downloaded');
+      const llmDoubleCheck = await ipcRenderer.invoke('llm-is-downloaded');
+      
+      if (!parakeetDoubleCheck || !llmDoubleCheck) {
+        console.error('[Offline] Model check failed on double-check');
+        alert('Local models not available. Please download them in Settings first.');
         showSettings();
         return;
       }

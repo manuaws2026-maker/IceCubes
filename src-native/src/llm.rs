@@ -111,32 +111,48 @@ pub fn is_llm_downloaded() -> bool {
     // The model directory name is based on the repo name with -- replacing /
     let home = match dirs::home_dir() {
         Some(h) => h,
-        None => return false,
+        None => {
+            println!("[LLM] Cannot determine home directory");
+            return false;
+        }
     };
     
     let cache_dir = home.join(".cache/huggingface/hub");
     let model_dir_name = format!("models--{}", GGUF_REPO.replace("/", "--"));
     let model_dir = cache_dir.join(&model_dir_name);
     
+    println!("[LLM] Checking for model at: {}", model_dir.display());
+    
     // Check if the snapshots directory exists and has content
     let snapshots_dir = model_dir.join("snapshots");
     if !snapshots_dir.exists() {
-        println!("[LLM] Model not downloaded: {} not found", snapshots_dir.display());
+        println!("[LLM] Model not downloaded: snapshots dir not found");
         return false;
     }
     
-    // Check if any snapshot has the GGUF file
+    // Check if any snapshot has the GGUF file with reasonable size
+    // The Q4_K_M model should be around 2GB
+    const MIN_MODEL_SIZE: u64 = 1_500_000_000; // At least 1.5GB
+    
     if let Ok(entries) = std::fs::read_dir(&snapshots_dir) {
         for entry in entries.flatten() {
             let gguf_path = entry.path().join(GGUF_FILE);
             if gguf_path.exists() {
-                println!("[LLM] Model found at: {}", gguf_path.display());
-                return true;
+                // Verify file size is reasonable
+                if let Ok(metadata) = std::fs::metadata(&gguf_path) {
+                    let size = metadata.len();
+                    if size >= MIN_MODEL_SIZE {
+                        println!("[LLM] ✅ Model found: {} ({:.2} GB)", gguf_path.display(), size as f64 / 1_000_000_000.0);
+                        return true;
+                    } else {
+                        println!("[LLM] ⚠️ Model file too small: {} bytes (expected >= {})", size, MIN_MODEL_SIZE);
+                    }
+                }
             }
         }
     }
     
-    println!("[LLM] Model not downloaded: GGUF file not found in snapshots");
+    println!("[LLM] ❌ Model not downloaded or incomplete");
     false
 }
 
