@@ -100,6 +100,16 @@
       padding-top: 48px;
     }
     
+    .settings-drag-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      -webkit-app-region: drag;
+      z-index: 999;
+    }
+    
     .settings-close-btn {
       position: absolute;
       top: 12px;
@@ -614,6 +624,9 @@
   </style>
 </head>
 <body>
+  <!-- Drag bar for window dragging -->
+  <div class="settings-drag-bar"></div>
+  
   <div class="settings-container">
     <button class="settings-close-btn" id="settingsCloseBtn">✕</button>
     
