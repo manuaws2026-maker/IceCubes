@@ -74,6 +74,8 @@ export declare function initLlm(): boolean
 /** Synchronous init that blocks until model is ready */
 export declare function initLlmSync(): boolean
 export declare function shutdownLlm(): void
+/** Delete the downloaded LLM model from HuggingFace cache */
+export declare function deleteLlmModel(): boolean
 /** Generate text completion using the local LLM */
 export declare function llmGenerate(prompt: string, maxTokens?: number | undefined | null, temperature?: number | undefined | null): LlmResponse
 /**

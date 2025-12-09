@@ -2719,6 +2719,22 @@ Answer:`;
       return false;
     }
   });
+  
+  ipcMain.handle('llm-delete-model', async () => {
+    try {
+      const result = nativeModule?.deleteLlmModel?.();
+      
+      // Notify editor window that model was deleted
+      if (result && editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send('model-deleted', 'llm');
+      }
+      
+      return result ?? false;
+    } catch (e) {
+      console.error('[LLM] Delete model error:', e);
+      return false;
+    }
+  });
 
   // Get/Set AI engine preference (openai or local)
   ipcMain.handle('ai-get-engine', async () => {

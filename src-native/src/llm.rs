@@ -290,6 +290,35 @@ pub fn shutdown_llm() {
     println!("[LLM] Shutdown complete");
 }
 
+/// Delete the downloaded LLM model from HuggingFace cache
+#[napi]
+pub fn delete_llm_model() -> Result<bool> {
+    // First shutdown the model if it's loaded
+    {
+        let mut state = LLM_STATE.lock();
+        *state = None;
+    }
+    
+    let home = dirs::home_dir()
+        .ok_or_else(|| Error::from_reason("Cannot determine home directory"))?;
+    
+    let cache_dir = home.join(".cache/huggingface/hub");
+    let model_dir_name = format!("models--{}", GGUF_REPO.replace("/", "--"));
+    let model_dir = cache_dir.join(&model_dir_name);
+    
+    println!("[LLM] Deleting model at: {}", model_dir.display());
+    
+    if model_dir.exists() {
+        std::fs::remove_dir_all(&model_dir)
+            .map_err(|e| Error::from_reason(format!("Failed to delete model: {}", e)))?;
+        println!("[LLM] ✅ Model deleted successfully");
+        Ok(true)
+    } else {
+        println!("[LLM] Model directory not found, nothing to delete");
+        Ok(false)
+    }
+}
+
 // ============================================================================
 // NAPI Exports - Inference
 // ============================================================================

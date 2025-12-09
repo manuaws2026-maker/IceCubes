@@ -1432,9 +1432,31 @@
       }
     });
     
-    // Delete Local LLM - TODO: Implement in backend
+    // Delete Local LLM
     document.getElementById('localLLMDeleteBtn')?.addEventListener('click', async () => {
-      alert('To delete the Qwen model, manually remove:\n~/.cache/huggingface/hub/models--Qwen--Qwen2.5-3B-Instruct-GGUF');
+      // Check if OpenAI key is configured first
+      const hasOpenAIKey = await ipcRenderer.invoke('has-openai-key');
+      if (!hasOpenAIKey) {
+        alert('Cannot delete local LLM model - you need OpenAI API key configured first to ensure AI notes functionality.');
+        return;
+      }
+      
+      const confirmed = confirm('Delete the Qwen2.5 3B model (~2GB)?\n\nThis will free up disk space but you\'ll need to re-download it to use local AI again.');
+      if (!confirmed) return;
+      
+      try {
+        const result = await ipcRenderer.invoke('llm-delete-model');
+        if (result) {
+          alert('Qwen model deleted successfully.');
+          // Switch to OpenAI since local model is gone
+          await ipcRenderer.invoke('ai-set-engine', 'openai');
+          loadState();
+        } else {
+          alert('Model not found or already deleted.');
+        }
+      } catch (e) {
+        alert('Failed to delete model: ' + e.message);
+      }
     });
     
     // External links
