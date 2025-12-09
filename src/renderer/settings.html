@@ -1513,8 +1513,8 @@
           
           calendarsList.innerHTML = calendars.map(cal => `
             <div class="calendar-item" data-id="${cal.id}">
-              <div class="calendar-color" style="background: ${cal.color || '#4285f4'}"></div>
-              <span class="calendar-name">${cal.name}</span>
+              <div class="calendar-color" style="background: ${cal.backgroundColor || '#4285f4'}"></div>
+              <span class="calendar-name">${cal.summary || cal.name || 'Unnamed Calendar'}</span>
               <div class="calendar-toggle ${cal.selected !== false ? 'active' : ''}" data-id="${cal.id}"></div>
             </div>
           `).join('');
