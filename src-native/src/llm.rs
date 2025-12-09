@@ -1,7 +1,7 @@
 //! Local LLM inference engine
 //!
 //! This module provides local language model inference using mistral.rs
-//! with support for GGUF quantized models like Llama 3.2 3B.
+//! with support for GGUF quantized models like Qwen2.5 3B.
 
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeFunction, ErrorStrategy, ThreadsafeFunctionCallMode};
@@ -16,11 +16,11 @@ use mistralrs::{
     RequestBuilder, Response, ChatCompletionChunkResponse, ChunkChoice, Delta,
 };
 
-// Model configuration for Llama 3.2 3B Instruct
-const GGUF_REPO: &str = "bartowski/Llama-3.2-3B-Instruct-GGUF";
-const GGUF_FILE: &str = "Llama-3.2-3B-Instruct-Q4_K_M.gguf";
-const TOKENIZER_REPO: &str = "meta-llama/Llama-3.2-3B-Instruct";
-const MODEL_SIZE_BYTES: u64 = 2_019_000_000; // ~2GB
+// Model configuration for Qwen2.5 3B Instruct (public, no auth required)
+const GGUF_REPO: &str = "Qwen/Qwen2.5-3B-Instruct-GGUF";
+const GGUF_FILE: &str = "qwen2.5-3b-instruct-q4_k_m.gguf";
+const TOKENIZER_REPO: &str = "Qwen/Qwen2.5-3B-Instruct";
+const MODEL_SIZE_BYTES: u64 = 2_100_000_000; // ~2GB
 
 // ============================================================================
 // Global State
@@ -87,7 +87,7 @@ pub fn get_llm_model_info() -> LlmModelInfo {
     
     LlmModelInfo {
         ready,
-        model_name: "Llama 3.2 3B Instruct (Q4_K_M)".to_string(),
+        model_name: "Qwen2.5 3B Instruct (Q4_K_M)".to_string(),
         model_repo: GGUF_REPO.to_string(),
         model_file: GGUF_FILE.to_string(),
         estimated_size: MODEL_SIZE_BYTES as i64,
@@ -143,7 +143,7 @@ pub fn init_llm() -> bool {
 }
 
 fn do_init_llm() {
-    println!("[LLM] Initializing Llama 3.2 3B...");
+    println!("[LLM] Initializing Qwen2.5 3B...");
     println!("[LLM] Repo: {}", GGUF_REPO);
     println!("[LLM] File: {}", GGUF_FILE);
     println!("[LLM] Tokenizer: {}", TOKENIZER_REPO);
@@ -194,7 +194,7 @@ fn do_init_llm() {
 /// Synchronous init that blocks until model is ready
 #[napi]
 pub fn init_llm_sync() -> Result<bool> {
-    println!("[LLM] Initializing Llama 3.2 3B (sync)...");
+    println!("[LLM] Initializing Qwen2.5 3B (sync)...");
     
     // Check if already loaded
     {

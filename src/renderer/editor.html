@@ -6459,9 +6459,9 @@
         <div class="setup-checklist hidden" id="setupLocalLLMConfig">
           <div class="setup-item" style="flex-direction: column; align-items: stretch;">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <div class="setup-item-icon">🦙</div>
+              <div class="setup-item-icon">🤖</div>
               <div class="setup-item-text">
-                <div class="setup-item-title">Llama 3.2 3B</div>
+                <div class="setup-item-title">Qwen2.5 3B</div>
                 <div class="setup-item-desc">Local AI model</div>
               </div>
               <div class="setup-status" id="localLLMStatus"></div>
@@ -7296,7 +7296,7 @@
                 </button>
                 <button class="provider-toggle-btn" id="aiProviderLocal" data-provider="local">
                   <span class="provider-icon">💻</span>
-                  <span class="provider-name">Llama 3.2</span>
+                  <span class="provider-name">Qwen2.5</span>
                   <span class="provider-badge local">Local</span>
                 </button>
               </div>
@@ -7329,7 +7329,7 @@
               <!-- Local LLM Config -->
               <div class="provider-config hidden" id="localLLMConfig">
                 <div class="provider-config-header">
-                  <span class="config-title">Llama 3.2 3B Local Model</span>
+                  <span class="config-title">Qwen2.5 3B Local Model</span>
                   <div class="settings-status" id="localLLMSettingsStatus">
                     <span class="status-dot"></span>
                     <span id="localLLMSettingsStatusText">Not downloaded</span>
@@ -9616,7 +9616,7 @@
       if (settingsState.aiEngine === 'openai' && settingsState.openaiKey) {
         aiActiveName.textContent = 'OpenAI (Cloud)';
       } else if (settingsState.aiEngine === 'local' && settingsState.localLLMReady) {
-        aiActiveName.textContent = 'Llama 3.2 (Local)';
+        aiActiveName.textContent = 'Qwen2.5 (Local)';
       } else {
         aiActiveName.textContent = 'Not configured';
         aiActiveName.style.color = '#ef4444';
@@ -9760,7 +9760,7 @@
       
       const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
         title: 'Clear OpenAI API Key',
-        message: 'This will remove your OpenAI API key. AI notes will use local Llama 3.2 model. Continue?',
+        message: 'This will remove your OpenAI API key. AI notes will use local Qwen2.5 model. Continue?',
         okLabel: 'Clear Key',
         cancelLabel: 'Cancel'
       });
@@ -9899,7 +9899,7 @@
       
       const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
         title: 'Delete Local LLM Model',
-        message: 'This will delete the local Llama 3.2 model (~2 GB). AI notes will switch to OpenAI. Continue?',
+        message: 'This will delete the local Qwen2.5 model (~2 GB). AI notes will switch to OpenAI. Continue?',
         okLabel: 'Delete',
         cancelLabel: 'Cancel'
       });
