@@ -2212,23 +2212,30 @@ Answer:`;
   // Uses AI router to choose between OpenAI and local LLM
   ipcMain.handle('openai-generate-enhanced', async (_, data: { transcript: string, rawNotes: string, meetingTitle: string, meetingInfo?: any, templateId?: string }) => {
     const aiEngine = getAIEngine();
+    const localLLMReady = isLocalLLMReady();
+    const hasOpenAIKey = openaiService?.hasApiKey() ?? false;
+    
+    console.log(`[IPC] 🤖 AI ENGINE STATUS:`);
+    console.log(`[IPC]   - Selected engine: ${aiEngine.toUpperCase()}`);
+    console.log(`[IPC]   - Local LLM ready: ${localLLMReady}`);
+    console.log(`[IPC]   - OpenAI key configured: ${hasOpenAIKey}`);
     
     // Check if we can generate notes
-    if (aiEngine === 'openai' && !openaiService?.hasApiKey()) {
+    if (aiEngine === 'openai' && !hasOpenAIKey) {
       console.log('[IPC] No OpenAI API key, checking local LLM...');
-      if (!isLocalLLMReady()) {
-        console.log('[IPC] No AI engine available');
+      if (!localLLMReady) {
+        console.log('[IPC] ❌ No AI engine available');
         return null;
       }
-    } else if (aiEngine === 'local' && !isLocalLLMReady()) {
+    } else if (aiEngine === 'local' && !localLLMReady) {
       console.log('[IPC] Local LLM not ready, falling back to OpenAI...');
-      if (!openaiService?.hasApiKey()) {
-        console.log('[IPC] No AI engine available');
+      if (!hasOpenAIKey) {
+        console.log('[IPC] ❌ No AI engine available');
         return null;
       }
     }
     
-    console.log('[IPC] Generating enhanced notes with engine:', aiEngine);
+    console.log(`[IPC] ✅ Generating enhanced notes with engine: ${aiEngine.toUpperCase()}`);
     
     // Get language settings
     const langSettings = store.get('langSettings', { transcriptionLang: 'en', aiNotesLang: 'same', autoDetect: false }) as any;
@@ -2639,6 +2646,22 @@ Answer:`;
   ipcMain.handle('ai-set-engine', async (_, engine: 'openai' | 'local') => {
     store.set('aiEngine', engine);
     console.log('[AI] Engine set to:', engine);
+    
+    // Auto-initialize local LLM when selected
+    if (engine === 'local') {
+      const isReady = nativeModule?.isLlmReady?.() ?? false;
+      console.log('[AI] Local LLM ready:', isReady);
+      
+      if (!isReady) {
+        console.log('[AI] Auto-initializing local LLM...');
+        try {
+          nativeModule?.initLlm?.();
+        } catch (e) {
+          console.error('[AI] Failed to init LLM:', e);
+        }
+      }
+    }
+    
     return true;
   });
 }

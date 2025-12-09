@@ -81,12 +81,21 @@ export class TranscriptionRouter {
    * Start streaming with the current engine
    */
   async startStreaming(): Promise<boolean> {
+    // Re-read engine from store to get latest value
+    const savedEngine = store.get('transcriptionEngine') as TranscriptionEngine;
+    if (savedEngine && savedEngine !== this.currentEngine) {
+      console.log(`[TranscriptionRouter] Engine mismatch! Updating from ${this.currentEngine} to ${savedEngine}`);
+      this.currentEngine = savedEngine;
+    }
+    
+    console.log(`[TranscriptionRouter] 🎙️ Starting transcription with engine: ${this.currentEngine.toUpperCase()}`);
+    
     try {
       if (this.currentEngine === 'parakeet') {
-        console.log('[TranscriptionRouter] Starting Parakeet (Rust) transcription...');
+        console.log('[TranscriptionRouter] Using Parakeet (local) for transcription');
         return await this.startParakeetStreaming();
       } else {
-        console.log('[TranscriptionRouter] Starting Deepgram transcription...');
+        console.log('[TranscriptionRouter] Using Deepgram (cloud) for transcription');
         return this.deepgramEngine.startStreaming();
       }
     } catch (error) {
