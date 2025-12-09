@@ -1466,11 +1466,14 @@
           calendarStatus?.classList.remove('error');
           calendarStatusText.textContent = 'Connected';
           calendarConnectBtn.textContent = 'Reconnect Google Calendar';
+          // Load calendar list when connected
+          loadCalendarList();
         } else {
           calendarStatus?.classList.remove('connected');
           calendarStatus?.classList.remove('error');
           calendarStatusText.textContent = 'Not connected';
           calendarConnectBtn.textContent = 'Connect Google Calendar';
+          visibleCalendarsSection?.classList.add('hidden');
         }
       } catch (e) {
         calendarStatus?.classList.remove('connected');
@@ -1495,8 +1498,64 @@
       }
     });
     
+    // Load calendar list
+    const visibleCalendarsSection = document.getElementById('visibleCalendarsSection');
+    const calendarsList = document.getElementById('calendarsList');
+    const resetCalendarsBtn = document.getElementById('resetCalendarsBtn');
+    
+    async function loadCalendarList() {
+      try {
+        const calendars = await ipcRenderer.invoke('calendar-get-list');
+        console.log('[Settings] Got calendars:', calendars);
+        
+        if (calendars && calendars.length > 0) {
+          visibleCalendarsSection?.classList.remove('hidden');
+          
+          calendarsList.innerHTML = calendars.map(cal => `
+            <div class="calendar-item" data-id="${cal.id}">
+              <div class="calendar-color" style="background: ${cal.color || '#4285f4'}"></div>
+              <span class="calendar-name">${cal.name}</span>
+              <div class="calendar-toggle ${cal.selected !== false ? 'active' : ''}" data-id="${cal.id}"></div>
+            </div>
+          `).join('');
+          
+          // Add toggle handlers
+          calendarsList.querySelectorAll('.calendar-toggle').forEach(toggle => {
+            toggle.addEventListener('click', async () => {
+              const calId = toggle.dataset.id;
+              const isActive = toggle.classList.contains('active');
+              toggle.classList.toggle('active');
+              await ipcRenderer.invoke('calendar-set-selected', calId, !isActive);
+            });
+          });
+        } else {
+          visibleCalendarsSection?.classList.add('hidden');
+        }
+      } catch (e) {
+        console.error('[Settings] Error loading calendars:', e);
+        visibleCalendarsSection?.classList.add('hidden');
+      }
+    }
+    
+    resetCalendarsBtn?.addEventListener('click', async () => {
+      // Reset all calendars to selected
+      const toggles = calendarsList.querySelectorAll('.calendar-toggle');
+      for (const toggle of toggles) {
+        toggle.classList.add('active');
+        await ipcRenderer.invoke('calendar-set-selected', toggle.dataset.id, true);
+      }
+    });
+    
     // Check calendar status on load
     checkCalendarStatus();
+    
+    // Load calendar list if connected
+    (async () => {
+      const connected = await ipcRenderer.invoke('calendar-is-connected');
+      if (connected) {
+        loadCalendarList();
+      }
+    })();
     
     // Load settings on init
     loadState();
