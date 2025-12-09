@@ -1298,6 +1298,11 @@ function setupIPC() {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.close();
     }
+    
+    // Notify editor window that settings closed (to re-check offline status)
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('settings-closed');
+    }
   });
   
   // Reposition window for recording mode (right side of screen)
@@ -2480,7 +2485,14 @@ Answer:`;
   ipcMain.handle('parakeet-delete-model', async () => {
     try {
       nativeModule?.shutdownParakeet?.();
-      return nativeModule?.deleteParakeetModel?.() ?? false;
+      const result = nativeModule?.deleteParakeetModel?.() ?? false;
+      
+      // Notify editor window that model was deleted
+      if (result && editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send('model-deleted', 'parakeet');
+      }
+      
+      return result;
     } catch (e) {
       console.error('[Parakeet] Delete model error:', e);
       return false;
@@ -2547,6 +2559,12 @@ Answer:`;
 
   ipcMain.handle('transcription-set-engine', async (_, engine: 'deepgram' | 'parakeet') => {
     transcriptionRouter.setEngine(engine);
+    
+    // Notify editor window that engine changed
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('engine-changed');
+    }
+    
     return true;
   });
 
@@ -2718,6 +2736,11 @@ Answer:`;
           console.error('[AI] Failed to init LLM:', e);
         }
       }
+    }
+    
+    // Notify editor window that engine changed
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('engine-changed');
     }
     
     return true;

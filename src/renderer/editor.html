@@ -8292,36 +8292,93 @@
     async function checkOfflineStatus() {
       const isOnline = navigator.onLine;
       
-      // Check if user is using ANY cloud models
+      // Get current engine settings
       const transcriptionEngine = await ipcRenderer.invoke('transcription-get-engine');
       const aiEngine = await ipcRenderer.invoke('ai-get-engine');
       
-      const usingCloudTranscription = transcriptionEngine === 'deepgram';
-      const usingCloudAI = aiEngine === 'openai';
-      const usingAnyCloud = usingCloudTranscription || usingCloudAI;
+      // Check if local models are actually available
+      const parakeetDownloaded = await ipcRenderer.invoke('parakeet-check-downloaded');
+      const llmDownloaded = await ipcRenderer.invoke('llm-is-downloaded');
       
-      console.log(`[Offline] Check: online=${isOnline}, transcription=${transcriptionEngine}, ai=${aiEngine}`);
+      // Determine what's actually usable offline
+      const hasWorkingTranscription = (transcriptionEngine === 'parakeet' && parakeetDownloaded) ||
+                                       (transcriptionEngine === 'deepgram' && isOnline);
+      const hasWorkingAI = (aiEngine === 'local' && llmDownloaded) ||
+                           (aiEngine === 'openai' && isOnline);
       
-      // Show banner if offline AND using any cloud service
-      if (!isOnline && usingAnyCloud) {
-        showOfflineBanner(usingCloudTranscription, usingCloudAI);
+      // Determine specific issues
+      const transcriptionIssue = !hasWorkingTranscription;
+      const aiIssue = !hasWorkingAI;
+      
+      // Build issue details for banner
+      const issues = [];
+      if (transcriptionIssue) {
+        if (transcriptionEngine === 'deepgram') {
+          issues.push({ service: 'Deepgram (transcription)', reason: 'cloud', canFix: parakeetDownloaded });
+        } else {
+          issues.push({ service: 'Parakeet (transcription)', reason: 'deleted', canFix: false });
+        }
+      }
+      if (aiIssue) {
+        if (aiEngine === 'openai') {
+          issues.push({ service: 'OpenAI (AI notes)', reason: 'cloud', canFix: llmDownloaded });
+        } else {
+          issues.push({ service: 'Qwen (AI notes)', reason: 'deleted', canFix: false });
+        }
+      }
+      
+      console.log(`[Offline] Check: online=${isOnline}, trans=${transcriptionEngine}, ai=${aiEngine}`);
+      console.log(`[Offline] Models: parakeet=${parakeetDownloaded}, llm=${llmDownloaded}`);
+      console.log(`[Offline] Working: transcription=${hasWorkingTranscription}, ai=${hasWorkingAI}`);
+      console.log(`[Offline] Issues:`, issues);
+      
+      // Show banner if there are any issues (offline with cloud OR local model deleted)
+      if (!isOnline && issues.length > 0) {
+        showOfflineBanner(issues, parakeetDownloaded, llmDownloaded);
       } else {
         hideOfflineBanner();
       }
     }
     
-    function showOfflineBanner(cloudTranscription, cloudAI) {
+    function showOfflineBanner(issues, parakeetReady, llmReady) {
       const suggestionText = offlineBanner?.querySelector('.offline-suggestion');
+      const switchBtn = document.getElementById('offlineSwitchBtn');
+      
       if (suggestionText) {
-        const services = [];
-        if (cloudTranscription) services.push('Deepgram (transcription)');
-        if (cloudAI) services.push('OpenAI (AI notes)');
-        suggestionText.textContent = `${services.join(' & ')} won't work offline. Switch to local models for uninterrupted use.`;
+        const serviceNames = issues.map(i => i.service).join(' & ');
+        
+        // Check if issues are fixable by switching
+        const allFixable = issues.every(i => i.canFix);
+        const someDeleted = issues.some(i => i.reason === 'deleted');
+        
+        if (someDeleted) {
+          // Local model was deleted
+          const deletedServices = issues.filter(i => i.reason === 'deleted').map(i => i.service).join(' & ');
+          suggestionText.textContent = `${deletedServices} model not available. Download in Settings to use offline.`;
+          if (switchBtn) {
+            switchBtn.textContent = 'Open Settings';
+            switchBtn.onclick = () => showSettings();
+          }
+        } else if (allFixable) {
+          // Can switch to local
+          suggestionText.textContent = `${serviceNames} won't work offline. Switch to local models for uninterrupted use.`;
+          if (switchBtn) {
+            switchBtn.textContent = 'Switch to Local';
+            switchBtn.onclick = null; // Will be set by the default handler
+          }
+        } else {
+          // Mixed - some cloud, some missing local
+          suggestionText.textContent = `${serviceNames} unavailable offline. Download local models in Settings.`;
+          if (switchBtn) {
+            switchBtn.textContent = 'Open Settings';
+            switchBtn.onclick = () => showSettings();
+          }
+        }
       }
       
       offlineBanner?.classList.remove('hidden');
       document.body.classList.add('has-offline-banner');
-      console.log('[Offline] Banner shown - using cloud services while offline');
+      console.log('[Offline] Banner shown');
     }
     
     function hideOfflineBanner() {
@@ -8329,8 +8386,13 @@
       document.body.classList.remove('has-offline-banner');
     }
     
-    // Switch to local models
-    offlineSwitchBtn?.addEventListener('click', async () => {
+    // Switch to local models (default handler - may be overridden by showOfflineBanner)
+    offlineSwitchBtn?.addEventListener('click', async (e) => {
+      // Check if there's a custom onclick handler (set by showOfflineBanner)
+      if (offlineSwitchBtn.onclick) {
+        return; // Let the custom handler run
+      }
+      
       console.log('[Offline] User switching to local models');
       
       // Check if local models are downloaded
@@ -8350,17 +8412,6 @@
         return;
       }
       
-      // Double-check both models are really available before switching
-      const parakeetDoubleCheck = await ipcRenderer.invoke('parakeet-check-downloaded');
-      const llmDoubleCheck = await ipcRenderer.invoke('llm-is-downloaded');
-      
-      if (!parakeetDoubleCheck || !llmDoubleCheck) {
-        console.error('[Offline] Model check failed on double-check');
-        alert('Local models not available. Please download them in Settings first.');
-        showSettings();
-        return;
-      }
-      
       // Switch to local models for BOTH transcription and AI
       try {
         console.log('[Offline] Setting transcription engine to parakeet...');
@@ -8371,12 +8422,7 @@
         
         console.log('[Offline] ✅ Switched to local models (Parakeet + Qwen)');
         
-        // Verify the switch worked
-        const newTranscription = await ipcRenderer.invoke('transcription-get-engine');
-        const newAI = await ipcRenderer.invoke('ai-get-engine');
-        console.log(`[Offline] Verified: transcription=${newTranscription}, ai=${newAI}`);
-        
-        // Re-check status (this will hide banner if both are local)
+        // Re-check status (this will hide banner if both are local and available)
         await checkOfflineStatus();
         
         // Show confirmation
@@ -8419,6 +8465,24 @@
     
     // Periodically check (every 10 seconds for quicker response)
     setInterval(checkOfflineStatus, 10000);
+    
+    // Re-check when settings window closes (model might have been deleted/downloaded)
+    ipcRenderer.on('settings-closed', () => {
+      console.log('[Offline] Settings closed, re-checking status...');
+      checkOfflineStatus();
+    });
+    
+    // Re-check when models are deleted (triggered from main process)
+    ipcRenderer.on('model-deleted', (_, modelType) => {
+      console.log(`[Offline] Model deleted: ${modelType}, re-checking status...`);
+      checkOfflineStatus();
+    });
+    
+    // Re-check when engine settings change
+    ipcRenderer.on('engine-changed', () => {
+      console.log('[Offline] Engine changed, re-checking status...');
+      checkOfflineStatus();
+    });
     
     // ============================================================================
     // SETUP/PERMISSIONS CHECK
