@@ -26,6 +26,13 @@ ureq = "2"     # For HTTP downloads
 dirs = "5"     # For app data directories
 rubato = "0.14"  # High-quality audio resampling
 
+# Local LLM inference (mistral.rs)
+mistralrs = { git = "https://github.com/EricLBuehler/mistral.rs", features = ["metal"] }
+anyhow = "1"
+futures = "0.3"
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
 core-graphics = "0.24"

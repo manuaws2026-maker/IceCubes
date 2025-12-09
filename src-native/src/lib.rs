@@ -11,6 +11,7 @@ use std::sync::Arc;
 mod window;
 mod audio;
 mod parakeet;
+mod llm;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -21,6 +22,7 @@ mod windows_impl;
 pub use window::*;
 pub use audio::*;
 pub use parakeet::*;
+pub use llm::*;
 
 /// Window information returned from native APIs
 #[napi(object)]
