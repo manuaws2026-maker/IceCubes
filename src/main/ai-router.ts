@@ -5,10 +5,24 @@
  * local Llama 3.2 inference via mistral.rs
  */
 
-import Store from 'electron-store';
+import { app } from 'electron';
+import path from 'path';
+import fs from 'fs';
 import { OpenAIService, NoteGenerationResult } from './openai';
 
-const store = new Store();
+// Use same settings file as index.ts
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
+
+function readSettings(): Record<string, any> {
+  try {
+    if (fs.existsSync(SETTINGS_PATH)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('[AIRouter] Error reading settings:', e);
+  }
+  return {};
+}
 
 export type AIEngine = 'openai' | 'local';
 
@@ -23,15 +37,24 @@ export function setNativeModuleForAI(module: any) {
  * Get current AI engine preference
  */
 export function getAIEngine(): AIEngine {
-  return (store.get('aiEngine') as AIEngine) || 'openai';
+  const settings = readSettings();
+  const engine = (settings.aiEngine as AIEngine) || 'openai';
+  console.log(`[AIRouter] getAIEngine() = ${engine} (from settings.json)`);
+  return engine;
 }
 
 /**
  * Set AI engine preference
  */
 export function setAIEngine(engine: AIEngine): void {
-  store.set('aiEngine', engine);
-  console.log('[AIRouter] Engine set to:', engine);
+  const settings = readSettings();
+  settings.aiEngine = engine;
+  try {
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
+    console.log('[AIRouter] Engine set to:', engine);
+  } catch (e) {
+    console.error('[AIRouter] Error saving engine:', e);
+  }
 }
 
 /**
@@ -118,7 +141,8 @@ async function openAIChatCompletion(
   temperature: number,
   jsonMode?: boolean
 ): Promise<string | null> {
-  const apiKey = store.get('openaiKey') as string;
+  const settings = readSettings();
+  const apiKey = settings.openaiKey as string;
   
   if (!apiKey) {
     console.error('[AIRouter] No OpenAI API key');
@@ -172,14 +196,48 @@ export async function generateEnhancedNotesWithRouter(
   template?: any
 ): Promise<NoteGenerationResult | null> {
   const engine = getAIEngine();
+  const localReady = isLocalLLMReady();
+  const hasOpenAI = openaiService?.hasApiKey() ?? false;
   
-  console.log(`[AIRouter] 📝 Using AI engine: ${engine.toUpperCase()} for note generation`);
+  console.log(`[AIRouter] 📝 GENERATING ENHANCED NOTES`);
+  console.log(`[AIRouter]   - Configured engine: ${engine.toUpperCase()}`);
+  console.log(`[AIRouter]   - Local LLM ready: ${localReady}`);
+  console.log(`[AIRouter]   - OpenAI available: ${hasOpenAI}`);
+  console.log(`[AIRouter]   - Transcript length: ${transcript.length} chars`);
   
-  if (engine === 'local') {
-    return generateNotesWithLocalLLM(transcript, rawNotes, meetingTitle, meetingInfo, outputLanguage, template);
+  // Determine which engine to actually use
+  let useEngine = engine;
+  
+  if (engine === 'local' && !localReady) {
+    console.log(`[AIRouter] ⚠️ Local LLM not ready, falling back to OpenAI`);
+    if (hasOpenAI) {
+      useEngine = 'openai';
+    } else {
+      console.log(`[AIRouter] ❌ No AI engine available!`);
+      return null;
+    }
+  }
+  
+  if (engine === 'openai' && !hasOpenAI) {
+    console.log(`[AIRouter] ⚠️ No OpenAI key, trying local LLM`);
+    if (localReady) {
+      useEngine = 'local';
+    } else {
+      console.log(`[AIRouter] ❌ No AI engine available!`);
+      return null;
+    }
+  }
+  
+  console.log(`[AIRouter] ✅ Using: ${useEngine.toUpperCase()}`);
+  
+  if (useEngine === 'local') {
+    const result = await generateNotesWithLocalLLM(transcript, rawNotes, meetingTitle, meetingInfo, outputLanguage, template);
+    console.log(`[AIRouter] Local LLM result: ${result ? 'SUCCESS' : 'NULL'}`);
+    return result;
   } else {
-    // Use existing OpenAI service
-    return openaiService.generateEnhancedNotes(transcript, rawNotes, meetingTitle, meetingInfo, outputLanguage, template);
+    const result = await openaiService.generateEnhancedNotes(transcript, rawNotes, meetingTitle, meetingInfo, outputLanguage, template);
+    console.log(`[AIRouter] OpenAI result: ${result ? 'SUCCESS' : 'NULL'}`);
+    return result;
   }
 }
 
