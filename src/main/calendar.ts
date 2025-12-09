@@ -395,7 +395,19 @@ export class CalendarService {
                   </head>
                   <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);">
                     <div style="text-align: center; padding: 40px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); max-width: 400px;">
-                      <div style="font-size: 64px; margin-bottom: 16px;">🧊</div>
+                      <svg width="64" height="64" viewBox="0 0 100 100" style="margin-bottom: 16px;">
+                        <defs>
+                          <linearGradient id="iceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                          </linearGradient>
+                        </defs>
+                        <rect x="15" y="15" width="70" height="70" rx="12" fill="url(#iceGrad)" />
+                        <rect x="25" y="25" width="20" height="20" rx="4" fill="rgba(255,255,255,0.4)" />
+                        <rect x="55" y="25" width="20" height="20" rx="4" fill="rgba(255,255,255,0.25)" />
+                        <rect x="25" y="55" width="20" height="20" rx="4" fill="rgba(255,255,255,0.25)" />
+                        <rect x="55" y="55" width="20" height="20" rx="4" fill="rgba(255,255,255,0.15)" />
+                      </svg>
                       <h1 style="color: #065f46; margin: 0 0 12px; font-size: 24px; font-weight: 600;">Connected to Google Calendar!</h1>
                       <p style="color: #6b7280; margin: 0; font-size: 15px;">You can close this window and return to IceCubes.</p>
                       <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
