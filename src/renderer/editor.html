@@ -6103,6 +6103,111 @@
       background: rgba(139, 92, 246, 0.2);
     }
     
+    /* Offline Warning Banner */
+    .offline-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100000;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: white;
+      padding: 8px 16px;
+      font-size: 13px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      animation: slideDown 0.3s ease-out;
+      -webkit-app-region: no-drag;
+    }
+    
+    @keyframes slideDown {
+      from {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .offline-banner.hidden {
+      display: none;
+    }
+    
+    .offline-banner-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .offline-icon {
+      font-size: 16px;
+    }
+    
+    .offline-text {
+      flex: 1;
+    }
+    
+    .offline-suggestion {
+      opacity: 0.9;
+      font-size: 12px;
+    }
+    
+    .offline-switch-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    
+    .offline-switch-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .offline-dismiss-btn {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+    
+    .offline-dismiss-btn:hover {
+      opacity: 1;
+    }
+    
+    /* Adjust body padding when offline banner is shown */
+    body.has-offline-banner .app-container {
+      padding-top: 40px;
+    }
+    
+    body.has-offline-banner .floating-recording-indicator {
+      top: 120px;
+    }
+    
     /* Floating Recording Indicator */
     .floating-recording-indicator {
       position: fixed;
@@ -6242,6 +6347,20 @@
   </style>
 </head>
 <body>
+  <!-- Offline Warning Banner -->
+  <div class="offline-banner hidden" id="offlineBanner">
+    <div class="offline-banner-content">
+      <span class="offline-icon">📡</span>
+      <span class="offline-text">
+        <strong>You're offline.</strong> 
+        Cloud services unavailable. 
+        <span class="offline-suggestion">Consider switching to local models for uninterrupted use.</span>
+      </span>
+      <button class="offline-switch-btn" id="offlineSwitchBtn">Switch to Local</button>
+      <button class="offline-dismiss-btn" id="offlineDismissBtn">×</button>
+    </div>
+  </div>
+
   <!-- Floating Recording Indicator (shown when recording but not viewing editor) -->
   <div class="floating-recording-indicator hidden" id="floatingRecordingIndicator">
     <div class="floating-recording-content" id="floatingRecordingContent">
@@ -8180,6 +8299,125 @@
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(initTiptapEditor, 100);
     });
+    
+    // ============================================================================
+    // OFFLINE DETECTION
+    // ============================================================================
+    const offlineBanner = document.getElementById('offlineBanner');
+    const offlineSwitchBtn = document.getElementById('offlineSwitchBtn');
+    const offlineDismissBtn = document.getElementById('offlineDismissBtn');
+    let offlineBannerDismissed = false;
+    
+    async function checkOfflineStatus() {
+      const isOnline = navigator.onLine;
+      
+      if (!isOnline && !offlineBannerDismissed) {
+        // Check if user is using cloud models
+        const transcriptionEngine = await ipcRenderer.invoke('transcription-get-engine');
+        const aiEngine = await ipcRenderer.invoke('ai-get-engine');
+        
+        const usingCloudTranscription = transcriptionEngine === 'deepgram';
+        const usingCloudAI = aiEngine === 'openai';
+        
+        if (usingCloudTranscription || usingCloudAI) {
+          showOfflineBanner(usingCloudTranscription, usingCloudAI);
+        } else {
+          hideOfflineBanner();
+        }
+      } else {
+        hideOfflineBanner();
+        if (isOnline) {
+          offlineBannerDismissed = false; // Reset dismiss when back online
+        }
+      }
+    }
+    
+    function showOfflineBanner(cloudTranscription, cloudAI) {
+      const suggestionText = offlineBanner?.querySelector('.offline-suggestion');
+      if (suggestionText) {
+        const services = [];
+        if (cloudTranscription) services.push('Deepgram');
+        if (cloudAI) services.push('OpenAI');
+        suggestionText.textContent = `${services.join(' & ')} won't work offline. Switch to local models for uninterrupted use.`;
+      }
+      
+      offlineBanner?.classList.remove('hidden');
+      document.body.classList.add('has-offline-banner');
+      console.log('[Offline] Banner shown - using cloud services while offline');
+    }
+    
+    function hideOfflineBanner() {
+      offlineBanner?.classList.add('hidden');
+      document.body.classList.remove('has-offline-banner');
+    }
+    
+    // Switch to local models
+    offlineSwitchBtn?.addEventListener('click', async () => {
+      console.log('[Offline] User switching to local models');
+      
+      // Check if local models are available
+      const parakeetReady = await ipcRenderer.invoke('parakeet-is-downloaded');
+      const llmReady = await ipcRenderer.invoke('llm-is-ready');
+      
+      if (!parakeetReady || !llmReady) {
+        const missing = [];
+        if (!parakeetReady) missing.push('Parakeet (transcription)');
+        if (!llmReady) missing.push('Qwen (AI notes)');
+        
+        alert(`Please download the following local models first:\n• ${missing.join('\n• ')}\n\nOpen Settings to download them.`);
+        showSettings();
+        return;
+      }
+      
+      // Switch to local models
+      await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
+      await ipcRenderer.invoke('ai-set-engine', 'local');
+      
+      hideOfflineBanner();
+      console.log('[Offline] Switched to local models (Parakeet + Qwen)');
+      
+      // Show confirmation
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 13px;
+        z-index: 100001;
+        animation: slideIn 0.3s ease-out;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      `;
+      notification.innerHTML = '✅ Switched to local models. You can now work offline!';
+      document.body.appendChild(notification);
+      setTimeout(() => notification.remove(), 4000);
+    });
+    
+    // Dismiss banner
+    offlineDismissBtn?.addEventListener('click', () => {
+      offlineBannerDismissed = true;
+      hideOfflineBanner();
+    });
+    
+    // Listen for online/offline events
+    window.addEventListener('online', () => {
+      console.log('[Network] Back online');
+      checkOfflineStatus();
+    });
+    
+    window.addEventListener('offline', () => {
+      console.log('[Network] Gone offline');
+      checkOfflineStatus();
+    });
+    
+    // Check on startup
+    setTimeout(checkOfflineStatus, 2000);
+    
+    // Periodically check (every 30 seconds)
+    setInterval(checkOfflineStatus, 30000);
     
     // ============================================================================
     // SETUP/PERMISSIONS CHECK
