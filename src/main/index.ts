@@ -1808,6 +1808,12 @@ function setupIPC() {
   
   ipcMain.handle('calendar-set-selected', async (_, calendarId: string, selected: boolean) => {
     calendarService?.setCalendarSelected(calendarId, selected);
+    
+    // Notify editor window to refresh calendar events
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('calendar-selection-changed');
+    }
+    
     return true;
   });
   

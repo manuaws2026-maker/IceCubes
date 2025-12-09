@@ -8495,6 +8495,13 @@
       checkOfflineStatus();
     });
     
+    // Refresh calendar events when selection changes in settings
+    ipcRenderer.on('calendar-selection-changed', () => {
+      console.log('[Calendar] Selection changed, refreshing events...');
+      loadCalendarEvents();
+      updateNextMeeting();
+    });
+    
     // Re-check when models are deleted (triggered from main process)
     ipcRenderer.on('model-deleted', (_, modelType) => {
       console.log(`[Offline] Model deleted: ${modelType}, re-checking status...`);
