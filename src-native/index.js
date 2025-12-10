@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, initLlm, initLlmSync, shutdownLlm, deleteLlmModel, llmGenerate, llmChat, llmChatStream, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
+const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, initLlm, initLlmSync, shutdownLlm, deleteLlmModel, llmGenerate, llmChat, llmChatStream, isEmbeddingDownloaded, downloadEmbeddingModel, getEmbeddingDownloadProgress, initEmbeddingModel, isEmbeddingReady, generateEmbedding, generateEmbeddingsBatch, deleteEmbeddingModel, getEmbeddingDimension, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
 
 module.exports.isParakeetDownloaded = isParakeetDownloaded
 module.exports.getParakeetModelInfo = getParakeetModelInfo
@@ -335,6 +335,15 @@ module.exports.deleteLlmModel = deleteLlmModel
 module.exports.llmGenerate = llmGenerate
 module.exports.llmChat = llmChat
 module.exports.llmChatStream = llmChatStream
+module.exports.isEmbeddingDownloaded = isEmbeddingDownloaded
+module.exports.downloadEmbeddingModel = downloadEmbeddingModel
+module.exports.getEmbeddingDownloadProgress = getEmbeddingDownloadProgress
+module.exports.initEmbeddingModel = initEmbeddingModel
+module.exports.isEmbeddingReady = isEmbeddingReady
+module.exports.generateEmbedding = generateEmbedding
+module.exports.generateEmbeddingsBatch = generateEmbeddingsBatch
+module.exports.deleteEmbeddingModel = deleteEmbeddingModel
+module.exports.getEmbeddingDimension = getEmbeddingDimension
 module.exports.getActiveWindows = getActiveWindows
 module.exports.checkAccessibilityPermission = checkAccessibilityPermission
 module.exports.requestAccessibilityPermission = requestAccessibilityPermission

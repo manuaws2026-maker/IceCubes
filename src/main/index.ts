@@ -1972,21 +1972,22 @@ function setupIPC() {
   
   // Reindex all existing notes (useful after creating test data or first setup)
   ipcMain.handle('vector-search-reindex-all', async () => {
+    // Initialize with OpenAI key if available, but works without it for local embeddings
     const apiKey = openaiService?.getApiKey();
-    if (!apiKey) {
-      console.log('[VectorSearch] No API key, cannot reindex');
-      return { indexed: 0, errors: 0 };
+    await vectorSearchService.initialize(apiKey || undefined);
+    
+    if (!vectorSearchService.isReady()) {
+      console.log('[VectorSearch] Not ready for reindex');
+      return { indexed: 0, errors: 0, engine: 'none' };
     }
     
-    await vectorSearchService.initialize(apiKey);
-    if (!vectorSearchService.isReady()) {
-      return { indexed: 0, errors: 0 };
-    }
+    const engine = vectorSearchService.getEmbeddingEngine();
+    console.log('[VectorSearch] Reindexing with engine:', engine);
     
     // Get all notes
     const notesPath = path.join(app.getPath('userData'), 'notes');
     if (!fs.existsSync(notesPath)) {
-      return { indexed: 0, errors: 0 };
+      return { indexed: 0, errors: 0, engine };
     }
     
     const noteFiles = fs.readdirSync(notesPath).filter(f => f.endsWith('.json'));
@@ -2018,7 +2019,7 @@ function setupIPC() {
     }
     
     console.log('[VectorSearch] ✅ Reindex complete:', indexed, 'indexed,', errors, 'errors');
-    return { indexed, errors };
+    return { indexed, errors, engine };
   });
   
   // Folder search with LLM synthesis
@@ -2225,7 +2226,9 @@ Answer:`;
   // OPENAI IPC HANDLERS
   // ============================================================================
   ipcMain.handle('openai-has-key', () => {
-    return openaiService?.hasApiKey() ?? false;
+    const hasKey = openaiService?.hasApiKey() ?? false;
+    console.log('[OpenAI] has-key check:', hasKey);
+    return hasKey;
   });
   
   ipcMain.handle('openai-get-key', () => {
@@ -2237,7 +2240,9 @@ Answer:`;
   });
   
   ipcMain.handle('openai-clear-key', () => {
+    console.log('[OpenAI] Clear key called, hasKey before:', openaiService?.hasApiKey());
     openaiService?.clearApiKey();
+    console.log('[OpenAI] Clear key done, hasKey after:', openaiService?.hasApiKey());
     return true;
   });
   
@@ -2791,6 +2796,142 @@ Answer:`;
     }
     
     return true;
+  });
+
+  // ============================================================================
+  // EMBEDDING (Local MiniLM model for offline vector search)
+  // ============================================================================
+  
+  ipcMain.handle('embedding-check-downloaded', async () => {
+    try {
+      return nativeModule?.isEmbeddingDownloaded?.() ?? false;
+    } catch (e) {
+      console.error('[Embedding] Check downloaded error:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('embedding-download-model', async () => {
+    console.log('[Embedding] Starting download...');
+    try {
+      return nativeModule?.downloadEmbeddingModel?.() ?? false;
+    } catch (e) {
+      console.error('[Embedding] Download error:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('embedding-get-download-progress', async () => {
+    try {
+      return nativeModule?.getEmbeddingDownloadProgress?.() ?? {
+        isDownloading: false,
+        currentFile: '',
+        currentFileIndex: 0,
+        totalFiles: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        percent: 0,
+        error: null
+      };
+    } catch (e) {
+      return {
+        isDownloading: false,
+        currentFile: '',
+        currentFileIndex: 0,
+        totalFiles: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        percent: 0,
+        error: String(e)
+      };
+    }
+  });
+
+  ipcMain.handle('embedding-init', async () => {
+    console.log('[Embedding] Initializing model...');
+    try {
+      return nativeModule?.initEmbeddingModel?.() ?? false;
+    } catch (e) {
+      console.error('[Embedding] Init error:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('embedding-is-ready', async () => {
+    try {
+      return nativeModule?.isEmbeddingReady?.() ?? false;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  ipcMain.handle('embedding-generate', async (_, text: string) => {
+    try {
+      return nativeModule?.generateEmbedding?.(text) ?? null;
+    } catch (e) {
+      console.error('[Embedding] Generate error:', e);
+      return null;
+    }
+  });
+
+  ipcMain.handle('embedding-generate-batch', async (_, texts: string[]) => {
+    try {
+      return nativeModule?.generateEmbeddingsBatch?.(texts) ?? null;
+    } catch (e) {
+      console.error('[Embedding] Batch generate error:', e);
+      return null;
+    }
+  });
+
+  ipcMain.handle('embedding-delete-model', async () => {
+    console.log('[Embedding] Delete model called');
+    try {
+      const result = nativeModule?.deleteEmbeddingModel?.();
+      if (result && editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send('model-deleted', 'embedding');
+      }
+      return result ?? false;
+    } catch (e) {
+      console.error('[Embedding] Delete error:', e);
+      return false;
+    }
+  });
+
+  ipcMain.handle('embedding-get-dimension', async () => {
+    try {
+      return nativeModule?.getEmbeddingDimension?.() ?? 384;
+    } catch (e) {
+      return 384;
+    }
+  });
+
+  // Get/Set embedding engine preference (openai or local)
+  ipcMain.handle('embedding-get-engine', async () => {
+    return store.get('embeddingEngine', 'local') as string; // Default to local
+  });
+
+  ipcMain.handle('embedding-set-engine', async (_, engine: 'openai' | 'local') => {
+    const previousEngine = store.get('embeddingEngine', 'local') as string;
+    store.set('embeddingEngine', engine);
+    console.log('[Embedding] Engine set to:', engine);
+    
+    // Auto-initialize local embedding when selected
+    if (engine === 'local') {
+      const isDownloaded = nativeModule?.isEmbeddingDownloaded?.() ?? false;
+      const isReady = nativeModule?.isEmbeddingReady?.() ?? false;
+      
+      if (isDownloaded && !isReady) {
+        console.log('[Embedding] Auto-initializing local embedding model...');
+        try {
+          nativeModule?.initEmbeddingModel?.();
+        } catch (e) {
+          console.error('[Embedding] Failed to init:', e);
+        }
+      }
+    }
+    
+    // Return whether reindex is needed (engine changed)
+    return { success: true, needsReindex: previousEngine !== engine };
   });
 }
 

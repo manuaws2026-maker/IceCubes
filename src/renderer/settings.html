@@ -76,9 +76,9 @@
     .theme-toggle-btn {
       flex: 1;
       padding: 8px 4px;
-      border: none;
+      border: 2px solid transparent;
       background: transparent;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       display: flex;
       flex-direction: column;
@@ -95,8 +95,9 @@
     }
     
     .theme-toggle-btn.active {
-      background: var(--accent);
-      color: #000;
+      background: rgba(74, 222, 128, 0.1);
+      border: 2px solid var(--accent);
+      color: var(--text-primary);
     }
     
     .theme-toggle-btn .theme-icon {
@@ -138,32 +139,20 @@
       overflow-y: auto;
       padding-top: 48px;
       -webkit-app-region: no-drag;
+      position: relative;
     }
     
-    .settings-close-btn {
+    /* Draggable title bar area at top of main content */
+    .settings-titlebar {
       position: absolute;
-      top: 12px;
-      right: 12px;
-      width: 32px;
-      height: 32px;
-      border: none;
-      background: rgba(255,255,255,0.1);
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      -webkit-app-region: no-drag;
-      transition: all 0.2s;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      -webkit-app-region: drag;
+      z-index: 1;
     }
     
-    .settings-close-btn:hover {
-      background: rgba(255,255,255,0.2);
-      color: var(--text-primary);
-    }
     
     .settings-tab {
       display: none;
@@ -629,8 +618,6 @@
 </head>
 <body>
   <div class="settings-container">
-    <button class="settings-close-btn" id="settingsCloseBtn">✕</button>
-    
     <div class="settings-sidebar">
       <div class="settings-title">Settings</div>
       <div class="settings-nav">
@@ -645,6 +632,12 @@
         </button>
         <button class="settings-nav-item" data-tab="notifications">
           <span class="nav-icon">🔔</span> Notifications
+        </button>
+        <button class="settings-nav-item" data-tab="search">
+          <span class="nav-icon">🔍</span> Search
+        </button>
+        <button class="settings-nav-item" data-tab="templates">
+          <span class="nav-icon">📋</span> Templates
         </button>
       </div>
       <div class="settings-theme-toggle" id="sidebarThemeToggle">
@@ -664,6 +657,9 @@
     </div>
     
     <div class="settings-main">
+      <!-- Draggable title bar area -->
+      <div class="settings-titlebar"></div>
+      
       <!-- Transcription Tab -->
       <div class="settings-tab active" id="settingsTabTranscription">
         <div class="settings-section">
@@ -875,17 +871,141 @@
         </div>
       </div>
       
+      <!-- Search Tab -->
+      <div class="settings-tab" id="settingsTabSearch">
+        <div class="settings-section">
+          <h3>🔍 Search & Indexing</h3>
+          <p class="settings-desc">Configure how your notes are indexed for search</p>
+          
+          <!-- Embedding Provider Selection -->
+          <div class="provider-selector" style="margin-top: 16px;">
+            <div class="provider-label" style="font-size: 14px; margin-bottom: 8px; color: var(--text-secondary);">Embedding Model</div>
+            <div class="provider-buttons" style="display: flex; gap: 8px;">
+              <button class="provider-btn" id="settingsEmbeddingLocal" data-provider="local" style="flex: 1; padding: 12px; border: 2px solid transparent; border-radius: 8px; background: var(--bg-tertiary); cursor: pointer; text-align: left;">
+                <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">💻 Local (MiniLM)</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Works offline, ~90MB download</div>
+              </button>
+              <button class="provider-btn" id="settingsEmbeddingOpenAI" data-provider="openai" style="flex: 1; padding: 12px; border: 2px solid transparent; border-radius: 8px; background: var(--bg-tertiary); cursor: pointer; text-align: left;">
+                <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">☁️ Cloud (OpenAI)</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Best quality, requires API key</div>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Local Embedding Model Status -->
+          <div id="localEmbeddingSection" style="margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600; color: var(--text-primary);">Local Embedding Model</div>
+                <div id="embeddingModelStatus" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Checking...</div>
+              </div>
+              <button id="embeddingDownloadBtn" class="small-btn" style="padding: 8px 16px; border-radius: 6px; background: var(--accent); color: #000; border: none; cursor: pointer; font-weight: 500;">Download</button>
+            </div>
+            
+            <!-- Download Progress -->
+            <div id="embeddingDownloadProgress" class="hidden" style="margin-top: 12px;">
+              <div style="height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+                <div id="embeddingProgressBar" style="height: 100%; background: var(--accent); width: 0%; transition: width 0.3s;"></div>
+              </div>
+              <div id="embeddingProgressText" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Downloading...</div>
+            </div>
+          </div>
+          
+          <!-- Index Stats -->
+          <div style="margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-weight: 600; color: var(--text-primary);">Search Index</div>
+                <div id="indexStats" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Loading...</div>
+              </div>
+              <button id="reindexBtn" class="small-btn" style="padding: 8px 16px; border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); cursor: pointer; font-weight: 500;">Reindex All</button>
+            </div>
+            <div id="reindexProgress" class="hidden" style="margin-top: 12px; font-size: 12px; color: var(--text-secondary);">Reindexing...</div>
+          </div>
+          
+        </div>
+      </div>
+      
+      <!-- Templates Tab -->
+      <div class="settings-tab" id="settingsTabTemplates">
+        <!-- List View -->
+        <div id="templatesListView">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <h3 style="margin: 0; font-size: 18px; color: var(--text-primary);">📋 Templates</h3>
+              <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">Manage AI note templates</p>
+            </div>
+            <button id="newTemplateBtn" style="padding: 8px 16px; border-radius: 8px; border: none; background: var(--accent); color: #000; font-size: 13px; font-weight: 500; cursor: pointer;">+ New</button>
+          </div>
+          
+          <div style="margin-bottom: 24px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">My Templates</div>
+            <div id="myTemplatesList" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Custom templates -->
+            </div>
+          </div>
+          
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Built-in</div>
+            <div id="builtInTemplatesList" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Built-in templates -->
+            </div>
+          </div>
+        </div>
+        
+        <!-- Editor View (hidden by default) -->
+        <div id="templatesEditorView" class="hidden">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <button id="templatesBackBtn" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-primary); font-size: 13px; cursor: pointer;">
+              ← Back
+            </button>
+            <button id="deleteTemplateBtn" class="hidden" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ef4444; background: transparent; color: #ef4444; font-size: 13px; cursor: pointer;">Delete</button>
+          </div>
+          
+          <!-- Template Header -->
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 28px;">
+            <button id="templateIconBtn" style="width: 56px; height: 56px; border-radius: 12px; border: 2px solid var(--border); background: var(--accent); font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s;">📝</button>
+            <div style="flex: 1;">
+              <input type="text" id="templateNameInput" placeholder="Template name" style="width: 100%; padding: 0; border: none; background: transparent; color: var(--text-primary); font-size: 22px; font-weight: 600; outline: none;">
+              <div id="templateOwnerLabel" style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">Me</div>
+            </div>
+          </div>
+          
+          <!-- Meeting Context -->
+          <div style="margin-bottom: 28px;">
+            <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Meeting Context</label>
+            <textarea id="templateContextInput" placeholder="Give the AI an overview of the meeting and your goals for it" style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; font-family: inherit; resize: none; min-height: 70px; box-sizing: border-box; outline: none; transition: border-color 0.15s;"></textarea>
+          </div>
+          
+          <!-- Sections -->
+          <div style="margin-bottom: 28px;">
+            <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Sections</label>
+            <div id="templateSectionsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Sections rendered here -->
+            </div>
+            <button id="addSectionBtn" style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-top: 10px; background: transparent; border: 1px dashed var(--border); border-radius: 8px; color: var(--text-secondary); font-size: 13px; cursor: pointer; transition: all 0.15s; width: 100%;">
+              <span>+</span>
+              <span>Add Section</span>
+            </button>
+          </div>
+          
+          <!-- Actions -->
+          <div style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 20px; border-top: 1px solid var(--border);">
+            <button id="cancelTemplateBtn" style="padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-primary); font-size: 14px; cursor: pointer;">Cancel</button>
+            <button id="saveTemplateBtn" style="padding: 10px 20px; border-radius: 8px; border: none; background: var(--accent); color: #000; font-size: 14px; font-weight: 500; cursor: pointer;">Save Changes</button>
+          </div>
+        </div>
+        
+        <!-- Icon Picker -->
+        <div id="iconPickerDropdown" class="hidden" style="position: fixed; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 12px; padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 9999; display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px;"></div>
+      </div>
+      
     </div>
   </div>
 
   <script>
     console.log('[Settings] Script starting...');
     const { ipcRenderer, shell } = require('electron');
-    
-    // Close button
-    document.getElementById('settingsCloseBtn').addEventListener('click', () => {
-      ipcRenderer.send('close-settings-window');
-    });
     
     // Tab navigation
     document.querySelectorAll('.settings-nav-item').forEach(item => {
@@ -922,6 +1042,9 @@
       openaiKey: false,
       parakeetReady: false,
       localLLMReady: false,
+      embeddingEngine: 'local',
+      embeddingDownloaded: false,
+      embeddingReady: false,
     };
     
     // Language definitions by provider
@@ -1150,6 +1273,9 @@
         settingsState.openaiKey = await ipcRenderer.invoke('openai-has-key');
         settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
         settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
+        settingsState.embeddingEngine = await ipcRenderer.invoke('embedding-get-engine') || 'local';
+        settingsState.embeddingDownloaded = await ipcRenderer.invoke('embedding-check-downloaded');
+        settingsState.embeddingReady = await ipcRenderer.invoke('embedding-is-ready');
         
         // Load language settings
         const langSettings = await ipcRenderer.invoke('lang-get-settings');
@@ -1382,7 +1508,14 @@
     
     // Clear keys
     document.getElementById('deepgramClearBtn')?.addEventListener('click', async () => {
-      if (confirm('Clear Deepgram API key?')) {
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Clear Deepgram API Key',
+        message: 'Are you sure you want to clear your Deepgram API key?\n\nYou will need to re-enter it to use cloud transcription.',
+        okLabel: 'Clear Key',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
         await ipcRenderer.invoke('clear-deepgram-key');
         settingsState.deepgramKey = false;
         updateUI();
@@ -1390,8 +1523,57 @@
     });
     
     document.getElementById('openaiClearBtn')?.addEventListener('click', async () => {
-      if (confirm('Clear OpenAI API key?')) {
-        await ipcRenderer.invoke('clear-openai-key');
+      // Check if local models are available
+      const localEmbeddingReady = await ipcRenderer.invoke('embedding-check-downloaded');
+      const localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
+      
+      // BOTH local models must be downloaded to allow clearing OpenAI key
+      if (!localEmbeddingReady || !localLLMReady) {
+        const missing = [];
+        if (!localEmbeddingReady) missing.push('• Local Embedding Model (Settings → Search)');
+        if (!localLLMReady) missing.push('• Qwen2.5 AI Model (Settings → AI Notes)');
+        
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Clear OpenAI Key',
+          message: `Please download the following local models first:\n\n${missing.join('\n')}\n\nThese are required for the app to function without OpenAI.`,
+          type: 'warning'
+        });
+        return;
+      }
+      
+      // Build warning message based on what will change
+      let warningParts = [];
+      if (settingsState.embeddingEngine === 'openai') {
+        warningParts.push('• Search will switch to local embeddings');
+      }
+      if (settingsState.aiEngine === 'openai') {
+        warningParts.push('• AI notes will switch to local Qwen model');
+      }
+      
+      const warningMessage = warningParts.length > 0 
+        ? `Are you sure you want to clear your OpenAI API key?\n\n${warningParts.join('\n')}\n\nYou will need to re-enter it to use cloud features.`
+        : 'Are you sure you want to clear your OpenAI API key?\n\nYou will need to re-enter it to use cloud AI features.';
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Clear OpenAI API Key',
+        message: warningMessage,
+        okLabel: 'Clear Key',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
+        // Switch to local models
+        if (settingsState.embeddingEngine === 'openai') {
+          await ipcRenderer.invoke('embedding-set-engine', 'local');
+          settingsState.embeddingEngine = 'local';
+        }
+        if (settingsState.aiEngine === 'openai') {
+          await ipcRenderer.invoke('ai-set-engine', 'local');
+          settingsState.aiEngine = 'local';
+        }
+        
+        // Now clear the key - FIXED: was 'clear-openai-key', should be 'openai-clear-key'
+        await ipcRenderer.invoke('openai-clear-key');
         settingsState.openaiKey = false;
         updateUI();
       }
@@ -1763,8 +1945,293 @@
       }
     })();
     
+    // ============================================================================
+    // SEARCH TAB - Embedding & Indexing
+    // ============================================================================
+    
+    const embeddingLocalBtn = document.getElementById('settingsEmbeddingLocal');
+    const embeddingOpenAIBtn = document.getElementById('settingsEmbeddingOpenAI');
+    const embeddingModelStatus = document.getElementById('embeddingModelStatus');
+    const embeddingDownloadBtn = document.getElementById('embeddingDownloadBtn');
+    const embeddingDownloadProgress = document.getElementById('embeddingDownloadProgress');
+    const embeddingProgressBar = document.getElementById('embeddingProgressBar');
+    const embeddingProgressText = document.getElementById('embeddingProgressText');
+    const indexStats = document.getElementById('indexStats');
+    const reindexBtn = document.getElementById('reindexBtn');
+    const reindexProgress = document.getElementById('reindexProgress');
+    
+    // Update embedding UI
+    function updateEmbeddingUI() {
+      // Provider selection styling
+      if (settingsState.embeddingEngine === 'local') {
+        embeddingLocalBtn?.classList.add('selected');
+        embeddingLocalBtn?.style.setProperty('border-color', 'var(--accent)');
+        embeddingLocalBtn?.style.setProperty('background', 'rgba(74, 222, 128, 0.1)');
+        embeddingOpenAIBtn?.classList.remove('selected');
+        embeddingOpenAIBtn?.style.setProperty('border-color', 'transparent');
+        embeddingOpenAIBtn?.style.setProperty('background', 'var(--bg-tertiary)');
+      } else {
+        embeddingOpenAIBtn?.classList.add('selected');
+        embeddingOpenAIBtn?.style.setProperty('border-color', 'var(--accent)');
+        embeddingOpenAIBtn?.style.setProperty('background', 'rgba(74, 222, 128, 0.1)');
+        embeddingLocalBtn?.classList.remove('selected');
+        embeddingLocalBtn?.style.setProperty('border-color', 'transparent');
+        embeddingLocalBtn?.style.setProperty('background', 'var(--bg-tertiary)');
+      }
+      
+      // Disable OpenAI button if no API key
+      if (!settingsState.openaiKey) {
+        embeddingOpenAIBtn?.style.setProperty('opacity', '0.5');
+        embeddingOpenAIBtn?.style.setProperty('cursor', 'not-allowed');
+        // Update the description to indicate API key required
+        const openaiDesc = embeddingOpenAIBtn?.querySelector('div:last-child');
+        if (openaiDesc) openaiDesc.textContent = 'Requires API key (not configured)';
+      } else {
+        embeddingOpenAIBtn?.style.setProperty('opacity', '1');
+        embeddingOpenAIBtn?.style.setProperty('cursor', 'pointer');
+        const openaiDesc = embeddingOpenAIBtn?.querySelector('div:last-child');
+        if (openaiDesc) openaiDesc.textContent = 'Best quality, requires API key';
+      }
+      
+      // Disable Local button if model not downloaded
+      if (!settingsState.embeddingDownloaded) {
+        embeddingLocalBtn?.style.setProperty('opacity', '0.5');
+        embeddingLocalBtn?.style.setProperty('cursor', 'not-allowed');
+        const localDesc = embeddingLocalBtn?.querySelector('div:last-child');
+        if (localDesc) localDesc.textContent = 'Not downloaded (~90MB)';
+      } else {
+        embeddingLocalBtn?.style.setProperty('opacity', '1');
+        embeddingLocalBtn?.style.setProperty('cursor', 'pointer');
+        const localDesc = embeddingLocalBtn?.querySelector('div:last-child');
+        if (localDesc) localDesc.textContent = 'Works offline, ~90MB download';
+      }
+      
+      // Model status
+      if (settingsState.embeddingDownloaded) {
+        if (settingsState.embeddingReady) {
+          embeddingModelStatus.textContent = '✅ Downloaded & Ready (all-MiniLM-L6-v2, 384 dimensions)';
+          embeddingDownloadBtn.textContent = 'Delete Model';
+          embeddingDownloadBtn.style.background = 'var(--bg-secondary)';
+          embeddingDownloadBtn.style.color = 'var(--text-primary)';
+          embeddingDownloadBtn.disabled = false;
+        } else {
+          embeddingModelStatus.textContent = '⏳ Downloaded, initializing...';
+          embeddingDownloadBtn.textContent = 'Initializing...';
+          embeddingDownloadBtn.disabled = true;
+        }
+      } else {
+        embeddingModelStatus.textContent = '❌ Not downloaded (~90MB)';
+        embeddingDownloadBtn.textContent = 'Download Model';
+        embeddingDownloadBtn.style.background = 'var(--accent)';
+        embeddingDownloadBtn.style.color = '#000';
+        embeddingDownloadBtn.disabled = false;
+      }
+    }
+    
+    // Provider selection handlers
+    embeddingLocalBtn?.addEventListener('click', async () => {
+      if (settingsState.embeddingEngine === 'local') return;
+      
+      if (!settingsState.embeddingDownloaded) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Local Embedding Not Available',
+          message: 'Please download the local embedding model first.\n\nGo to the Search tab and click "Download Model".',
+          type: 'warning'
+        });
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Switch to Local Embeddings',
+        message: 'Switching to local embeddings (MiniLM) will reindex all your notes.\n\nThis may take a few minutes. Continue?',
+        okLabel: 'Switch & Reindex',
+        cancelLabel: 'Cancel'
+      });
+      if (!confirmed) return;
+      
+      const result = await ipcRenderer.invoke('embedding-set-engine', 'local');
+      if (result?.success) {
+        settingsState.embeddingEngine = 'local';
+        updateEmbeddingUI();
+        if (result.needsReindex) {
+          startReindex();
+        }
+      }
+    });
+    
+    embeddingOpenAIBtn?.addEventListener('click', async () => {
+      if (settingsState.embeddingEngine === 'openai') return;
+      
+      if (!settingsState.openaiKey) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'OpenAI API Key Required',
+          message: 'Please configure your OpenAI API key in the AI Notes tab first.\n\nOpenAI embeddings require an active API key.',
+          type: 'warning'
+        });
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Switch to OpenAI Embeddings',
+        message: 'Switching to OpenAI embeddings will reindex all your notes.\n\nThis uses your OpenAI API key and may incur costs. Continue?',
+        okLabel: 'Switch & Reindex',
+        cancelLabel: 'Cancel'
+      });
+      if (!confirmed) return;
+      
+      const result = await ipcRenderer.invoke('embedding-set-engine', 'openai');
+      if (result?.success) {
+        settingsState.embeddingEngine = 'openai';
+        updateEmbeddingUI();
+        if (result.needsReindex) {
+          startReindex();
+        }
+      }
+    });
+    
+    // Download/Delete button handler
+    embeddingDownloadBtn?.addEventListener('click', async () => {
+      if (settingsState.embeddingDownloaded) {
+        // Check if we can delete - need OpenAI key if currently using local embeddings
+        if (settingsState.embeddingEngine === 'local' && !settingsState.openaiKey) {
+          await ipcRenderer.invoke('show-alert-dialog', {
+            title: 'Cannot Delete Embedding Model',
+            message: 'You are currently using local embeddings and have no OpenAI API key configured.\n\nPlease add an OpenAI API key first, or keep using local embeddings.',
+            type: 'warning'
+          });
+          return;
+        }
+        
+        // Delete model
+        const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+          title: 'Delete Embedding Model',
+          message: 'Delete the local embedding model (~90MB)?\n\nYou will need to re-download it to use local search again.',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel'
+        });
+        if (!confirmed) return;
+        
+        await ipcRenderer.invoke('embedding-delete-model');
+        settingsState.embeddingDownloaded = false;
+        settingsState.embeddingReady = false;
+        // Switch to OpenAI if local model was selected and we have a key
+        if (settingsState.embeddingEngine === 'local' && settingsState.openaiKey) {
+          settingsState.embeddingEngine = 'openai';
+          await ipcRenderer.invoke('embedding-set-engine', 'openai');
+        }
+        updateEmbeddingUI();
+      } else {
+        // Start download
+        embeddingDownloadProgress?.classList.remove('hidden');
+        embeddingProgressText.textContent = 'Starting download...';
+        embeddingProgressBar.style.width = '0%';
+        embeddingDownloadBtn.disabled = true;
+        embeddingDownloadBtn.textContent = 'Downloading...';
+        
+        await ipcRenderer.invoke('embedding-download-model');
+        
+        // Poll for progress
+        const progressInterval = setInterval(async () => {
+          const progress = await ipcRenderer.invoke('embedding-get-download-progress');
+          
+          if (progress.error) {
+            clearInterval(progressInterval);
+            embeddingProgressText.textContent = 'Error: ' + progress.error;
+            embeddingDownloadBtn.disabled = false;
+            embeddingDownloadBtn.textContent = 'Retry Download';
+            return;
+          }
+          
+          embeddingProgressBar.style.width = progress.percent + '%';
+          embeddingProgressText.textContent = `Downloading ${progress.currentFile}... ${progress.percent}%`;
+          
+          if (progress.percent >= 100 || !progress.isDownloading) {
+            clearInterval(progressInterval);
+            settingsState.embeddingDownloaded = true;
+            embeddingDownloadProgress?.classList.add('hidden');
+            
+            // Initialize the model
+            embeddingModelStatus.textContent = '⏳ Initializing model...';
+            await ipcRenderer.invoke('embedding-init');
+            settingsState.embeddingReady = await ipcRenderer.invoke('embedding-is-ready');
+            updateEmbeddingUI();
+            
+            // Auto-switch to local if not using OpenAI
+            if (settingsState.embeddingReady && !settingsState.openaiKey) {
+              settingsState.embeddingEngine = 'local';
+              await ipcRenderer.invoke('embedding-set-engine', 'local');
+              updateEmbeddingUI();
+              startReindex();
+            }
+          }
+        }, 500);
+      }
+    });
+    
+    // Reindex function
+    async function startReindex() {
+      reindexBtn.disabled = true;
+      reindexBtn.textContent = 'Reindexing...';
+      reindexProgress?.classList.remove('hidden');
+      reindexProgress.textContent = 'Reindexing all notes...';
+      
+      try {
+        const result = await ipcRenderer.invoke('vector-search-reindex-all');
+        
+        // Build a more helpful message
+        const engineName = result.engine === 'local' ? 'Local (MiniLM)' : 'OpenAI';
+        
+        if (result.indexed === 0 && result.errors === 0) {
+          reindexProgress.textContent = `✅ Index ready • No notes to reindex • Using ${engineName}`;
+        } else if (result.errors === 0) {
+          reindexProgress.textContent = `✅ Successfully indexed ${result.indexed} note${result.indexed !== 1 ? 's' : ''} • Using ${engineName}`;
+        } else {
+          reindexProgress.textContent = `⚠️ Indexed ${result.indexed} note${result.indexed !== 1 ? 's' : ''}, ${result.errors} error${result.errors !== 1 ? 's' : ''} • Using ${engineName}`;
+        }
+        
+        // Update stats
+        loadIndexStats();
+      } catch (e) {
+        reindexProgress.textContent = '❌ Reindex failed: ' + (e.message || 'Unknown error');
+      }
+      
+      reindexBtn.disabled = false;
+      reindexBtn.textContent = 'Reindex All';
+      
+      setTimeout(() => {
+        reindexProgress?.classList.add('hidden');
+      }, 5000);
+    }
+    
+    reindexBtn?.addEventListener('click', () => {
+      startReindex();
+    });
+    
+    // Load index stats
+    async function loadIndexStats() {
+      try {
+        const stats = await ipcRenderer.invoke('vector-search-stats');
+        const engine = await ipcRenderer.invoke('embedding-get-engine');
+        indexStats.textContent = `${stats?.noteCount || 0} notes indexed (${stats?.totalItems || 0} chunks) • Engine: ${engine}`;
+      } catch (e) {
+        indexStats.textContent = 'Unable to load stats';
+      }
+    }
+    
+    // Load embedding status on tab switch
+    document.querySelector('[data-tab="search"]')?.addEventListener('click', () => {
+      updateEmbeddingUI();
+      loadIndexStats();
+    });
+    
     // Load settings on init
     loadState();
+    
+    // Also initialize embedding UI after load
+    setTimeout(() => {
+      updateEmbeddingUI();
+      loadIndexStats();
+    }, 500);
     
     // Load saved theme
     (async () => {
@@ -1775,6 +2242,367 @@
         });
       }
     })();
+    
+    // ============================================================================
+    // TEMPLATES TAB - Stack Navigation
+    // ============================================================================
+    
+    let allTemplates = [];
+    let editingTemplate = null;
+    let editingIsNew = false;
+    let draggedSectionIndex = null;
+    
+    // Elements
+    const templatesListView = document.getElementById('templatesListView');
+    const templatesEditorView = document.getElementById('templatesEditorView');
+    const myTemplatesList = document.getElementById('myTemplatesList');
+    const builtInTemplatesList = document.getElementById('builtInTemplatesList');
+    const newTemplateBtn = document.getElementById('newTemplateBtn');
+    const templatesBackBtn = document.getElementById('templatesBackBtn');
+    const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
+    const templateIconBtn = document.getElementById('templateIconBtn');
+    const templateNameInput = document.getElementById('templateNameInput');
+    const templateOwnerLabel = document.getElementById('templateOwnerLabel');
+    const templateContextInput = document.getElementById('templateContextInput');
+    const templateSectionsContainer = document.getElementById('templateSectionsContainer');
+    const addSectionBtn = document.getElementById('addSectionBtn');
+    const cancelTemplateBtn = document.getElementById('cancelTemplateBtn');
+    const saveTemplateBtn = document.getElementById('saveTemplateBtn');
+    const iconPickerDropdown = document.getElementById('iconPickerDropdown');
+    
+    // Icon options
+    const iconOptions = ['📝', '👥', '🧍', '🔍', '💼', '💰', '📊', '🎯', '💡', '📞', '🤝', '📈', '🗓️', '❤️', '✏️', '🎨', '🔧', '📱'];
+    if (iconPickerDropdown) {
+      iconPickerDropdown.innerHTML = iconOptions.map(icon => 
+        `<button class="icon-opt" data-icon="${icon}" style="padding: 10px; border: none; background: transparent; font-size: 20px; cursor: pointer; border-radius: 6px; transition: background 0.15s;">${icon}</button>`
+      ).join('');
+    }
+    
+    // Load templates
+    async function loadTemplates() {
+      allTemplates = await ipcRenderer.invoke('templates-get-all');
+      renderTemplatesList();
+    }
+    
+    function renderTemplatesList() {
+      const myTemplates = allTemplates.filter(t => !t.isBuiltIn);
+      const builtIn = allTemplates.filter(t => t.isBuiltIn);
+      
+      if (myTemplatesList) {
+        myTemplatesList.innerHTML = myTemplates.length > 0 
+          ? myTemplates.map(renderTemplateCard).join('')
+          : '<div style="padding: 12px 16px; font-size: 13px; color: var(--text-muted); font-style: italic; background: var(--bg-secondary); border-radius: 8px;">No custom templates yet</div>';
+      }
+      
+      if (builtInTemplatesList) {
+        builtInTemplatesList.innerHTML = builtIn.map(renderTemplateCard).join('');
+      }
+      
+      // Add click handlers
+      document.querySelectorAll('.template-card').forEach(card => {
+        card.addEventListener('click', () => openTemplate(card.dataset.id));
+      });
+    }
+    
+    function renderTemplateCard(t) {
+      return `
+        <div class="template-card" data-id="${t.id}" style="display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: var(--bg-secondary); border-radius: 10px; cursor: pointer; transition: all 0.15s; border: 1px solid transparent;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: ${t.isBuiltIn ? 'var(--bg-tertiary)' : 'var(--accent)'}; display: flex; align-items: center; justify-content: center; font-size: 20px;">${t.icon}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 500; color: var(--text-primary); font-size: 14px;">${t.name}</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">${t.isBuiltIn ? 'IceCubes' : 'Me'} • ${t.sections?.length || 0} sections</div>
+          </div>
+          <div style="color: var(--text-muted); font-size: 18px;">›</div>
+        </div>
+      `;
+    }
+    
+    // Navigation
+    function showListView() {
+      templatesEditorView?.classList.add('hidden');
+      templatesListView?.classList.remove('hidden');
+      editingTemplate = null;
+    }
+    
+    function showEditorView() {
+      templatesListView?.classList.add('hidden');
+      templatesEditorView?.classList.remove('hidden');
+    }
+    
+    // Open template for editing
+    function openTemplate(id) {
+      const template = allTemplates.find(t => t.id === id);
+      if (!template) return;
+      
+      editingTemplate = JSON.parse(JSON.stringify(template));
+      editingIsNew = false;
+      
+      populateEditor();
+      showEditorView();
+    }
+    
+    // Create new template
+    function createNewTemplate() {
+      editingTemplate = {
+        id: null,
+        name: 'Untitled template',
+        icon: '📝',
+        description: '',
+        sections: [{ id: 's1', title: 'Summary', instructions: 'Brief overview of the meeting' }],
+        isBuiltIn: false,
+        isDefault: false
+      };
+      editingIsNew = true;
+      
+      populateEditor();
+      showEditorView();
+      templateNameInput?.focus();
+      templateNameInput?.select();
+    }
+    
+    // Populate editor with template data
+    function populateEditor() {
+      if (!editingTemplate) return;
+      
+      const isReadOnly = editingTemplate.isBuiltIn;
+      
+      templateIconBtn.textContent = editingTemplate.icon;
+      templateIconBtn.style.cursor = isReadOnly ? 'default' : 'pointer';
+      templateIconBtn.style.background = isReadOnly ? 'var(--bg-tertiary)' : 'var(--accent)';
+      
+      templateNameInput.value = editingTemplate.name;
+      templateNameInput.readOnly = isReadOnly;
+      
+      templateOwnerLabel.textContent = isReadOnly ? 'IceCubes • ' + (editingTemplate.sections?.length || 0) + ' sections' : 'Me • ' + (editingTemplate.sections?.length || 0) + ' sections';
+      
+      templateContextInput.value = editingTemplate.description || '';
+      templateContextInput.readOnly = isReadOnly;
+      
+      deleteTemplateBtn?.classList.toggle('hidden', isReadOnly || editingIsNew);
+      addSectionBtn.style.display = isReadOnly ? 'none' : 'flex';
+      saveTemplateBtn.style.display = isReadOnly ? 'none' : 'block';
+      cancelTemplateBtn.textContent = isReadOnly ? 'Close' : 'Cancel';
+      
+      renderSections();
+    }
+    
+    // Render sections with drag-drop
+    function renderSections() {
+      if (!editingTemplate || !templateSectionsContainer) return;
+      
+      const isReadOnly = editingTemplate.isBuiltIn;
+      
+      templateSectionsContainer.innerHTML = editingTemplate.sections.map((section, i) => `
+        <div class="section-card" data-index="${i}" draggable="${!isReadOnly}" style="display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border); transition: all 0.15s;">
+          <div class="drag-handle" style="cursor: ${isReadOnly ? 'default' : 'grab'}; padding: 2px; color: var(--text-muted); user-select: none; opacity: ${isReadOnly ? '0.3' : '0.6'};">⋮⋮</div>
+          <div style="flex: 1;">
+            <input type="text" class="section-title" data-index="${i}" value="${section.title}" placeholder="Section title" ${isReadOnly ? 'readonly' : ''} style="width: 100%; padding: 4px 0; border: none; background: transparent; color: var(--text-primary); font-size: 14px; font-weight: 500; outline: none;">
+            <textarea class="section-instructions" data-index="${i}" placeholder="Instructions for this section..." ${isReadOnly ? 'readonly' : ''} style="width: 100%; padding: 4px 0; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-family: inherit; resize: none; min-height: 32px; outline: none;">${section.instructions || ''}</textarea>
+          </div>
+          ${!isReadOnly ? `<button class="remove-section" data-index="${i}" style="padding: 4px 8px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 18px; opacity: 0.5; transition: opacity 0.15s;" ${editingTemplate.sections.length <= 1 ? 'disabled' : ''}>×</button>` : ''}
+        </div>
+      `).join('');
+      
+      if (!isReadOnly) {
+        // Input handlers
+        templateSectionsContainer.querySelectorAll('.section-title').forEach(input => {
+          input.addEventListener('input', e => {
+            editingTemplate.sections[parseInt(e.target.dataset.index)].title = e.target.value;
+          });
+        });
+        
+        templateSectionsContainer.querySelectorAll('.section-instructions').forEach(input => {
+          input.addEventListener('input', e => {
+            editingTemplate.sections[parseInt(e.target.dataset.index)].instructions = e.target.value;
+            // Auto-resize
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          });
+        });
+        
+        templateSectionsContainer.querySelectorAll('.remove-section').forEach(btn => {
+          btn.addEventListener('click', e => {
+            editingTemplate.sections.splice(parseInt(e.target.dataset.index), 1);
+            renderSections();
+            updateOwnerLabel();
+          });
+          btn.addEventListener('mouseenter', () => btn.style.opacity = '1');
+          btn.addEventListener('mouseleave', () => btn.style.opacity = '0.5');
+        });
+        
+        // Drag and drop
+        templateSectionsContainer.querySelectorAll('.section-card').forEach(card => {
+          card.addEventListener('dragstart', handleDragStart);
+          card.addEventListener('dragend', handleDragEnd);
+          card.addEventListener('dragover', handleDragOver);
+          card.addEventListener('dragenter', handleDragEnter);
+          card.addEventListener('dragleave', handleDragLeave);
+          card.addEventListener('drop', handleDrop);
+        });
+      }
+    }
+    
+    function updateOwnerLabel() {
+      if (templateOwnerLabel && editingTemplate) {
+        const isReadOnly = editingTemplate.isBuiltIn;
+        templateOwnerLabel.textContent = (isReadOnly ? 'IceCubes' : 'Me') + ' • ' + (editingTemplate.sections?.length || 0) + ' sections';
+      }
+    }
+    
+    // Drag handlers
+    function handleDragStart(e) {
+      draggedSectionIndex = parseInt(e.target.dataset.index);
+      e.target.style.opacity = '0.5';
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    
+    function handleDragEnd(e) {
+      e.target.style.opacity = '1';
+      document.querySelectorAll('.section-card').forEach(card => {
+        card.style.borderColor = 'var(--border)';
+        card.style.background = 'var(--bg-secondary)';
+      });
+      draggedSectionIndex = null;
+    }
+    
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+    
+    function handleDragEnter(e) {
+      e.preventDefault();
+      const card = e.target.closest('.section-card');
+      if (card && parseInt(card.dataset.index) !== draggedSectionIndex) {
+        card.style.borderColor = 'var(--accent)';
+        card.style.background = 'var(--bg-tertiary)';
+      }
+    }
+    
+    function handleDragLeave(e) {
+      const card = e.target.closest('.section-card');
+      if (card) {
+        card.style.borderColor = 'var(--border)';
+        card.style.background = 'var(--bg-secondary)';
+      }
+    }
+    
+    function handleDrop(e) {
+      e.preventDefault();
+      const card = e.target.closest('.section-card');
+      if (!card) return;
+      
+      const targetIndex = parseInt(card.dataset.index);
+      if (draggedSectionIndex === null || draggedSectionIndex === targetIndex) return;
+      
+      const [removed] = editingTemplate.sections.splice(draggedSectionIndex, 1);
+      editingTemplate.sections.splice(targetIndex, 0, removed);
+      
+      renderSections();
+    }
+    
+    // Event listeners
+    newTemplateBtn?.addEventListener('click', createNewTemplate);
+    templatesBackBtn?.addEventListener('click', showListView);
+    cancelTemplateBtn?.addEventListener('click', showListView);
+    
+    addSectionBtn?.addEventListener('click', () => {
+      if (!editingTemplate || editingTemplate.isBuiltIn) return;
+      editingTemplate.sections.push({
+        id: 's' + Date.now(),
+        title: '',
+        instructions: ''
+      });
+      renderSections();
+      updateOwnerLabel();
+      // Focus the new section
+      const inputs = templateSectionsContainer.querySelectorAll('.section-title');
+      inputs[inputs.length - 1]?.focus();
+    });
+    
+    // Icon picker
+    templateIconBtn?.addEventListener('click', e => {
+      if (editingTemplate?.isBuiltIn) return;
+      e.stopPropagation();
+      const rect = templateIconBtn.getBoundingClientRect();
+      iconPickerDropdown.style.top = (rect.bottom + 8) + 'px';
+      iconPickerDropdown.style.left = rect.left + 'px';
+      iconPickerDropdown.classList.toggle('hidden');
+    });
+    
+    iconPickerDropdown?.querySelectorAll('.icon-opt').forEach(btn => {
+      btn.addEventListener('mouseenter', () => btn.style.background = 'var(--bg-secondary)');
+      btn.addEventListener('mouseleave', () => btn.style.background = 'transparent');
+      btn.addEventListener('click', () => {
+        if (editingTemplate && !editingTemplate.isBuiltIn) {
+          editingTemplate.icon = btn.dataset.icon;
+          templateIconBtn.textContent = btn.dataset.icon;
+        }
+        iconPickerDropdown.classList.add('hidden');
+      });
+    });
+    
+    document.addEventListener('click', () => iconPickerDropdown?.classList.add('hidden'));
+    
+    // Delete
+    deleteTemplateBtn?.addEventListener('click', async () => {
+      if (!editingTemplate || editingTemplate.isBuiltIn) return;
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Delete Template',
+        message: `Delete "${editingTemplate.name}"?\n\nThis cannot be undone.`,
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
+        await ipcRenderer.invoke('templates-delete', editingTemplate.id);
+        await loadTemplates();
+        showListView();
+      }
+    });
+    
+    // Save
+    saveTemplateBtn?.addEventListener('click', async () => {
+      if (!editingTemplate || editingTemplate.isBuiltIn) return;
+      
+      editingTemplate.name = templateNameInput.value.trim() || 'Untitled Template';
+      editingTemplate.description = templateContextInput.value.trim();
+      editingTemplate.sections = editingTemplate.sections.filter(s => s.title.trim());
+      
+      if (editingTemplate.sections.length === 0) {
+        editingTemplate.sections.push({ id: 's1', title: 'Summary', instructions: '' });
+      }
+      
+      try {
+        if (editingIsNew) {
+          await ipcRenderer.invoke('templates-create', editingTemplate);
+        } else {
+          await ipcRenderer.invoke('templates-update', editingTemplate.id, editingTemplate);
+        }
+        
+        await loadTemplates();
+        
+        saveTemplateBtn.textContent = '✓ Saved';
+        setTimeout(() => {
+          saveTemplateBtn.textContent = 'Save Changes';
+          showListView();
+        }, 800);
+      } catch (err) {
+        console.error('[Templates] Save error:', err);
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Error',
+          message: 'Failed to save template: ' + err.message,
+          type: 'error'
+        });
+      }
+    });
+    
+    // Load on tab open
+    document.querySelector('[data-tab="templates"]')?.addEventListener('click', () => {
+      loadTemplates();
+      showListView();
+    });
   </script>
 </body>
 </html>

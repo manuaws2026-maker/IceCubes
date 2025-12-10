@@ -1,6 +1,9 @@
 /**
- * Vector Search Service - Embedded vector database for semantic search
- * Uses vectra for local vector storage and OpenAI for embeddings
+ * Vector Search Service - Semantic search for meeting notes
+ * 
+ * Supports two embedding modes:
+ * 1. LOCAL (MiniLM): Uses all-MiniLM-L6-v2 via native ONNX - works offline
+ * 2. CLOUD (OpenAI): Uses text-embedding-3-small - highest quality
  */
 
 import * as fs from 'fs';
@@ -8,6 +11,17 @@ import * as path from 'path';
 import { app } from 'electron';
 import { LocalIndex } from 'vectra';
 import OpenAI from 'openai';
+
+// Native module for local embeddings
+let nativeModule: any = null;
+try {
+  nativeModule = require('ghost-native');
+  console.log('[VectorSearch] Native module loaded for local embeddings');
+} catch (e) {
+  console.log('[VectorSearch] Native module not available, will use OpenAI');
+}
+
+type EmbeddingEngine = 'local' | 'openai';
 
 // Types
 interface TranscriptSegment {
@@ -42,7 +56,7 @@ const VECTOR_INDEX_PATH = path.join(USER_DATA, 'vector-index');
 // Constants
 const CHUNK_SIZE = 500; // Characters per chunk
 const CHUNK_OVERLAP = 100; // Overlap between chunks
-const EMBEDDING_MODEL = 'text-embedding-3-small'; // Fast and cheap
+const EMBEDDING_MODEL = 'text-embedding-3-small'; // For cloud mode
 const TOP_K_RESULTS = 10;
 
 class VectorSearchService {
@@ -50,13 +64,41 @@ class VectorSearchService {
   private openai: OpenAI | null = null;
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
+  private embeddingEngine: EmbeddingEngine = 'local'; // Default to local
+  private localEmbeddingReady = false;
 
   constructor() {
-    // Lazy initialization
+    // Check if local embedding model is available
+    this.checkLocalEmbedding();
   }
 
   /**
-   * Initialize the vector index and OpenAI client
+   * Check if local embedding model is ready
+   */
+  private checkLocalEmbedding(): void {
+    try {
+      if (nativeModule?.isEmbeddingReady?.()) {
+        this.localEmbeddingReady = true;
+        this.embeddingEngine = 'local';
+        console.log('[VectorSearch] Local embedding model ready (MiniLM)');
+      } else if (nativeModule?.isEmbeddingDownloaded?.()) {
+        // Model downloaded but not initialized - try to init
+        console.log('[VectorSearch] Initializing local embedding model...');
+        nativeModule?.initEmbeddingModel?.();
+        this.localEmbeddingReady = nativeModule?.isEmbeddingReady?.() ?? false;
+        if (this.localEmbeddingReady) {
+          this.embeddingEngine = 'local';
+          console.log('[VectorSearch] ✅ Local embedding model initialized');
+        }
+      }
+    } catch (e) {
+      console.log('[VectorSearch] Local embedding not available:', e);
+    }
+  }
+
+  /**
+   * Initialize the search service
+   * Works in local mode by default, optionally enables cloud mode with API key
    */
   async initialize(apiKey?: string): Promise<boolean> {
     if (this.isInitialized) return true;
@@ -73,41 +115,49 @@ class VectorSearchService {
 
   private async _doInitialize(apiKey?: string): Promise<void> {
     try {
-      // Get API key from environment or parameter
-      const key = apiKey || process.env.OPENAI_API_KEY;
-      if (!key) {
-        console.log('[VectorSearch] No OpenAI API key found - vector search disabled');
-        return;
+      // Check local embedding first (preferred for offline)
+      this.checkLocalEmbedding();
+      
+      if (this.localEmbeddingReady) {
+        console.log('[VectorSearch] ✅ Using LOCAL embeddings (MiniLM - offline capable)');
+        this.embeddingEngine = 'local';
       }
 
-      this.openai = new OpenAI({ apiKey: key });
+      // Setup OpenAI if API key available
+      const key = apiKey || process.env.OPENAI_API_KEY;
+      if (key) {
+        this.openai = new OpenAI({ apiKey: key });
+        
+        // If local embedding not available, use OpenAI
+        if (!this.localEmbeddingReady) {
+          this.embeddingEngine = 'openai';
+          console.log('[VectorSearch] ✅ Using CLOUD embeddings (OpenAI)');
+        }
+      }
 
       // Ensure vector index directory exists
       if (!fs.existsSync(VECTOR_INDEX_PATH)) {
         fs.mkdirSync(VECTOR_INDEX_PATH, { recursive: true });
       }
 
-      // Create or load index with corruption detection
+      // Create or load vectra index
       this.index = new LocalIndex(VECTOR_INDEX_PATH);
       
-      // Check if index exists, if not create it
       if (!await this.index.isIndexCreated()) {
         await this.index.createIndex();
         console.log('[VectorSearch] Created new vector index');
       } else {
-        // Validate existing index by attempting a query
         try {
           await this.validateIndex();
           console.log('[VectorSearch] Loaded existing vector index');
         } catch (validationErr: any) {
-          // Index is corrupted, silently rebuild
           console.log('[VectorSearch] Index validation failed, rebuilding...');
           await this.rebuildCorruptedIndex();
         }
       }
 
       this.isInitialized = true;
-      console.log('[VectorSearch] ✅ Initialized successfully');
+      console.log('[VectorSearch] ✅ Initialized with engine:', this.embeddingEngine);
     } catch (err) {
       console.error('[VectorSearch] Initialization error:', err);
       this.isInitialized = false;
@@ -118,7 +168,47 @@ class VectorSearchService {
    * Check if service is ready
    */
   isReady(): boolean {
-    return this.isInitialized && !!this.index && !!this.openai;
+    // Ready if initialized - works in all modes
+    return this.isInitialized;
+  }
+
+  /**
+   * Get current embedding engine
+   */
+  getEmbeddingEngine(): EmbeddingEngine {
+    return this.embeddingEngine;
+  }
+
+  /**
+   * Set embedding engine (triggers reindex if changed)
+   */
+  setEmbeddingEngine(engine: EmbeddingEngine): boolean {
+    if (engine === 'local' && !this.localEmbeddingReady) {
+      console.log('[VectorSearch] Cannot use local embeddings - model not ready');
+      return false;
+    }
+    if (engine === 'openai' && !this.openai) {
+      console.log('[VectorSearch] Cannot use OpenAI embeddings - no API key');
+      return false;
+    }
+    
+    this.embeddingEngine = engine;
+    console.log('[VectorSearch] Embedding engine set to:', engine);
+    return true;
+  }
+
+  /**
+   * Check if local embedding model is available
+   */
+  isLocalEmbeddingAvailable(): boolean {
+    return this.localEmbeddingReady;
+  }
+
+  /**
+   * Check if using local mode (offline-capable)
+   */
+  isLocalMode(): boolean {
+    return this.embeddingEngine !== 'openai';
   }
 
   /**
@@ -153,15 +243,36 @@ class VectorSearchService {
   /**
    * Get embedding for text using OpenAI
    */
+  /**
+   * Get embedding for text using the configured engine
+   * Supports: local (MiniLM) or openai
+   */
   private async getEmbedding(text: string): Promise<number[]> {
-    if (!this.openai) throw new Error('OpenAI not initialized');
-
-    const response = await this.openai.embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: text.substring(0, 8000), // Limit input size
-    });
-
-    return response.data[0].embedding;
+    const truncatedText = text.substring(0, 8000); // Limit input size
+    
+    // Try local embedding first if available
+    if (this.embeddingEngine === 'local' && this.localEmbeddingReady) {
+      try {
+        const embedding = nativeModule?.generateEmbedding?.(truncatedText);
+        if (embedding && Array.isArray(embedding)) {
+          return embedding;
+        }
+      } catch (e) {
+        console.error('[VectorSearch] Local embedding failed:', e);
+        // Fall through to OpenAI
+      }
+    }
+    
+    // Use OpenAI as fallback or primary
+    if (this.openai) {
+      const response = await this.openai.embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: truncatedText,
+      });
+      return response.data[0].embedding;
+    }
+    
+    throw new Error('No embedding engine available');
   }
 
   /**
@@ -270,6 +381,7 @@ class VectorSearchService {
 
   /**
    * Index a note's transcript for semantic search
+   * Works in both local and cloud modes
    */
   async indexNote(noteId: string, noteTitle: string, transcript: TranscriptSegment[], folderId: string | null, userNotes?: string): Promise<boolean> {
     if (!this.isReady()) {
@@ -296,23 +408,33 @@ class VectorSearchService {
         documents.push(...notesChunks);
       }
       
-      console.log('[VectorSearch] Indexing', documents.length, 'chunks for note:', noteId);
+      console.log('[VectorSearch] Indexing', documents.length, 'chunks for note:', noteId, '(engine:', this.embeddingEngine, ')');
 
-      // Index each chunk
+      if (!this.index) {
+        console.error('[VectorSearch] No index available');
+        return false;
+      }
+
+      // Index with vector embeddings
       for (const doc of documents) {
-        const embedding = await this.getEmbedding(doc.text);
-        
-        await this.index!.insertItem({
-          vector: embedding,
-          metadata: {
-            noteId: doc.noteId,
-            noteTitle: doc.noteTitle,
-            folderId: doc.folderId || '', // Empty string instead of null
-            chunkIndex: doc.chunkIndex,
-            text: doc.text,
-            speaker: doc.speaker || '' // Empty string instead of undefined
-          }
-        });
+        try {
+          const embedding = await this.getEmbedding(doc.text);
+          
+          await this.index.insertItem({
+            vector: embedding,
+            metadata: {
+              noteId: doc.noteId,
+              noteTitle: doc.noteTitle,
+              folderId: doc.folderId || '', // Empty string instead of null
+              chunkIndex: doc.chunkIndex,
+              text: doc.text,
+              speaker: doc.speaker || '' // Empty string instead of undefined
+            }
+          });
+        } catch (embErr) {
+          console.error('[VectorSearch] Failed to index chunk:', embErr);
+          // Continue with other chunks
+        }
       }
 
       console.log('[VectorSearch] ✅ Indexed note:', noteId);
@@ -335,23 +457,22 @@ class VectorSearchService {
   }
 
   /**
-   * Remove a note from the index
+   * Remove a note from the index (both local and cloud)
    */
   async removeNote(noteId: string): Promise<boolean> {
-    if (!this.isReady()) return false;
+    if (!this.isReady() || !this.index) return false;
 
     try {
       // Query for all items with this noteId and delete them
-      // vectra doesn't have direct delete by metadata, so we need to rebuild
-      // For now, we'll use a workaround by listing and filtering
-      const items = await this.index!.listItems();
+      const items = await this.index.listItems();
       const toDelete = items.filter(item => item.metadata?.noteId === noteId);
       
       for (const item of toDelete) {
-        await this.index!.deleteItem(item.id);
+        await this.index.deleteItem(item.id);
       }
 
       console.log('[VectorSearch] Removed', toDelete.length, 'chunks for note:', noteId);
+
       return true;
     } catch (err: any) {
       // Check if it's a JSON corruption error - silently rebuild
@@ -405,12 +526,18 @@ class VectorSearchService {
       return [];
     }
 
+    if (!this.index) {
+      console.log('[VectorSearch] No vector index available');
+      return [];
+    }
+
+    console.log(`[VectorSearch] Search using engine: ${this.embeddingEngine}`);
+
     try {
       // Get embedding for query
       const queryEmbedding = await this.getEmbedding(query);
 
-      // Search the index (vectra requires: vector, query string, topK)
-      const results = await this.index!.queryItems(queryEmbedding, query, limit * 2); // Get more to filter
+      const results = await this.index.queryItems(queryEmbedding, query, limit * 2);
 
       console.log('[VectorSearch] Raw results:', results.length, 'folderId filter:', folderId);
       

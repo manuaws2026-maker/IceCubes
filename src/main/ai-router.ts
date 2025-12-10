@@ -272,23 +272,26 @@ async function generateNotesWithLocalLLM(
 
     const systemPrompt = `You are an AI meeting assistant. Create enhanced meeting notes in ${languageName}.
 ${templatePrompt}
-Output clear, well-formatted markdown notes with:
-- ## Section headers for main topics
-- **Bold** for important terms
-- Bullet points for key information
-- Action items with owner names when mentioned
+Rules:
+- Use ## headers for each section from the template
+- Use **bold** for important terms and names
+- Use bullet points (•) for key information
+- Include action items with owner names when mentioned
+- Be concise and focus on the most important information
+- Do NOT add any headers like "Meeting Notes" at the top
+- Do NOT include any explanation or commentary about the format
+- Do NOT add meta-text like "This document outlines..." at the end
+- Output ONLY the structured notes content`;
 
-Be concise and focus on the most important information.`;
+    const userPrompt = `Meeting Title: ${meetingTitle}
 
-    const userPrompt = `Meeting: ${meetingTitle}
-
-User's Personal Notes:
+User's Notes:
 ${rawNotes || '(None)'}
 
-Meeting Transcript:
+Transcript:
 ${transcript}
 
-Generate enhanced meeting notes in markdown format. Include a brief summary at the start.`;
+Generate the enhanced notes now. Start directly with the first section header.`;
 
     const messages = [
       { role: 'system', content: systemPrompt },

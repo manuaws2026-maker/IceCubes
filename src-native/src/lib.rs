@@ -12,6 +12,7 @@ mod window;
 mod audio;
 mod parakeet;
 mod llm;
+mod embedding;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -23,6 +24,7 @@ pub use window::*;
 pub use audio::*;
 pub use parakeet::*;
 pub use llm::*;
+pub use embedding::*;
 
 /// Window information returned from native APIs
 #[napi(object)]

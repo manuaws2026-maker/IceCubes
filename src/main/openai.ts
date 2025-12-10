@@ -71,10 +71,13 @@ export class OpenAIService {
   }
 
   clearApiKey(): void {
+    console.log('[OpenAI] clearApiKey called, current apiKey:', !!this.apiKey);
     if (fs.existsSync(API_KEY_PATH)) {
       fs.unlinkSync(API_KEY_PATH);
+      console.log('[OpenAI] Deleted API key file');
     }
     this.apiKey = null;
+    console.log('[OpenAI] API key cleared from memory');
   }
 
   // Reset state for a new meeting

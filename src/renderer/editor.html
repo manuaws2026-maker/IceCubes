@@ -6556,61 +6556,96 @@
       <!-- Step 3: AI Configuration -->
       <div class="setup-screen hidden" id="setupScreen3">
         <div class="setup-screen-title">AI-Enhanced Notes</div>
-        <p class="setup-screen-desc" style="margin-bottom: 16px; color: #888;">Choose how to power your AI note enhancement</p>
-        
-        <!-- AI Engine Selection -->
-        <div class="setup-choice-buttons" id="aiEngineChoice">
-          <button class="setup-choice-button" id="setupChoiceOpenAI" data-engine="openai">
-            <div class="choice-icon">☁️</div>
-            <div class="choice-title">OpenAI (Cloud)</div>
-            <div class="choice-desc">Best quality, requires API key</div>
-          </button>
-          <button class="setup-choice-button" id="setupChoiceLocalLLM" data-engine="local">
-            <div class="choice-icon">💻</div>
-            <div class="choice-title">Local LLM</div>
-            <div class="choice-desc">Free & private, ~2GB download</div>
-          </button>
-        </div>
-        
-        <!-- OpenAI Configuration -->
-        <div class="setup-checklist hidden" id="setupOpenAIConfig">
-          <div class="setup-item" id="setupOpenAI" style="flex-direction: column; align-items: stretch;">
+        <div class="setup-checklist">
+          <div class="setup-item setup-item-choice" id="setupAI">
+            <div class="setup-item-icon">🤖</div>
+            <div class="setup-item-text">
+              <div class="setup-item-title">AI Engine</div>
+              <div class="setup-item-desc">Choose how to enhance your meeting notes</div>
+            </div>
+            <div class="setup-choice-buttons">
+              <button class="setup-choice-btn" id="setupChoiceOpenAI" data-engine="openai">
+                <div class="setup-choice-header">
+                  <span class="setup-choice-title">OpenAI</span>
+                  <span class="setup-choice-badge setup-badge-cloud">Cloud</span>
+                </div>
+                <div class="setup-choice-benefit">Best quality AI notes with GPT-4o</div>
+              </button>
+              <button class="setup-choice-btn" id="setupChoiceLocalLLM" data-engine="local">
+                <div class="setup-choice-header">
+                  <span class="setup-choice-title">Qwen2.5 3B</span>
+                  <span class="setup-choice-badge setup-badge-local">Local</span>
+                </div>
+                <div class="setup-choice-benefit">100% private, runs on your Mac - free after ~2GB download</div>
+              </button>
+            </div>
+          </div>
+          
+          <!-- OpenAI API Key (shown when OpenAI selected) -->
+          <div class="setup-item hidden" id="setupOpenAI" style="margin-top: 12px; flex-direction: column; align-items: stretch;">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
               <div class="setup-item-icon">🔑</div>
               <div class="setup-item-text">
                 <div class="setup-item-title">OpenAI API Key</div>
                 <div class="setup-item-desc">Required for cloud AI</div>
               </div>
-              <div class="setup-status" id="openaiKeyStatus"></div>
             </div>
             <input type="password" id="openaiApiInput" class="setup-input" placeholder="sk-..." autocomplete="off" spellcheck="false"/>
             <a href="https://platform.openai.com/api-keys" target="_blank" class="setup-link">Get API key from OpenAI →</a>
           </div>
-        </div>
-        
-        <!-- Local LLM Configuration -->
-        <div class="setup-checklist hidden" id="setupLocalLLMConfig">
-          <div class="setup-item" style="flex-direction: column; align-items: stretch;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <div class="setup-item-icon">🤖</div>
+          
+          <!-- Local LLM Model Download (shown when Local LLM selected) -->
+          <div class="setup-item hidden" id="setupLocalLLMConfig" style="margin-top: 12px; flex-direction: column; align-items: stretch;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="setup-item-icon">📦</div>
               <div class="setup-item-text">
-                <div class="setup-item-title">Qwen2.5 3B</div>
-                <div class="setup-item-desc">Local AI model</div>
+                <div class="setup-item-title">Qwen2.5 3B Model</div>
+                <div class="setup-item-desc">Download for local AI</div>
               </div>
-              <div class="setup-status" id="localLLMStatus"></div>
             </div>
-            <div id="localLLMNotDownloaded">
-              <div style="margin: 8px 0; font-size: 13px; color: #888;">
-                <strong>Size:</strong> ~2 GB &bull; <strong>Privacy:</strong> 100% local
+            
+            <!-- LLM download UI -->
+            <div class="parakeet-download-inline" id="llmDownloadUI">
+              <div id="localLLMNotDownloaded">
+                <div class="parakeet-info-grid">
+                  <span class="parakeet-info-label">Status:</span>
+                  <span class="parakeet-info-value" style="color: #ef4444;">Model not downloaded</span>
+                  
+                  <span class="parakeet-info-label">Size:</span>
+                  <span class="parakeet-info-value">~2 GB</span>
+                  
+                  <span class="parakeet-info-label">Privacy:</span>
+                  <span class="parakeet-info-value">100% local</span>
+                </div>
+                <button class="setup-item-action" id="setupLLMDownloadBtn" style="width: 100%;">
+                  Download Model (~2 GB)
+                </button>
               </div>
-              <button class="setup-btn" id="setupLLMDownloadBtn">Download Model</button>
-            </div>
-            <div id="localLLMDownloading" class="hidden">
-              <div class="setup-progress-bar"><div class="setup-progress-fill llm-progress-indeterminate" id="llmProgressFill"></div></div>
-              <div class="setup-progress-text" id="llmProgressText">Downloading...</div>
-            </div>
-            <div id="localLLMDownloaded" class="hidden" style="color: #4CAF50; font-size: 13px; margin: 8px 0;">
-              ✓ Model ready! AI runs locally on your Mac.
+              
+              <div id="localLLMDownloading" class="hidden">
+                <div class="parakeet-progress parakeet-progress-indeterminate">
+                  <div class="parakeet-progress-fill parakeet-progress-animated" id="llmProgressFill"></div>
+                </div>
+                <div class="parakeet-progress-text" id="llmProgressText">
+                  Downloading from HuggingFace...
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; text-align: center;">
+                  Model downloads in the background. This may take a few minutes.
+                </p>
+              </div>
+              
+              <div id="localLLMDownloaded" class="hidden">
+                <div class="parakeet-info-grid">
+                  <span class="parakeet-info-label">Status:</span>
+                  <span class="parakeet-info-value" style="color: #4caf50;">✓ Model ready</span>
+                  
+                  <span class="parakeet-info-label">Size:</span>
+                  <span class="parakeet-info-value">~2 GB</span>
+                </div>
+                <button class="setup-btn-danger" id="setupLLMDeleteBtn" style="width: 100%; margin-top: 8px;">
+                  🗑️ Delete Model
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -8591,14 +8626,24 @@
       setupState.deepgramKey = await ipcRenderer.invoke('has-deepgram-key');
       setupState.openaiKey = await ipcRenderer.invoke('openai-has-key');
       
-      // Populate input fields if keys exist
-      if (setupState.deepgramKey && deepgramApiInput) {
-        deepgramApiInput.value = '••••••••••••••••'; // Show masked value
-        deepgramApiInput.disabled = true; // Disable editing once set
+      // Update input fields based on key state
+      if (deepgramApiInput) {
+        if (setupState.deepgramKey) {
+          deepgramApiInput.value = '••••••••••••••••'; // Show masked value
+          deepgramApiInput.disabled = true; // Disable editing once set
+        } else {
+          deepgramApiInput.value = ''; // Clear the input
+          deepgramApiInput.disabled = false; // Enable editing
+        }
       }
-      if (setupState.openaiKey && openaiApiInput) {
-        openaiApiInput.value = '••••••••••••••••'; // Show masked value
-        openaiApiInput.disabled = true; // Disable editing once set
+      if (openaiApiInput) {
+        if (setupState.openaiKey) {
+          openaiApiInput.value = '••••••••••••••••'; // Show masked value
+          openaiApiInput.disabled = true; // Disable editing once set
+        } else {
+          openaiApiInput.value = ''; // Clear the input
+          openaiApiInput.disabled = false; // Enable editing
+        }
       }
       
       // Check Parakeet model
@@ -8612,7 +8657,8 @@
       
       // Check AI engine and local LLM state
       setupState.selectedAIEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
-      setupState.localLLMReady = await ipcRenderer.invoke('llm-is-ready');
+      // Use llm-is-downloaded instead of llm-is-ready (model may be downloaded but not loaded)
+      setupState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
       
       // Select AI engine in UI if we have a preference
       if (typeof selectAIEngine === 'function' && setupState.selectedAIEngine) {
@@ -8820,7 +8866,7 @@
     let selectedAIEngine = null;
     const setupChoiceOpenAI = document.getElementById('setupChoiceOpenAI');
     const setupChoiceLocalLLM = document.getElementById('setupChoiceLocalLLM');
-    const setupOpenAIConfig = document.getElementById('setupOpenAIConfig');
+    // setupOpenAI already declared above
     const setupLocalLLMConfig = document.getElementById('setupLocalLLMConfig');
     const localLLMNotDownloaded = document.getElementById('localLLMNotDownloaded');
     const localLLMDownloading = document.getElementById('localLLMDownloading');
@@ -8840,18 +8886,18 @@
       if (engine === 'openai') {
         setupChoiceOpenAI?.classList.add('selected');
         setupChoiceLocalLLM?.classList.remove('selected');
-        setupOpenAIConfig?.classList.remove('hidden');
+        setupOpenAI?.classList.remove('hidden');
         setupLocalLLMConfig?.classList.add('hidden');
       } else if (engine === 'local') {
         setupChoiceOpenAI?.classList.remove('selected');
         setupChoiceLocalLLM?.classList.add('selected');
-        setupOpenAIConfig?.classList.add('hidden');
+        setupOpenAI?.classList.add('hidden');
         setupLocalLLMConfig?.classList.remove('hidden');
         
-        // Check if local LLM is ready
-        const isReady = await ipcRenderer.invoke('llm-is-ready');
-        setupState.localLLMReady = isReady;
-        updateLocalLLMUI(isReady);
+        // Check if local LLM is downloaded (not necessarily loaded yet)
+        const isDownloaded = await ipcRenderer.invoke('llm-is-downloaded');
+        setupState.localLLMReady = isDownloaded;
+        updateLocalLLMUI(isDownloaded);
       }
       
       // Save engine preference
@@ -8880,42 +8926,54 @@
       localLLMNotDownloaded?.classList.add('hidden');
       localLLMDownloading?.classList.remove('hidden');
       localLLMDownloaded?.classList.add('hidden');
-      llmProgressText.textContent = 'Initializing download...';
-      llmProgressFill.style.width = '0%';
+      if (llmProgressText) llmProgressText.textContent = 'Starting download from HuggingFace...';
       
       try {
         // Start the LLM init (downloads model from HuggingFace if not cached)
         const started = await ipcRenderer.invoke('llm-init');
+        console.log('[Setup] LLM init started:', started);
         
         if (started) {
           // Poll for progress
           const pollProgress = setInterval(async () => {
             const progress = await ipcRenderer.invoke('llm-get-init-progress');
+            console.log('[Setup] LLM progress:', progress);
             
             if (progress.error) {
               clearInterval(pollProgress);
-              llmProgressText.textContent = 'Download failed: ' + progress.error;
+              if (llmProgressText) llmProgressText.textContent = 'Download failed: ' + progress.error;
               localLLMNotDownloaded?.classList.remove('hidden');
               localLLMDownloading?.classList.add('hidden');
               return;
             }
             
-            llmProgressText.textContent = progress.status || 'Downloading...';
-            
-            if (!progress.isLoading) {
-              clearInterval(pollProgress);
-              
-              // Check if ready
-              const isReady = await ipcRenderer.invoke('llm-is-ready');
-              setupState.localLLMReady = isReady;
-              updateLocalLLMUI(isReady);
-              updateSetupUI();
+            // Update progress text
+            if (llmProgressText) {
+              if (progress.status) {
+                llmProgressText.textContent = progress.status;
+              } else if (progress.isLoading) {
+                llmProgressText.textContent = 'Downloading model from HuggingFace... Please wait.';
+              }
             }
-          }, 1000);
+            
+            // Check if download is complete (not loading anymore and no error)
+            if (!progress.isLoading && !progress.error) {
+              // Double-check by verifying the model is downloaded
+              const isDownloaded = await ipcRenderer.invoke('llm-is-downloaded');
+              console.log('[Setup] LLM download complete, isDownloaded:', isDownloaded);
+              
+              if (isDownloaded) {
+                clearInterval(pollProgress);
+                setupState.localLLMReady = true;
+                updateLocalLLMUI(true);
+                updateSetupUI();
+              }
+            }
+          }, 1500);
         }
       } catch (e) {
         console.error('[Setup] LLM init error:', e);
-        llmProgressText.textContent = 'Error: ' + e.message;
+        if (llmProgressText) llmProgressText.textContent = 'Error: ' + e.message;
         localLLMNotDownloaded?.classList.remove('hidden');
         localLLMDownloading?.classList.add('hidden');
       }
@@ -9290,6 +9348,8 @@
     let aiNotesInterval = null;
     let currentAINotes = null;
     let hasOpenAIKey = false;
+    let hasLocalLLM = false;
+    let currentAIEngine = 'openai';
     let currentSuggestedFolder = null; // { folderId, confidence, reason }
     
     // Folder suggestion cache: { noteId: { contentHash, suggestion } }
@@ -9975,13 +10035,23 @@
       
       if (settingsState.openaiKey) {
         openaiClearBtn?.classList.remove('hidden');
-        // Disable clear if local LLM not ready
-        if (openaiClearBtn) {
-          openaiClearBtn.disabled = !settingsState.localLLMReady;
-          openaiClearBtn.title = settingsState.localLLMReady 
-            ? 'Clear OpenAI API key' 
-            : 'Download local LLM model first to enable clearing';
-        }
+        // Disable clear if local models not ready
+        // Need both local LLM AND local embedding to allow clearing OpenAI key
+        (async () => {
+          const localEmbeddingReady = await ipcRenderer.invoke('embedding-check-downloaded');
+          const canClear = settingsState.localLLMReady && localEmbeddingReady;
+          if (openaiClearBtn) {
+            openaiClearBtn.disabled = !canClear;
+            if (!canClear) {
+              const missing = [];
+              if (!settingsState.localLLMReady) missing.push('Qwen2.5 model');
+              if (!localEmbeddingReady) missing.push('Embedding model');
+              openaiClearBtn.title = `Download ${missing.join(' and ')} first to enable clearing`;
+            } else {
+              openaiClearBtn.title = 'Clear OpenAI API key';
+            }
+          }
+        })();
       } else {
         openaiClearBtn?.classList.add('hidden');
       }
@@ -10045,7 +10115,8 @@
         settingsState.deepgramKey = await ipcRenderer.invoke('has-deepgram-key');
         settingsState.openaiKey = await ipcRenderer.invoke('openai-has-key');
         settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
-        settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-ready');
+        // Use llm-is-downloaded instead of llm-is-ready to check if model is available
+        settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
         console.log('[Settings] Provider state loaded:', settingsState);
       } catch (e) {
         console.error('[Settings] Error loading provider state:', e);
@@ -10090,19 +10161,39 @@
     
     // Clear OpenAI key
     openaiClearBtn?.addEventListener('click', async () => {
-      if (!settingsState.localLLMReady) {
-        alert('Please download the local LLM model first before clearing the OpenAI API key.');
+      // Check for local models - BOTH must be downloaded
+      const localEmbeddingReady = await ipcRenderer.invoke('embedding-check-downloaded');
+      const localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
+      
+      // BOTH local models must be downloaded to allow clearing OpenAI key
+      if (!localEmbeddingReady || !localLLMReady) {
+        const missing = [];
+        if (!localEmbeddingReady) missing.push('• Local Embedding Model (Settings → Search)');
+        if (!localLLMReady) missing.push('• Qwen2.5 AI Model (Settings → AI Notes)');
+        
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Clear OpenAI Key',
+          message: `Please download the following local models first:\n\n${missing.join('\n')}\n\nThese are required for the app to function without OpenAI.`,
+          type: 'warning'
+        });
         return;
       }
       
+      const embeddingEngine = await ipcRenderer.invoke('embedding-get-engine');
+      
       const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
         title: 'Clear OpenAI API Key',
-        message: 'This will remove your OpenAI API key. AI notes will use local Qwen2.5 model. Continue?',
+        message: 'This will remove your OpenAI API key.\n\n• AI notes will use local Qwen2.5 model\n• Search will use local embeddings\n\nContinue?',
         okLabel: 'Clear Key',
         cancelLabel: 'Cancel'
       });
       
       if (confirmed) {
+        // Switch embedding to local if currently using OpenAI
+        if (embeddingEngine === 'openai') {
+          await ipcRenderer.invoke('embedding-set-engine', 'local');
+        }
+        
         await ipcRenderer.invoke('openai-clear-key');
         await ipcRenderer.invoke('ai-set-engine', 'local');
         settingsState.openaiKey = false;
@@ -10742,7 +10833,17 @@
     
     async function checkOpenAIKey() {
       hasOpenAIKey = await ipcRenderer.invoke('openai-has-key');
+      hasLocalLLM = await ipcRenderer.invoke('llm-is-downloaded');
+      currentAIEngine = await ipcRenderer.invoke('ai-get-engine') || 'openai';
       // Don't show AI panel during meeting - only after
+    }
+    
+    // Check if AI is available (either OpenAI or local LLM based on current engine)
+    function isAIAvailable() {
+      if (currentAIEngine === 'local') {
+        return hasLocalLLM;
+      }
+      return hasOpenAIKey;
     }
     
     // Called when recording starts - store initial state
@@ -11205,7 +11306,10 @@
     }
     
     async function regenerateWithTemplate(templateId) {
-      if (!hasOpenAIKey || isGeneratingAINotes) return;
+      if (!isAIAvailable() || isGeneratingAINotes) {
+        console.log('[Templates] Cannot regenerate - AI not available or already generating');
+        return;
+      }
       
       currentTemplateId = templateId;
       
@@ -11297,8 +11401,8 @@
     
     // Called when recording stops - generate AI-enhanced notes
     async function generateEnhancedNotes() {
-      if (!hasOpenAIKey) {
-        console.log('[AI Notes] No OpenAI key configured');
+      if (!isAIAvailable()) {
+        console.log('[AI Notes] No AI available (OpenAI key or local LLM not configured)');
         return;
       }
       
@@ -15006,8 +15110,8 @@
         return;
       }
       
-      // If viewing a note, switch to home view first
-      if (notesHome && notesHome.classList.contains('hidden')) {
+      // If viewing a note (notesHome is hidden via display:none), switch to home view first
+      if (notesHome && notesHome.style.display === 'none') {
         console.log('[Search] Switching from note view to home view...');
         showEmptyState(); // This shows the notes list / home view
       }
@@ -15041,7 +15145,11 @@
     
     // Render search results in the right panel
     function renderSearchResults(results, query) {
-      if (!notesList) return;
+      console.log('[Search] renderSearchResults called, notesList:', !!notesList);
+      if (!notesList) {
+        console.error('[Search] notesList is null, cannot render results!');
+        return;
+      }
       
       // Hide calendar section during search
       const calendarSection = document.getElementById('calendarSection');
@@ -15247,10 +15355,23 @@
     
     // Get a snippet of text containing the search term
     function getSearchSnippet(note, query) {
-      // Extract text from transcript array (not JSON string)
-      const transcriptText = Array.isArray(note.transcript) 
-        ? note.transcript.map(seg => seg.text || '').join(' ')
-        : '';
+      // Extract text from transcript - handle both array and JSON string formats
+      let transcriptText = '';
+      if (Array.isArray(note.transcript)) {
+        transcriptText = note.transcript.map(seg => seg.text || '').join(' ');
+      } else if (typeof note.transcript === 'string') {
+        try {
+          const parsed = JSON.parse(note.transcript);
+          if (Array.isArray(parsed)) {
+            transcriptText = parsed.map(seg => seg.text || '').join(' ');
+          }
+        } catch {
+          // If not valid JSON, use as-is but skip if it looks like raw JSON
+          if (!note.transcript.includes('"speaker"') && !note.transcript.includes('"timestamp"')) {
+            transcriptText = note.transcript;
+          }
+        }
+      }
       
       const sources = [
         note.notes || '',
@@ -15261,6 +15382,11 @@
       const q = query.toLowerCase();
       
       for (const source of sources) {
+        // Skip sources that look like raw JSON data
+        if (source.includes('"speaker"') || source.includes('"timestamp"') || source.includes('"channel"')) {
+          continue;
+        }
+        
         const idx = source.toLowerCase().indexOf(q);
         if (idx !== -1) {
           const start = Math.max(0, idx - 30);

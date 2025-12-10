@@ -88,6 +88,25 @@ export declare function llmChat(messagesJson: string, maxTokens?: number | undef
  * This is useful for showing real-time responses
  */
 export declare function llmChatStream(messagesJson: string, callback: (...args: any[]) => any): void
+export interface EmbeddingDownloadProgress {
+  isDownloading: boolean
+  currentFile: string
+  currentFileIndex: number
+  totalFiles: number
+  bytesDownloaded: number
+  totalBytes: number
+  percent: number
+  error?: string
+}
+export declare function isEmbeddingDownloaded(): boolean
+export declare function downloadEmbeddingModel(): boolean
+export declare function getEmbeddingDownloadProgress(): EmbeddingDownloadProgress
+export declare function initEmbeddingModel(): boolean
+export declare function isEmbeddingReady(): boolean
+export declare function generateEmbedding(text: string): Array<number>
+export declare function generateEmbeddingsBatch(texts: Array<string>): Array<Array<number>>
+export declare function deleteEmbeddingModel(): boolean
+export declare function getEmbeddingDimension(): number
 /** Window information returned from native APIs */
 export interface WindowInfo {
   pid: number
