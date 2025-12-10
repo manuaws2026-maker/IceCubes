@@ -2721,8 +2721,11 @@ Answer:`;
   });
   
   ipcMain.handle('llm-delete-model', async () => {
+    console.log('[LLM] Delete model IPC called');
     try {
+      console.log('[LLM] Calling nativeModule.deleteLlmModel...');
       const result = nativeModule?.deleteLlmModel?.();
+      console.log('[LLM] Delete result:', result);
       
       // Notify editor window that model was deleted
       if (result && editorWindow && !editorWindow.isDestroyed()) {
