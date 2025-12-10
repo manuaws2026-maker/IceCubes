@@ -97,20 +97,6 @@
       padding: 24px;
       overflow-y: auto;
       padding-top: 48px;
-      position: relative;
-    }
-    
-    /* Drag header inside content - invisible but draggable */
-    .settings-drag-header {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 50px; /* Leave space for close button */
-      height: 40px;
-      -webkit-app-region: drag;
-      z-index: 100;
-      /* Debug: uncomment to see drag area */
-      /* background: rgba(255, 0, 0, 0.2); */
     }
     
     .settings-close-btn {
@@ -652,9 +638,6 @@
     </div>
     
     <div class="settings-main">
-      <!-- Drag header for window dragging -->
-      <div class="settings-drag-header"></div>
-      
       <!-- General Tab -->
       <div class="settings-tab active" id="settingsTabGeneral">
         <div class="settings-section">
