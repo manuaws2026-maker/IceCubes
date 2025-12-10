@@ -100,16 +100,15 @@
       padding-top: 48px;
     }
     
+    /* Thin drag strip at very top - doesn't cover content */
     .settings-drag-bar {
       position: fixed;
       top: 0;
-      left: 0;
-      right: 0;
-      height: 48px;
+      left: 200px; /* Start after sidebar */
+      right: 50px; /* Leave space for close button */
+      height: 20px;
       -webkit-app-region: drag;
       z-index: 10000;
-      /* Debug: uncomment to see the drag area */
-      /* background: rgba(255, 0, 0, 0.1); */
     }
     
     .settings-close-btn {
