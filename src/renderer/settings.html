@@ -899,6 +899,7 @@
   </div>
 
   <script>
+    console.log('[Settings] Script starting...');
     const { ipcRenderer, shell } = require('electron');
     
     // Close button
@@ -1436,13 +1437,17 @@
     });
     
     // Delete Local LLM
+    console.log('[Settings] Setting up LLM Delete button...');
     const llmDeleteBtn = document.getElementById('localLLMDeleteBtn');
+    console.log('[Settings] LLM Delete button element:', llmDeleteBtn);
     console.log('[Settings] LLM Delete button found:', !!llmDeleteBtn);
     
     if (llmDeleteBtn) {
-      llmDeleteBtn.addEventListener('click', async (e) => {
+      console.log('[Settings] Adding click listener to LLM Delete button');
+      llmDeleteBtn.onclick = async function(e) {
         e.preventDefault();
         e.stopPropagation();
+        alert('DELETE CLICKED!'); // Immediate visual feedback
         console.log('[Settings] LLM Delete button clicked');
         
         // Check if OpenAI key is configured first
@@ -1474,7 +1479,7 @@
           console.error('[Settings] Delete error:', e);
           alert('Failed to delete model: ' + e.message);
         }
-      });
+      };
     }
     
     // External links
