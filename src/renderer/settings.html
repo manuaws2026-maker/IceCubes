@@ -29,7 +29,6 @@
       color: var(--text-primary);
       height: 100vh;
       overflow: hidden;
-      -webkit-app-region: drag;
     }
     
     .settings-container {
@@ -1355,30 +1354,70 @@
     
     // Download Parakeet
     document.getElementById('parakeetDownloadBtn')?.addEventListener('click', async () => {
+      console.log('[Settings] Starting Parakeet download...');
       document.getElementById('parakeetNotDownloaded')?.classList.add('hidden');
       document.getElementById('parakeetDownloading')?.classList.remove('hidden');
       
+      const progressFill = document.getElementById('parakeetProgressFill');
+      const progressText = document.getElementById('parakeetProgressText');
+      
       try {
+        // Start download (returns immediately, runs in background)
         await ipcRenderer.invoke('parakeet-download-model');
+        
         // Poll for completion
         const checkProgress = setInterval(async () => {
           const progress = await ipcRenderer.invoke('parakeet-get-download-progress');
-          if (progress.status === 'completed') {
+          console.log('[Settings] Parakeet progress:', progress);
+          
+          // Update progress bar
+          if (progressFill && progress.percent > 0) {
+            progressFill.style.width = `${progress.percent}%`;
+          }
+          if (progressText) {
+            if (progress.isDownloading) {
+              const mb = (progress.bytesDownloaded / 1024 / 1024).toFixed(1);
+              progressText.textContent = `Downloading... ${mb} MB (${progress.percent}%)`;
+            }
+          }
+          
+          // Check for completion
+          const isDownloaded = await ipcRenderer.invoke('parakeet-check-downloaded');
+          if (isDownloaded && !progress.isDownloading) {
             clearInterval(checkProgress);
+            console.log('[Settings] Parakeet download complete!');
             settingsState.parakeetReady = true;
             document.getElementById('parakeetDownloading')?.classList.add('hidden');
             updateUI();
-          } else if (progress.status === 'error') {
+            
+            await ipcRenderer.invoke('show-alert-dialog', {
+              title: 'Download Complete',
+              message: 'Parakeet model downloaded successfully!',
+              type: 'info'
+            });
+          } else if (progress.error) {
             clearInterval(checkProgress);
-            alert('Download failed: ' + progress.error);
+            console.error('[Settings] Parakeet download error:', progress.error);
             document.getElementById('parakeetDownloading')?.classList.add('hidden');
             document.getElementById('parakeetNotDownloaded')?.classList.remove('hidden');
+            
+            await ipcRenderer.invoke('show-alert-dialog', {
+              title: 'Download Failed',
+              message: 'Failed to download Parakeet model: ' + progress.error,
+              type: 'error'
+            });
           }
         }, 1000);
       } catch (e) {
-        alert('Download failed: ' + e.message);
+        console.error('[Settings] Parakeet download exception:', e);
         document.getElementById('parakeetDownloading')?.classList.add('hidden');
         document.getElementById('parakeetNotDownloaded')?.classList.remove('hidden');
+        
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Download Failed',
+          message: 'Failed to download model: ' + e.message,
+          type: 'error'
+        });
       }
     });
     
@@ -1420,30 +1459,62 @@
     
     // Download Local LLM
     document.getElementById('localLLMDownloadBtn')?.addEventListener('click', async () => {
+      console.log('[Settings] Starting LLM download/init...');
       document.getElementById('localLLMNotDownloaded')?.classList.add('hidden');
       document.getElementById('localLLMDownloading')?.classList.remove('hidden');
       
+      const progressText = document.getElementById('localLLMProgressText');
+      
       try {
+        // llm-init downloads and loads the model (handled by mistralrs)
         await ipcRenderer.invoke('llm-init');
+        
         // Poll for completion
         const checkProgress = setInterval(async () => {
           const progress = await ipcRenderer.invoke('llm-get-init-progress');
-          if (progress.status === 'Model ready' || !progress.is_loading) {
+          console.log('[Settings] LLM init progress:', progress);
+          
+          if (progressText && progress.status) {
+            progressText.textContent = progress.status;
+          }
+          
+          if (progress.status === 'Model ready' || (!progress.is_loading && !progress.error)) {
             clearInterval(checkProgress);
+            console.log('[Settings] LLM init complete!');
             settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
             document.getElementById('localLLMDownloading')?.classList.add('hidden');
             updateUI();
+            
+            if (settingsState.localLLMReady) {
+              await ipcRenderer.invoke('show-alert-dialog', {
+                title: 'Model Ready',
+                message: 'Qwen2.5 3B model is ready for local AI notes!',
+                type: 'info'
+              });
+            }
           } else if (progress.error) {
             clearInterval(checkProgress);
-            alert('Download failed: ' + progress.error);
+            console.error('[Settings] LLM init error:', progress.error);
             document.getElementById('localLLMDownloading')?.classList.add('hidden');
             document.getElementById('localLLMNotDownloaded')?.classList.remove('hidden');
+            
+            await ipcRenderer.invoke('show-alert-dialog', {
+              title: 'Download Failed',
+              message: 'Failed to download/initialize model: ' + progress.error,
+              type: 'error'
+            });
           }
         }, 1000);
       } catch (e) {
-        alert('Download failed: ' + e.message);
+        console.error('[Settings] LLM init exception:', e);
         document.getElementById('localLLMDownloading')?.classList.add('hidden');
         document.getElementById('localLLMNotDownloaded')?.classList.remove('hidden');
+        
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Download Failed',
+          message: 'Failed to download model: ' + e.message,
+          type: 'error'
+        });
       }
     });
     
