@@ -60,6 +60,47 @@
       flex-direction: column;
       gap: 4px;
       -webkit-app-region: no-drag;
+      flex: 1;
+    }
+    
+    .settings-theme-toggle {
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      margin-top: auto;
+      -webkit-app-region: no-drag;
+    }
+    
+    .theme-toggle-btn {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--text-secondary);
+      font-size: 10px;
+      transition: all 0.2s;
+    }
+    
+    .theme-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+    
+    .theme-toggle-btn.active {
+      background: var(--accent);
+      color: #000;
+    }
+    
+    .theme-toggle-btn .theme-icon {
+      font-size: 16px;
     }
     
     .settings-nav-item {
@@ -150,39 +191,6 @@
       margin-bottom: 16px;
     }
     
-    /* Theme Selector */
-    .theme-selector {
-      display: flex;
-      gap: 12px;
-    }
-    
-    .theme-option {
-      flex: 1;
-      padding: 16px;
-      background: var(--bg-secondary);
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      color: var(--text-primary);
-      transition: all 0.2s;
-    }
-    
-    .theme-option:hover {
-      border-color: var(--accent);
-    }
-    
-    .theme-option.active {
-      border-color: var(--accent);
-      background: rgba(74, 222, 128, 0.1);
-    }
-    
-    .theme-icon {
-      font-size: 24px;
-    }
     
     /* Provider Toggle */
     .provider-toggle-group {
@@ -626,10 +634,7 @@
     <div class="settings-sidebar">
       <div class="settings-title">Settings</div>
       <div class="settings-nav">
-        <button class="settings-nav-item active" data-tab="general">
-          <span class="nav-icon">⚙️</span> General
-        </button>
-        <button class="settings-nav-item" data-tab="transcription">
+        <button class="settings-nav-item active" data-tab="transcription">
           <span class="nav-icon">🎙️</span> Transcription
         </button>
         <button class="settings-nav-item" data-tab="ai">
@@ -642,33 +647,25 @@
           <span class="nav-icon">🔔</span> Notifications
         </button>
       </div>
+      <div class="settings-theme-toggle" id="sidebarThemeToggle">
+        <button class="theme-toggle-btn" data-theme="light">
+          <span class="theme-icon">☀️</span>
+          <span>Light</span>
+        </button>
+        <button class="theme-toggle-btn active" data-theme="system">
+          <span class="theme-icon">💻</span>
+          <span>System</span>
+        </button>
+        <button class="theme-toggle-btn" data-theme="dark">
+          <span class="theme-icon">🌙</span>
+          <span>Dark</span>
+        </button>
+      </div>
     </div>
     
     <div class="settings-main">
-      <!-- General Tab -->
-      <div class="settings-tab active" id="settingsTabGeneral">
-        <div class="settings-section">
-          <h3>🎨 Appearance</h3>
-          <p class="settings-desc">Choose your preferred theme</p>
-          <div class="theme-selector" id="themeSelector">
-            <button class="theme-option" data-theme="light">
-              <span class="theme-icon">☀️</span>
-              <span>Light</span>
-            </button>
-            <button class="theme-option active" data-theme="system">
-              <span class="theme-icon">💻</span>
-              <span>System</span>
-            </button>
-            <button class="theme-option" data-theme="dark">
-              <span class="theme-icon">🌙</span>
-              <span>Dark</span>
-            </button>
-          </div>
-        </div>
-      </div>
-      
       <!-- Transcription Tab -->
-      <div class="settings-tab" id="settingsTabTranscription">
+      <div class="settings-tab active" id="settingsTabTranscription">
         <div class="settings-section">
           <h3>🎙️ Transcription Provider</h3>
           <p class="settings-desc">Choose how your meetings are transcribed</p>
@@ -911,14 +908,14 @@
       });
     });
     
-    // Theme selector
-    const themeSelector = document.getElementById('themeSelector');
-    themeSelector?.addEventListener('click', async (e) => {
-      const btn = e.target.closest('.theme-option');
+    // Theme toggle in sidebar
+    const sidebarThemeToggle = document.getElementById('sidebarThemeToggle');
+    sidebarThemeToggle?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.theme-toggle-btn');
       if (!btn) return;
       
       const theme = btn.dataset.theme;
-      document.querySelectorAll('.theme-option').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.theme-toggle-btn').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
       
       await ipcRenderer.invoke('theme-set', theme);
@@ -1732,7 +1729,7 @@
     (async () => {
       const theme = await ipcRenderer.invoke('theme-get');
       if (theme) {
-        document.querySelectorAll('.theme-option').forEach(t => {
+        document.querySelectorAll('.theme-toggle-btn').forEach(t => {
           t.classList.toggle('active', t.dataset.theme === theme);
         });
       }
