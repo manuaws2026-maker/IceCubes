@@ -930,7 +930,7 @@
       document.querySelectorAll('.theme-option').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
       
-      await ipcRenderer.invoke('set-theme', theme);
+      await ipcRenderer.invoke('theme-set', theme);
     });
     
     // State
@@ -1615,7 +1615,7 @@
     
     // Load saved theme
     (async () => {
-      const theme = await ipcRenderer.invoke('get-theme');
+      const theme = await ipcRenderer.invoke('theme-get');
       if (theme) {
         document.querySelectorAll('.theme-option').forEach(t => {
           t.classList.toggle('active', t.dataset.theme === theme);
