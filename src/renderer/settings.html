@@ -101,13 +101,15 @@
     }
     
     .settings-drag-bar {
-      position: absolute;
+      position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      height: 40px;
+      height: 48px;
       -webkit-app-region: drag;
-      z-index: 999;
+      z-index: 10000;
+      /* Debug: uncomment to see the drag area */
+      /* background: rgba(255, 0, 0, 0.1); */
     }
     
     .settings-close-btn {
@@ -1433,9 +1435,16 @@
     });
     
     // Delete Local LLM
-    document.getElementById('localLLMDeleteBtn')?.addEventListener('click', async () => {
+    const llmDeleteBtn = document.getElementById('localLLMDeleteBtn');
+    console.log('[Settings] LLM Delete button found:', !!llmDeleteBtn);
+    
+    llmDeleteBtn?.addEventListener('click', async () => {
+      console.log('[Settings] LLM Delete button clicked');
+      
       // Check if OpenAI key is configured first
       const hasOpenAIKey = await ipcRenderer.invoke('has-openai-key');
+      console.log('[Settings] Has OpenAI key:', hasOpenAIKey);
+      
       if (!hasOpenAIKey) {
         alert('Cannot delete local LLM model - you need OpenAI API key configured first to ensure AI notes functionality.');
         return;
@@ -1445,7 +1454,10 @@
       if (!confirmed) return;
       
       try {
+        console.log('[Settings] Calling llm-delete-model...');
         const result = await ipcRenderer.invoke('llm-delete-model');
+        console.log('[Settings] Delete result:', result);
+        
         if (result) {
           alert('Qwen model deleted successfully.');
           // Switch to OpenAI since local model is gone
@@ -1455,6 +1467,7 @@
           alert('Model not found or already deleted.');
         }
       } catch (e) {
+        console.error('[Settings] Delete error:', e);
         alert('Failed to delete model: ' + e.message);
       }
     });
