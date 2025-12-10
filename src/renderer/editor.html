@@ -14999,14 +14999,26 @@
     
     // Debounced search function
     function performGlobalSearch(query) {
+      console.log('[Search] performGlobalSearch called with query:', query);
       if (!query.trim()) {
+        console.log('[Search] Empty query, clearing search');
         clearSearch();
         return;
       }
       
+      // If viewing a note, switch to home view first
+      if (notesHome && notesHome.classList.contains('hidden')) {
+        console.log('[Search] Switching from note view to home view...');
+        showEmptyState(); // This shows the notes list / home view
+      }
+      
       isSearchActive = true;
+      console.log('[Search] Calling global-search IPC...');
       ipcRenderer.invoke('global-search', query).then(results => {
+        console.log('[Search] Got results:', results);
         renderSearchResults(results, query);
+      }).catch(err => {
+        console.error('[Search] IPC error:', err);
       });
     }
     
@@ -15278,15 +15290,36 @@
     }
     
     // Search input handler with debounce
-    globalSearchInput?.addEventListener('input', (e) => {
-      const query = e.target.value;
+    console.log('[Search] globalSearchInput element:', globalSearchInput);
+    if (globalSearchInput) {
+      // Input event - debounced search
+      globalSearchInput.addEventListener('input', (e) => {
+        const query = e.target.value;
+        console.log('[Search] Input event fired, query:', query);
+        
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+        
+        searchDebounceTimer = setTimeout(() => {
+          console.log('[Search] Performing search for:', query);
+          performGlobalSearch(query);
+        }, 300);
+      });
       
-      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      // Enter key - immediate search
+      globalSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const query = globalSearchInput.value;
+          console.log('[Search] Enter key pressed, query:', query);
+          if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+          performGlobalSearch(query);
+        }
+      });
       
-      searchDebounceTimer = setTimeout(() => {
-        performGlobalSearch(query);
-      }, 300);
-    });
+      console.log('[Search] Event listeners attached to globalSearchInput');
+    } else {
+      console.error('[Search] ERROR: globalSearchInput element not found!');
+    }
     
     // Keyboard shortcut (Cmd+K) to focus search
     document.addEventListener('keydown', (e) => {

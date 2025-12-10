@@ -1151,8 +1151,25 @@
         settingsState.parakeetReady = await ipcRenderer.invoke('parakeet-check-downloaded');
         settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
         
+        // Load language settings
+        const langSettings = await ipcRenderer.invoke('lang-get-settings');
+        console.log('[Settings] Loaded language settings:', langSettings);
+        settingsState.transcriptionLang = langSettings?.transcriptionLang || 'en';
+        settingsState.aiNotesLang = langSettings?.aiNotesLang || 'same';
+        settingsState.autoDetect = langSettings?.autoDetect || false;
+        
         updateUI();
         updateLanguageDropdowns();
+        
+        // Set language dropdown values after dropdowns are populated
+        const transcriptionSelect = document.getElementById('transcriptionLangSelect');
+        const aiNotesSelect = document.getElementById('aiNotesLangSelect');
+        const autoDetectCheckbox = document.getElementById('autoDetectLang');
+        
+        if (transcriptionSelect) transcriptionSelect.value = settingsState.transcriptionLang;
+        if (aiNotesSelect) aiNotesSelect.value = settingsState.aiNotesLang;
+        if (autoDetectCheckbox) autoDetectCheckbox.checked = settingsState.autoDetect;
+        
       } catch (e) {
         console.error('Error loading settings state:', e);
       }
@@ -1306,6 +1323,37 @@
       await ipcRenderer.invoke('ai-set-engine', 'local');
       updateUI();
       updateLanguageDropdowns();
+    });
+    
+    // Language settings - save on change
+    document.getElementById('transcriptionLangSelect')?.addEventListener('change', async (e) => {
+      settingsState.transcriptionLang = e.target.value;
+      console.log('[Settings] Saving transcription language:', settingsState.transcriptionLang);
+      await ipcRenderer.invoke('lang-save-settings', {
+        transcriptionLang: settingsState.transcriptionLang,
+        aiNotesLang: settingsState.aiNotesLang,
+        autoDetect: settingsState.autoDetect
+      });
+    });
+    
+    document.getElementById('aiNotesLangSelect')?.addEventListener('change', async (e) => {
+      settingsState.aiNotesLang = e.target.value;
+      console.log('[Settings] Saving AI notes language:', settingsState.aiNotesLang);
+      await ipcRenderer.invoke('lang-save-settings', {
+        transcriptionLang: settingsState.transcriptionLang,
+        aiNotesLang: settingsState.aiNotesLang,
+        autoDetect: settingsState.autoDetect
+      });
+    });
+    
+    document.getElementById('autoDetectLang')?.addEventListener('change', async (e) => {
+      settingsState.autoDetect = e.target.checked;
+      console.log('[Settings] Saving auto-detect:', settingsState.autoDetect);
+      await ipcRenderer.invoke('lang-save-settings', {
+        transcriptionLang: settingsState.transcriptionLang,
+        aiNotesLang: settingsState.aiNotesLang,
+        autoDetect: settingsState.autoDetect
+      });
     });
     
     // Save Deepgram key
