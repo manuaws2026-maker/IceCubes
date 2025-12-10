@@ -1384,10 +1384,37 @@
     
     // Delete Parakeet
     document.getElementById('parakeetDeleteBtn')?.addEventListener('click', async () => {
-      if (confirm('Delete Parakeet model?')) {
+      // Check if Deepgram key is configured first
+      const hasDeepgramKey = await ipcRenderer.invoke('has-deepgram-key');
+      if (!hasDeepgramKey) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Delete',
+          message: 'You need to configure a Deepgram API key first to ensure transcription functionality.',
+          type: 'warning'
+        });
+        return;
+      }
+      
+      const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+        title: 'Delete Parakeet Model',
+        message: 'Delete the Parakeet model (~670 MB)?\n\nThis will free up disk space but you\'ll need to re-download it to use local transcription again.',
+        okLabel: 'Delete',
+        cancelLabel: 'Cancel'
+      });
+      
+      if (confirmed) {
         await ipcRenderer.invoke('parakeet-delete-model');
         settingsState.parakeetReady = false;
+        // Switch to Deepgram
+        await ipcRenderer.invoke('transcription-set-engine', 'deepgram');
+        settingsState.transcriptionEngine = 'deepgram';
         updateUI();
+        
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Model Deleted',
+          message: 'Parakeet model deleted successfully.',
+          type: 'info'
+        });
       }
     });
     
@@ -1438,11 +1465,21 @@
         console.log('[Settings] Has OpenAI key:', hasOpenAIKey);
         
         if (!hasOpenAIKey) {
-          alert('Cannot delete local LLM model - you need OpenAI API key configured first to ensure AI notes functionality.');
+          await ipcRenderer.invoke('show-alert-dialog', {
+            title: 'Cannot Delete',
+            message: 'You need to configure an OpenAI API key first to ensure AI notes functionality.',
+            type: 'warning'
+          });
           return;
         }
         
-        const confirmed = confirm('Delete the Qwen2.5 3B model (~2GB)?\n\nThis will free up disk space but you\'ll need to re-download it to use local AI again.');
+        const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+          title: 'Delete Qwen Model',
+          message: 'Delete the Qwen2.5 3B model (~2GB)?\n\nThis will free up disk space but you\'ll need to re-download it to use local AI again.',
+          okLabel: 'Delete',
+          cancelLabel: 'Cancel'
+        });
+        
         if (!confirmed) return;
         
         try {
@@ -1451,16 +1488,28 @@
           console.log('[Settings] Delete result:', result);
           
           if (result) {
-            alert('Qwen model deleted successfully.');
+            await ipcRenderer.invoke('show-alert-dialog', {
+              title: 'Model Deleted',
+              message: 'Qwen model deleted successfully.',
+              type: 'info'
+            });
             // Switch to OpenAI since local model is gone
             await ipcRenderer.invoke('ai-set-engine', 'openai');
             loadState();
           } else {
-            alert('Model not found or already deleted.');
+            await ipcRenderer.invoke('show-alert-dialog', {
+              title: 'Not Found',
+              message: 'Model not found or already deleted.',
+              type: 'info'
+            });
           }
-        } catch (e) {
-          console.error('[Settings] Delete error:', e);
-          alert('Failed to delete model: ' + e.message);
+        } catch (err) {
+          console.error('[Settings] Delete error:', err);
+          await ipcRenderer.invoke('show-alert-dialog', {
+            title: 'Error',
+            message: 'Failed to delete model: ' + err.message,
+            type: 'error'
+          });
         }
       };
     }

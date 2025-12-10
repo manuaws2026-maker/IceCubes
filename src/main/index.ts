@@ -2519,6 +2519,19 @@ Answer:`;
     });
     return result.response === 1; // true if OK was clicked
   });
+  
+  // Show alert dialog with app icon
+  ipcMain.handle('show-alert-dialog', async (_, options: { title: string; message: string; type?: 'info' | 'warning' | 'error' }) => {
+    const iconPath = path.join(__dirname, '../renderer/assets/logo.png');
+    await dialog.showMessageBox({
+      type: options.type || 'info',
+      buttons: ['OK'],
+      title: options.title,
+      message: options.message,
+      icon: nativeImage.createFromPath(iconPath),
+    });
+    return true;
+  });
 
   // Get download progress (polled by UI)
   ipcMain.handle('parakeet-get-download-progress', async () => {
