@@ -1478,7 +1478,7 @@
             progressText.textContent = progress.status;
           }
           
-          if (progress.status === 'Model ready' || (!progress.is_loading && !progress.error)) {
+          if (progress.status === 'Model ready' || (!progress.isLoading && !progress.error)) {
             clearInterval(checkProgress);
             console.log('[Settings] LLM init complete!');
             settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
