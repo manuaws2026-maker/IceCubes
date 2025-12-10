@@ -468,6 +468,125 @@ Which template number is most appropriate?`;
   }
 }
 
+/**
+ * Suggest folder using AI - routes to OpenAI or local LLM
+ */
+export async function suggestFolderWithRouter(
+  openaiService: OpenAIService,
+  noteContent: string,
+  meetingTitle: string,
+  folders: Array<{ id: string; name: string; description: string }>
+): Promise<{ folderId: string; confidence: 'high' | 'medium' | 'low'; reason: string } | null> {
+  const engine = getAIEngine();
+  
+  console.log(`[AIRouter] suggestFolderWithRouter called - engine: ${engine}, folders: ${folders.length}`);
+  
+  // Use OpenAI if selected and available
+  if (engine === 'openai' && openaiService?.hasApiKey()) {
+    console.log('[AIRouter] Using OpenAI for folder suggestion');
+    return openaiService.suggestFolder(noteContent, meetingTitle, folders);
+  }
+  
+  // Use local LLM if ready
+  if (nativeModule?.isLlmReady?.()) {
+    console.log('[AIRouter] Using local LLM (Qwen) for folder suggestion');
+    try {
+      const folderList = folders.map((f, i) => {
+        const desc = f.description && f.description.trim().length > 0 
+          ? f.description 
+          : '(match based on folder name)';
+        return `${i + 1}. "${f.name}" - ${desc}`;
+      }).join('\n');
+
+      const systemPrompt = `You are a folder classification assistant. Analyze the meeting content and suggest the most appropriate folder.
+
+Output ONLY valid JSON in this exact format:
+{"number": N, "confidence": "high|medium|low", "reason": "brief explanation"}
+
+Where N is the folder number (1, 2, 3, etc.) or 0 if no folder matches.
+
+Rules:
+- "high" = content clearly matches folder purpose (70%+ sure)
+- "medium" = content somewhat matches (50-70% sure)
+- "low" = weak match (30-50% sure)
+- Use 0 if confidence would be below "low"`;
+
+      const userPrompt = `Meeting Title: ${meetingTitle}
+
+Meeting Content:
+${noteContent.substring(0, 1500)}
+
+Available Folders:
+${folderList}
+
+Which folder number best matches this meeting? Output JSON only.`;
+
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ];
+
+      console.log('[AIRouter] Calling local LLM for folder suggestion...');
+      const result = nativeModule.llmChat(JSON.stringify(messages), 150, 0.2);
+      
+      if (result?.text) {
+        console.log('[AIRouter] Local LLM response:', result.text);
+        
+        // Try to parse JSON from response
+        const jsonMatch = result.text.match(/\{[\s\S]*?\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            const folderIndex = parseInt(parsed.number) - 1;
+            
+            if (folderIndex >= 0 && folderIndex < folders.length && 
+                (parsed.confidence === 'high' || parsed.confidence === 'medium')) {
+              console.log('[AIRouter] Local LLM suggested folder:', folders[folderIndex].name, 
+                          'with', parsed.confidence, 'confidence');
+              return {
+                folderId: folders[folderIndex].id,
+                confidence: parsed.confidence,
+                reason: parsed.reason || 'Matched by local AI'
+              };
+            }
+          } catch (parseErr) {
+            console.warn('[AIRouter] Failed to parse JSON from local LLM:', parseErr);
+          }
+        }
+        
+        // Fallback: try to extract just a number
+        const numMatch = result.text.match(/(\d+)/);
+        if (numMatch) {
+          const folderIndex = parseInt(numMatch[1]) - 1;
+          if (folderIndex >= 0 && folderIndex < folders.length) {
+            console.log('[AIRouter] Local LLM suggested folder (fallback):', folders[folderIndex].name);
+            return {
+              folderId: folders[folderIndex].id,
+              confidence: 'medium',
+              reason: 'Matched by local AI'
+            };
+          }
+        }
+      }
+      
+      console.log('[AIRouter] No strong folder match from local LLM');
+      return null;
+    } catch (e) {
+      console.error('[AIRouter] Local folder suggestion error:', e);
+      return null;
+    }
+  }
+  
+  // Fallback to OpenAI if local not ready but OpenAI available
+  if (openaiService?.hasApiKey()) {
+    console.log('[AIRouter] Falling back to OpenAI for folder suggestion');
+    return openaiService.suggestFolder(noteContent, meetingTitle, folders);
+  }
+  
+  console.log('[AIRouter] No AI available for folder suggestion');
+  return null;
+}
+
 // Helper function to get language name
 function getLanguageName(code: string): string {
   const languages: Record<string, string> = {

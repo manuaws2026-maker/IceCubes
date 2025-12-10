@@ -32,7 +32,7 @@ import { TranscriptionService } from './transcription';
 import { getTranscriptionRouter } from './transcription/router';
 import { CalendarService } from './calendar';
 import { OpenAIService } from './openai';
-import { setNativeModuleForAI, getAIEngine, setAIEngine, isLocalLLMReady, generateEnhancedNotesWithRouter, askQuestionWithRouter, suggestTemplateWithRouter } from './ai-router';
+import { setNativeModuleForAI, getAIEngine, setAIEngine, isLocalLLMReady, generateEnhancedNotesWithRouter, askQuestionWithRouter, suggestTemplateWithRouter, suggestFolderWithRouter } from './ai-router';
 // Note: Folder service replaced with database service
 import { getVectorSearchService } from './vector-search';
 import { databaseService } from './database';
@@ -2356,9 +2356,17 @@ Answer:`;
   });
   
   // AI Folder Suggestion - Suggest a folder based on note content
+  // Uses AI router to choose between OpenAI and local LLM
   ipcMain.handle('openai-suggest-folder', async (_, data: { noteContent: string, meetingTitle: string }) => {
-    if (!openaiService?.hasApiKey()) return null;
-    console.log('[IPC] Suggesting folder for:', data.meetingTitle);
+    const hasOpenAI = openaiService?.hasApiKey();
+    const hasLocalLLM = isLocalLLMReady();
+    
+    if (!hasOpenAI && !hasLocalLLM) {
+      console.log('[IPC] No AI available for folder suggestion');
+      return null;
+    }
+    
+    console.log('[IPC] Suggesting folder for:', data.meetingTitle, '- OpenAI:', hasOpenAI, 'LocalLLM:', hasLocalLLM);
     
     try {
       // Get all folders from database
@@ -2372,7 +2380,8 @@ Answer:`;
       console.log('[IPC] Available folders for suggestion:', folders.map(f => f.name));
       if (folders.length === 0) return null;
       
-      const suggestion = await openaiService.suggestFolder(
+      const suggestion = await suggestFolderWithRouter(
+        openaiService!,
         data.noteContent,
         data.meetingTitle,
         folders
