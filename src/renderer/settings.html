@@ -1431,11 +1431,10 @@
       llmDeleteBtn.onclick = async function(e) {
         e.preventDefault();
         e.stopPropagation();
-        alert('DELETE CLICKED!'); // Immediate visual feedback
         console.log('[Settings] LLM Delete button clicked');
         
         // Check if OpenAI key is configured first
-        const hasOpenAIKey = await ipcRenderer.invoke('has-openai-key');
+        const hasOpenAIKey = await ipcRenderer.invoke('openai-has-key');
         console.log('[Settings] Has OpenAI key:', hasOpenAIKey);
         
         if (!hasOpenAIKey) {
