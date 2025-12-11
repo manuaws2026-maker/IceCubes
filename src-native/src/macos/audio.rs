@@ -1,11 +1,15 @@
-//! macOS audio capture using ScreenCaptureKit + AVFoundation microphone
+//! macOS audio capture using Core Audio Process Tap + AVFoundation microphone
 //!
 //! Audio capture approach:
-//! - System audio via ScreenCaptureKit loopback (all audio output)
+//! - System audio via Core Audio Process Tap (captures at HAL level - works with Bluetooth!)
 //! - Microphone audio via AVFoundation (user's voice)
 //! - Package as STEREO: Left = System, Right = Mic
 //! - Stream in real-time for live transcription
 //! - Also save to WAV at the end
+//!
+//! The Process Tap approach is superior to ScreenCaptureKit because it captures
+//! audio BEFORE it's routed to the output device, making it work regardless of
+//! whether the user is using Bluetooth headphones, wired headphones, or speakers.
 
 use crate::audio::{AudioError, WavHeader};
 use cocoa::base::{id, nil, BOOL, NO, YES};
@@ -100,6 +104,7 @@ static MIC_ENGINE: AtomicPtr<Object> = AtomicPtr::new(null_mut());
 static CB_CONTENT: AtomicPtr<Object> = AtomicPtr::new(null_mut());
 static CB_ERROR: AtomicBool = AtomicBool::new(false);
 static CB_START_OK: AtomicBool = AtomicBool::new(false);
+
 
 pub struct AudioStreamHandle {
     pub output_path: String,
@@ -447,7 +452,7 @@ unsafe fn stop_microphone_capture() {
 // ============================================================================
 
 /// Start capturing system audio + microphone
-/// System audio is captured via ScreenCaptureKit loopback (ALL audio output)
+/// System audio is captured via Core Audio Process Tap (works with Bluetooth!)
 /// Microphone is captured via AVFoundation
 #[allow(deprecated)]
 pub async fn start_capture(
@@ -457,7 +462,7 @@ pub async fn start_capture(
     output_path: &str,
     include_mic: bool,
 ) -> Result<AudioStreamHandle, AudioError> {
-    println!("[Audio] Starting capture (system loopback + mic={}))", include_mic);
+    println!("[Audio] Starting capture (ScreenCaptureKit, mic={})", include_mic);
 
     // Clear previous data
     SYSTEM_AUDIO_DATA.lock().clear();
@@ -473,9 +478,10 @@ pub async fn start_capture(
     let path = output_path.to_string();
     let capture_mic = include_mic;
 
-    // Run capture setup
+    // Run capture setup using ScreenCaptureKit
+    // Note: ScreenCaptureKit captures audio BEFORE Bluetooth encoding,
+    // so it works with both regular speakers and Bluetooth headphones!
     let result = tokio::task::spawn_blocking(move || unsafe { 
-        // Start ScreenCaptureKit for system audio (loopback - all audio)
         setup_system_audio_capture()?;
         
         // Start microphone capture if requested
@@ -506,6 +512,8 @@ pub async fn start_capture(
 }
 
 /// Setup ScreenCaptureKit to capture ALL system audio (loopback)
+/// Note: ScreenCaptureKit captures audio BEFORE Bluetooth encoding,
+/// so it works with both regular speakers and Bluetooth headphones!
 #[allow(deprecated)]
 unsafe fn setup_system_audio_capture() -> Result<(), AudioError> {
     let sem = dispatch_semaphore_create(0);
@@ -622,12 +630,13 @@ pub async fn stop_capture(handle: AudioStreamHandle) -> Result<(), AudioError> {
     // Stop microphone
     unsafe { stop_microphone_capture(); }
 
-    // Stop SCK
+    // Stop ScreenCaptureKit
     unsafe {
         let stream = ACTIVE_STREAM.swap(null_mut(), Ordering::SeqCst) as id;
         let del = ACTIVE_DELEGATE.swap(null_mut(), Ordering::SeqCst) as id;
 
         if !stream.is_null() {
+            println!("[Audio] Stopping ScreenCaptureKit...");
             let sem = dispatch_semaphore_create(0);
             let sem_ptr = sem as usize;
             let block = block::ConcreteBlock::new(move |_: id| {

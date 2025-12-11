@@ -17,6 +17,7 @@ mod embedding;
 #[cfg(target_os = "macos")]
 mod macos;
 
+
 #[cfg(target_os = "windows")]
 mod windows_impl;
 
@@ -342,4 +343,6 @@ pub fn has_audio_chunks() -> bool {
         false
     }
 }
+
+// ============================================================================
 

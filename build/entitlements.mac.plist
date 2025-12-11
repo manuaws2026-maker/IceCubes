@@ -14,7 +14,7 @@
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
     
-    <!-- Screen Recording permission (for ScreenCaptureKit) -->
+    <!-- Screen Recording permission (for ScreenCaptureKit - captures system audio too) -->
     <key>com.apple.security.screen-recording</key>
     <true/>
     
@@ -22,15 +22,8 @@
     <key>com.apple.security.device.audio-input</key>
     <true/>
     
-    <!-- Accessibility (for UI scraping) -->
+    <!-- Accessibility (for UI scraping / meeting detection) -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
 </dict>
 </plist>
-
-
-
-
-
-
-
