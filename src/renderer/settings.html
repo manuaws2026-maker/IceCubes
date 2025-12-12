@@ -1423,6 +1423,17 @@
     
     // Transcription provider toggle
     document.getElementById('transcriptionProviderDeepgram')?.addEventListener('click', async () => {
+      // Check if recording is active
+      const recordingActive = await ipcRenderer.invoke('is-recording');
+      if (recordingActive) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Change Provider',
+          message: 'Cannot change transcription provider during active recording.\n\nPlease stop the current recording first.',
+          buttons: ['OK']
+        });
+        return;
+      }
+      
       settingsState.transcriptionEngine = 'deepgram';
       await ipcRenderer.invoke('transcription-set-engine', 'deepgram');
       updateUI();
@@ -1430,6 +1441,17 @@
     });
     
     document.getElementById('transcriptionProviderParakeet')?.addEventListener('click', async () => {
+      // Check if recording is active
+      const recordingActive = await ipcRenderer.invoke('is-recording');
+      if (recordingActive) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Change Provider',
+          message: 'Cannot change transcription provider during active recording.\n\nPlease stop the current recording first.',
+          buttons: ['OK']
+        });
+        return;
+      }
+      
       settingsState.transcriptionEngine = 'parakeet';
       await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
       updateUI();
@@ -1438,6 +1460,17 @@
     
     // AI provider toggle
     document.getElementById('aiProviderOpenAI')?.addEventListener('click', async () => {
+      // Check if recording is active
+      const recordingActive = await ipcRenderer.invoke('is-recording');
+      if (recordingActive) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Change Provider',
+          message: 'Cannot change AI provider during active recording.\n\nPlease stop the current recording first.',
+          buttons: ['OK']
+        });
+        return;
+      }
+      
       settingsState.aiEngine = 'openai';
       await ipcRenderer.invoke('ai-set-engine', 'openai');
       updateUI();
@@ -1445,6 +1478,17 @@
     });
     
     document.getElementById('aiProviderLocal')?.addEventListener('click', async () => {
+      // Check if recording is active
+      const recordingActive = await ipcRenderer.invoke('is-recording');
+      if (recordingActive) {
+        await ipcRenderer.invoke('show-alert-dialog', {
+          title: 'Cannot Change Provider',
+          message: 'Cannot change AI provider during active recording.\n\nPlease stop the current recording first.',
+          buttons: ['OK']
+        });
+        return;
+      }
+      
       settingsState.aiEngine = 'local';
       await ipcRenderer.invoke('ai-set-engine', 'local');
       updateUI();

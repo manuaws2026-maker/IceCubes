@@ -8824,8 +8824,20 @@
       updateSetupUI();
     }
     
-    setupChoiceDeepgram?.addEventListener('click', () => selectTranscriptionEngine('deepgram'));
-    setupChoiceParakeet?.addEventListener('click', () => selectTranscriptionEngine('parakeet'));
+    setupChoiceDeepgram?.addEventListener('click', () => {
+      if (isRecording) {
+        alert('⚠️ Cannot change transcription provider during recording.\n\nPlease stop the current recording first.');
+        return;
+      }
+      selectTranscriptionEngine('deepgram');
+    });
+    setupChoiceParakeet?.addEventListener('click', () => {
+      if (isRecording) {
+        alert('⚠️ Cannot change transcription provider during recording.\n\nPlease stop the current recording first.');
+        return;
+      }
+      selectTranscriptionEngine('parakeet');
+    });
     
     // API key input handlers
     deepgramApiInput?.addEventListener('input', async (e) => {
@@ -8917,8 +8929,20 @@
       }
     }
     
-    setupChoiceOpenAI?.addEventListener('click', () => selectAIEngine('openai'));
-    setupChoiceLocalLLM?.addEventListener('click', () => selectAIEngine('local'));
+    setupChoiceOpenAI?.addEventListener('click', () => {
+      if (isRecording) {
+        alert('⚠️ Cannot change AI provider during recording.\n\nPlease stop the current recording first.');
+        return;
+      }
+      selectAIEngine('openai');
+    });
+    setupChoiceLocalLLM?.addEventListener('click', () => {
+      if (isRecording) {
+        alert('⚠️ Cannot change AI provider during recording.\n\nPlease stop the current recording first.');
+        return;
+      }
+      selectAIEngine('local');
+    });
     
     // LLM Download button
     setupLLMDownloadBtn?.addEventListener('click', async () => {

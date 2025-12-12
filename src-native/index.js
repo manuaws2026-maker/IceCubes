@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, initLlm, initLlmSync, shutdownLlm, deleteLlmModel, llmGenerate, llmChat, llmChatStream, isEmbeddingDownloaded, downloadEmbeddingModel, getEmbeddingDownloadProgress, initEmbeddingModel, isEmbeddingReady, generateEmbedding, generateEmbeddingsBatch, deleteEmbeddingModel, getEmbeddingDimension, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks, startProcessTap, stopProcessTap, getTapChunk, isTapActive, getTapSampleRate } = nativeBinding
+const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, initLlm, initLlmSync, shutdownLlm, deleteLlmModel, llmGenerate, llmChat, llmChatStream, isEmbeddingDownloaded, downloadEmbeddingModel, getEmbeddingDownloadProgress, initEmbeddingModel, isEmbeddingReady, generateEmbedding, generateEmbeddingsBatch, deleteEmbeddingModel, getEmbeddingDimension, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
 
 module.exports.isParakeetDownloaded = isParakeetDownloaded
 module.exports.getParakeetModelInfo = getParakeetModelInfo
@@ -359,8 +359,3 @@ module.exports.getCaptureDuration = getCaptureDuration
 module.exports.isMicrophoneInUse = isMicrophoneInUse
 module.exports.getAudioChunks = getAudioChunks
 module.exports.hasAudioChunks = hasAudioChunks
-module.exports.startProcessTap = startProcessTap
-module.exports.stopProcessTap = stopProcessTap
-module.exports.getTapChunk = getTapChunk
-module.exports.isTapActive = isTapActive
-module.exports.getTapSampleRate = getTapSampleRate

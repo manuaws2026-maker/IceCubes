@@ -1128,6 +1128,11 @@ function getNativeModule() {
 // IPC HANDLERS
 // ============================================================================
 function setupIPC() {
+  // Check if recording is active
+  ipcMain.handle('is-recording', () => {
+    return isRecording;
+  });
+  
   // Meeting bar controls
   ipcMain.on('start-recording-from-bar', () => {
     console.log('[IPC] Start recording from bar');
@@ -3147,4 +3152,10 @@ app.on('before-quit', (event) => {
   // Close database and save any pending changes
   console.log('[Database] Saving and closing database...');
   databaseService.close();
+});
+
+// Handle dock icon click on macOS - open editor window
+app.on('activate', () => {
+  console.log('[App] Dock icon clicked (activate event)');
+  openEditorWindow();
 });

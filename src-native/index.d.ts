@@ -162,19 +162,3 @@ export declare function isMicrophoneInUse(): boolean
 export declare function getAudioChunks(): Array<Buffer>
 /** Check if there are audio chunks ready for streaming */
 export declare function hasAudioChunks(): boolean
-/**
- * Start Core Audio Process Tap for system audio capture
- * This captures audio at the HAL level, working with Bluetooth headphones
- */
-export declare function startProcessTap(): void
-/** Stop Core Audio Process Tap and return captured samples */
-export declare function stopProcessTap(): Array<number>
-/**
- * Get audio chunk from Process Tap (for real-time streaming)
- * Returns samples resampled to target_rate
- */
-export declare function getTapChunk(maxSamples: number, targetRate: number): Array<number>
-/** Check if Process Tap is currently active */
-export declare function isTapActive(): boolean
-/** Get the current sample rate of the Process Tap */
-export declare function getTapSampleRate(): number

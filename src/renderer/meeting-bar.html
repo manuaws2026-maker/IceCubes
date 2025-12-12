@@ -50,8 +50,15 @@
     }
     
     .coco-icon {
-      font-size: 24px;
+      width: 32px;
+      height: 32px;
       filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+    
+    .coco-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
     
     .info {
@@ -133,7 +140,9 @@
 </head>
 <body>
   <div class="bar" id="bar">
-    <div class="coco-icon">🧊</div>
+    <div class="coco-icon">
+      <img src="assets/logo.png" alt="IceCubes">
+    </div>
     <div class="info">
       <div class="title" id="meetingTitle">Meeting Detected</div>
       <div class="subtitle" id="meetingProvider">via Chrome</div>

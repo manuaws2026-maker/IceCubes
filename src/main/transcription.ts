@@ -56,6 +56,7 @@ export class TranscriptionService {
   private ws: WebSocket | null = null;
   private isStreaming: boolean = false;
   private audioPollingInterval: ReturnType<typeof setInterval> | null = null;
+  private keepaliveInterval: ReturnType<typeof setInterval> | null = null;
   
   // Native module reference (will be set externally)
   private nativeModule: any = null;
@@ -225,6 +226,7 @@ export class TranscriptionService {
         console.log('[Transcription] Channel 0 = System (Them), Channel 1 = Mic (You) + diarization for voice ID');
         this.isStreaming = true;
         this.startAudioPolling();
+        this.startKeepalive();
       });
       
       this.ws.on('message', (data: Buffer) => {
@@ -254,6 +256,7 @@ export class TranscriptionService {
   public stopStreaming(): void {
     console.log('[Transcription] Stopping streaming...');
     this.stopAudioPolling();
+    this.stopKeepalive();
     
     if (this.ws) {
       // Send close frame
@@ -317,6 +320,36 @@ export class TranscriptionService {
       clearInterval(this.audioPollingInterval);
       this.audioPollingInterval = null;
       console.log('[Transcription] Stopped audio polling');
+    }
+  }
+  
+  /**
+   * Start sending keepalive pings to Deepgram
+   * Deepgram closes idle connections after ~10 seconds
+   */
+  private startKeepalive(): void {
+    if (this.keepaliveInterval) {
+      return;
+    }
+    
+    console.log('[Transcription] Starting keepalive (ping every 5s)...');
+    
+    this.keepaliveInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        // Send a JSON keepalive message
+        this.ws.send(JSON.stringify({ type: 'KeepAlive' }));
+      }
+    }, 5000); // Send keepalive every 5 seconds
+  }
+  
+  /**
+   * Stop sending keepalive pings
+   */
+  private stopKeepalive(): void {
+    if (this.keepaliveInterval) {
+      clearInterval(this.keepaliveInterval);
+      this.keepaliveInterval = null;
+      console.log('[Transcription] Stopped keepalive');
     }
   }
   
