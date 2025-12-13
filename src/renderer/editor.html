@@ -8815,7 +8815,8 @@
       // Get current transcription engine if not selected yet
       if (!setupState.selectedEngine) {
         setupState.selectedEngine = await ipcRenderer.invoke('transcription-get-engine') || 'deepgram';
-        selectTranscriptionEngine(setupState.selectedEngine);
+        // Just update UI, don't write back to store
+        displaySetupTranscriptionEngine(setupState.selectedEngine);
       }
       
       // Check AI engine and local LLM state
@@ -8823,10 +8824,8 @@
       // Use llm-is-downloaded instead of llm-is-ready (model may be downloaded but not loaded)
       setupState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
       
-      // Select AI engine in UI if we have a preference
-      if (typeof selectAIEngine === 'function' && setupState.selectedAIEngine) {
-        await selectAIEngine(setupState.selectedAIEngine);
-      }
+      // Update AI engine UI display only (don't write back to store)
+      displaySetupAIEngine(setupState.selectedAIEngine);
       
       updateSetupUI();
       
@@ -8968,23 +8967,26 @@
     function selectTranscriptionEngine(engine) {
       selectedEngine = engine;
       setupState.selectedEngine = engine;
-      
+      displaySetupTranscriptionEngine(engine);
+      updateSetupUI();
+    }
+    
+    // Display-only version for checkSetup (doesn't trigger state changes)
+    function displaySetupTranscriptionEngine(engine) {
       // Update button states
       if (engine === 'deepgram') {
-        setupChoiceDeepgram.classList.add('selected');
-        setupChoiceParakeet.classList.remove('selected');
+        setupChoiceDeepgram?.classList.add('selected');
+        setupChoiceParakeet?.classList.remove('selected');
         // Show Deepgram config, hide Parakeet
-        setupDeepgramItem.classList.remove('hidden');
-        setupParakeetItem.classList.add('hidden');
+        setupDeepgramItem?.classList.remove('hidden');
+        setupParakeetItem?.classList.add('hidden');
       } else if (engine === 'parakeet') {
-        setupChoiceDeepgram.classList.remove('selected');
-        setupChoiceParakeet.classList.add('selected');
+        setupChoiceDeepgram?.classList.remove('selected');
+        setupChoiceParakeet?.classList.add('selected');
         // Show Parakeet config, hide Deepgram
-        setupDeepgramItem.classList.add('hidden');
-        setupParakeetItem.classList.remove('hidden');
+        setupDeepgramItem?.classList.add('hidden');
+        setupParakeetItem?.classList.remove('hidden');
       }
-      
-      updateSetupUI();
     }
     
     setupChoiceDeepgram?.addEventListener('click', () => {
@@ -9056,7 +9058,14 @@
     async function selectAIEngine(engine) {
       selectedAIEngine = engine;
       setupState.selectedAIEngine = engine;
-      
+      await displaySetupAIEngine(engine);
+      // Save engine preference (only when user clicks)
+      await ipcRenderer.invoke('ai-set-engine', engine);
+      updateSetupUI();
+    }
+    
+    // Display-only version for checkSetup (doesn't save to store)
+    async function displaySetupAIEngine(engine) {
       // Update button states
       if (engine === 'openai') {
         setupChoiceOpenAI?.classList.add('selected');
@@ -9074,10 +9083,6 @@
         setupState.localLLMReady = isDownloaded;
         updateLocalLLMUI(isDownloaded);
       }
-      
-      // Save engine preference
-      await ipcRenderer.invoke('ai-set-engine', engine);
-      updateSetupUI();
     }
     
     function updateLocalLLMUI(isReady) {
@@ -10327,15 +10332,45 @@
         console.error('[Settings] Error loading provider state:', e);
       }
       
-      // Update UI
-      selectTranscriptionProviderSettings(settingsState.transcriptionEngine);
-      selectAIProviderSettings(settingsState.aiEngine);
+      // Update UI display only (don't re-save settings)
+      displayTranscriptionProviderUI(settingsState.transcriptionEngine);
+      displayAIProviderUI(settingsState.aiEngine);
       updateSettingsProviderStatus();
       await updateEngineStatusIndicator();
       
       // Start checking LLM status if using local engine
       if (settingsState.aiEngine === 'local') {
         startLLMStatusCheck();
+      }
+    }
+    
+    // Display-only UI update for transcription provider (no IPC save)
+    function displayTranscriptionProviderUI(provider) {
+      if (provider === 'deepgram') {
+        transcriptionProviderDeepgram?.classList.add('selected');
+        transcriptionProviderParakeet?.classList.remove('selected');
+        deepgramConfig?.classList.remove('hidden');
+        parakeetConfig?.classList.add('hidden');
+      } else {
+        transcriptionProviderDeepgram?.classList.remove('selected');
+        transcriptionProviderParakeet?.classList.add('selected');
+        deepgramConfig?.classList.add('hidden');
+        parakeetConfig?.classList.remove('hidden');
+      }
+    }
+    
+    // Display-only UI update for AI provider (no IPC save)
+    function displayAIProviderUI(provider) {
+      if (provider === 'openai') {
+        aiProviderOpenAI?.classList.add('selected');
+        aiProviderLocal?.classList.remove('selected');
+        openaiConfig?.classList.remove('hidden');
+        localLLMConfig?.classList.add('hidden');
+      } else {
+        aiProviderOpenAI?.classList.remove('selected');
+        aiProviderLocal?.classList.add('selected');
+        openaiConfig?.classList.add('hidden');
+        localLLMConfig?.classList.remove('hidden');
       }
     }
     
