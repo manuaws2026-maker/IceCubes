@@ -86,8 +86,9 @@ export declare function llmChat(messagesJson: string, maxTokens?: number | undef
 /**
  * Stream chat completion - returns chunks as they're generated
  * This is useful for showing real-time responses
+ * max_tokens limits output length (default 2000 if not specified)
  */
-export declare function llmChatStream(messagesJson: string, callback: (...args: any[]) => any): void
+export declare function llmChatStream(messagesJson: string, maxTokens: number | undefined | null, callback: (...args: any[]) => any): void
 export interface EmbeddingDownloadProgress {
   isDownloading: boolean
   currentFile: string

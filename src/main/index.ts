@@ -1,3 +1,7 @@
+// Load environment variables from .env file
+import dotenv from 'dotenv';
+dotenv.config();
+
 // Polyfill for undici/openai compatibility with Electron
 // These globals are expected by undici but not available in Electron's main process
 if (typeof (globalThis as any).File === 'undefined') {
@@ -977,8 +981,19 @@ function openEditorWindow(showHome = true) {
   if (editorWindow && !editorWindow.isDestroyed()) {
     editorWindow.show();
     editorWindow.focus();
-    // Send command to show home or editor view
+    
+    // Reposition window based on view mode
     if (showHome) {
+      // Home view: center of screen
+      const editorWidth = Math.floor(width * 0.55);
+      const editorHeight = Math.floor(height * 0.8);
+      editorWindow.setBounds({
+        x: Math.floor((width - editorWidth) / 2),
+        y: Math.floor((height - editorHeight) / 2),
+        width: editorWidth,
+        height: editorHeight
+      }, true);
+      
       try {
         if (!editorWindow.webContents.isDestroyed()) {
           editorWindow.webContents.send('show-home-view');
@@ -986,6 +1001,15 @@ function openEditorWindow(showHome = true) {
       } catch (e) {
         console.log('[Editor] Could not send show-home-view:', e);
       }
+    } else {
+      // Editor view (recording): right side
+      const recordingWidth = 420;
+      editorWindow.setBounds({
+        x: width - recordingWidth - 20,
+        y: 20,
+        width: recordingWidth,
+        height: height - 40
+      }, true);
     }
     return;
   }
@@ -1030,8 +1054,8 @@ function openEditorWindow(showHome = true) {
   editorWindow.webContents.on('did-finish-load', () => {
     console.log('[Editor] Page loaded successfully');
     
-    // DevTools - open for debugging
-    editorWindow?.webContents.openDevTools({ mode: 'detach' });
+    // DevTools - open for debugging (disabled by default)
+    // editorWindow?.webContents.openDevTools({ mode: 'detach' });
     
     // Small delay to ensure all JS event listeners are registered
     setTimeout(() => {
@@ -3157,5 +3181,6 @@ app.on('before-quit', (event) => {
 // Handle dock icon click on macOS - open editor window
 app.on('activate', () => {
   console.log('[App] Dock icon clicked (activate event)');
-  openEditorWindow();
+  // If recording, show editor view with current note. Otherwise show home.
+  openEditorWindow(!isRecording);
 });

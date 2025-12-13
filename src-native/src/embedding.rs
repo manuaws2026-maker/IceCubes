@@ -122,9 +122,18 @@ impl SimpleTokenizer {
                 while !remaining.is_empty() && input_ids.len() < max_length - 1 {
                     let mut found = false;
                     
-                    // Try progressively shorter substrings
-                    for end in (1..=remaining.len()).rev() {
-                        let substr = &remaining[..end];
+                    // Get character boundary indices for safe UTF-8 slicing
+                    let char_indices: Vec<usize> = remaining.char_indices().map(|(i, _)| i).collect();
+                    let char_count = char_indices.len();
+                    
+                    // Try progressively shorter substrings (by character count, not bytes)
+                    for num_chars in (1..=char_count).rev() {
+                        let end_byte = if num_chars == char_count {
+                            remaining.len()
+                        } else {
+                            char_indices[num_chars]
+                        };
+                        let substr = &remaining[..end_byte];
                         let lookup = if is_first {
                             substr.to_string()
                         } else {
@@ -134,7 +143,7 @@ impl SimpleTokenizer {
                         if let Some(&id) = self.vocab.get(&lookup) {
                             input_ids.push(id);
                             attention_mask.push(1);
-                            remaining = &remaining[end..];
+                            remaining = &remaining[end_byte..];
                             is_first = false;
                             found = true;
                             break;
@@ -142,10 +151,11 @@ impl SimpleTokenizer {
                     }
                     
                     if !found {
-                        // Use UNK token for unknown character
+                        // Use UNK token for unknown character, skip one character (not one byte)
                         input_ids.push(self.unk_token_id);
                         attention_mask.push(1);
-                        remaining = &remaining[1..];
+                        let first_char_len = remaining.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
+                        remaining = &remaining[first_char_len..];
                         is_first = false;
                     }
                 }

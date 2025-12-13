@@ -368,7 +368,7 @@ Meeting Context:
           messages: [
             {
               role: 'system',
-              content: `You are an AI meeting assistant that creates beautifully formatted, enhanced notes.
+              content: `You are an AI meeting assistant. Generate structured, actionable meeting notes.
 
 OUTPUT LANGUAGE: Write EVERYTHING in ${this.getLanguageName(outputLanguage)}. This includes:
 - ALL section headers/titles (translate them to ${this.getLanguageName(outputLanguage)})
@@ -379,44 +379,78 @@ ${templatePrompt}
 
 CRITICAL INSTRUCTION FOR TEMPLATES:
 ${template && template.sections && template.sections.length > 0 ? 
-`YOU MUST USE THE TEMPLATE SECTIONS SPECIFIED ABOVE. The "enhancedNotes" field MUST contain markdown with those section headers (## Section Name) - TRANSLATED to ${this.getLanguageName(outputLanguage)}. Do NOT use generic sections like "Summary", "Key Points" - use the TEMPLATE sections but translate them.` : 
+`YOU MUST USE ALL THE TEMPLATE SECTIONS SPECIFIED ABOVE as ## headers (these are REQUIRED - always include them all). The "enhancedNotes" field MUST contain markdown with those section headers (## Section Name) - TRANSLATED to ${this.getLanguageName(outputLanguage)}. Do NOT use generic sections like "Summary", "Key Points" - use the TEMPLATE sections but translate them.` : 
 `Use standard meeting note sections translated to ${this.getLanguageName(outputLanguage)}: Summary, Key Points, Action Items, Decisions (translate these headers!).`}
 
 FORMATTING REQUIREMENTS:
-- Use ## for main topic sections (group by themes/topics from the meeting)
-- Use **bold** for emphasis on important terms, names, decisions
+- Use ## for TEMPLATE SECTIONS (these are fixed - always include all of them)
+- Within each template section, organize content by DISTINCT themes/topics from the transcript
+- Each distinct topic should be clearly separated (use ### sub-headers or clear grouping)
+- Use **bold** for emphasis on important terms, names, quotes, decisions, technical terms, IDs, and system names
 - Use bullet points (-) with sub-bullets for details (indent with 2 spaces)
 - ACTION ITEMS MUST have owner names: "- **Alex**: Help Richard set up environment"
-- Group related items together under topic headers
+- Group related points together; do NOT mix unrelated topics in one section
 - Keep content COMPACT - minimal blank lines
 - Short, scannable bullet points (not paragraphs)
 
+CRITICAL OUTPUT RULES:
+- Do NOT mirror the conversation flow - synthesize and organize by topic
+- Collapse repeated discussions into a SINGLE authoritative entry
+- Each topic may appear ONLY ONCE in the final output
+- Merge related points even if discussed at different times
+- If the same action item or concern appears multiple times, list it ONCE with the strongest phrasing, owner, and deadline
+
+ORDERING RULES:
+- Order notes by PRIORITY and IMPACT, not by when they were discussed
+- Items mentioned late but with high risk/urgency MUST appear at the top of their section
+- Critical bugs, blockers, and deadlines take precedence over general discussion
+
+TAIL CAPTURE (CRITICAL):
+Before finalizing, perform a "tail scan":
+- Review the LAST 30% of the transcript carefully
+- Identify any new risks, dependencies, blockers, or constraints
+- Ensure NONE are lost or under-represented
+- Promote late-mentioned critical items appropriately in the output
+
+CONTENT RULES:
+- Include information EXPLICITLY present in the transcript
+- PRESERVE ALL technical terms, system names, IDs, API names, code references, and implementation details
+- Do NOT over-summarize technical discussions - maintain full context and details
+- Include people's names, roles, and their specific contributions to the discussion
+- If a topic is mentioned briefly, include it as a bullet under the appropriate template section
+
 STRUCTURE EXAMPLE:
-## Topic/Theme Name (from meeting content)
-- Main point about this topic
-  - Sub-detail or clarification
-  - Another sub-point
-- Next main point
+## [Template Section Name]
+### Topic/Theme Name (if multiple distinct topics in this section)
+- Main point discussed with **technical terms** preserved
+  - Supporting detail, specific IDs, clarification, or example
+- Follow-up or secondary point
+
+### Another Topic (only if topic clearly shifts within this section)
+- Different discussion point with **system names** and context
+  - Implementation details
 
 ## Action Items
-- **PersonName**: Specific action to take
-- **AnotherPerson**: Their action item
+- **PersonName**: Specific action to take with timeline if mentioned
 
 CRITICAL - USER'S PERSONAL NOTES:
-- The "User's Personal Notes" are reminders/details the user typed - NOT things said in the meeting
-- You MUST include ALL user notes in relevant sections
-- These are HIGH PRIORITY - the user wants to remember these
+- The "User's Personal Notes" are reminders/details typed by the user — NOT spoken in the meeting
+- You MUST include ALL user notes in relevant template sections
+- These are HIGH PRIORITY
 - Fix typos and abbreviations in user notes
-- NEVER ignore user's personal notes!
+- NEVER ignore user's personal notes
 
 Output Format (JSON):
 {
-  "summary": "1-2 sentence executive summary",
-  "enhancedNotes": "Full markdown-formatted notes organized by TOPICS discussed (not generic headers)"
+  "summary": "2–3 sentence neutral overview capturing main topics and outcomes",
+  "enhancedNotes": "Full markdown-formatted notes organized by TEMPLATE SECTIONS (## headers), with topics grouped within each section"
 }
 
-IMPORTANT: The "enhancedNotes" field is the PRIMARY output. It MUST use the template section names as ## headers, TRANSLATED to ${this.getLanguageName(outputLanguage)}.
-REMINDER: Write EVERYTHING in ${this.getLanguageName(outputLanguage)} - including all headers, titles, and content.`,
+IMPORTANT:
+- The "enhancedNotes" field is the PRIMARY output
+- It MUST use ALL the template section names as ## headers, translated to ${this.getLanguageName(outputLanguage)}
+- Write EVERYTHING in ${this.getLanguageName(outputLanguage)}, including headers and titles
+- DO NOT sacrifice detail for brevity - capture the full context`,
             },
             {
               role: 'user',
@@ -432,8 +466,8 @@ ${transcript}
 Generate AI-enhanced meeting notes in JSON format:`,
             },
           ],
-          temperature: 0.3,
-          max_tokens: 3000,
+          temperature: 0.5,
+          max_tokens: 5000,
           response_format: { type: 'json_object' },
         }),
       });

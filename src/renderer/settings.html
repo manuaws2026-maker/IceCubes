@@ -1543,7 +1543,7 @@
       const input = document.getElementById('openaiKeyInput');
       const key = input.value.trim();
       if (key) {
-        await ipcRenderer.invoke('save-openai-key', key);
+        await ipcRenderer.invoke('openai-save-key', key);
         input.value = '';
         settingsState.openaiKey = true;
         updateUI();

@@ -5112,6 +5112,45 @@
       display: none;
     }
     
+    /* Regenerate AI Notes Button - shown in raw notes view when content changed */
+    .regenerate-notes-wrapper {
+      margin-top: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: center;
+    }
+    
+    .regenerate-notes-wrapper.hidden {
+      display: none;
+    }
+    
+    .regenerate-notes-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    }
+    
+    .regenerate-notes-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    }
+    
+    .regenerate-notes-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+    
     .generate-btn-with-dropdown {
       display: flex;
       align-items: stretch;
@@ -5407,7 +5446,6 @@
       font-size: 11px;
       color: var(--text-muted);
       opacity: 0.7;
-    }
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -5573,6 +5611,93 @@
       flex: 1;
       max-width: 400px;
       margin: 0 20px;
+    }
+    
+    .footer-right {
+      display: flex;
+      align-items: center;
+    }
+    
+    /* Engine Status Indicator */
+    .engine-status {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--text-secondary);
+      opacity: 0.6;
+      cursor: default;
+      user-select: none;
+      transition: opacity 0.2s;
+    }
+    
+    .engine-status:hover {
+      opacity: 1;
+    }
+    
+    .engine-separator {
+      display: none;
+    }
+    
+    .engine-badge {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 6px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    
+    .engine-icon {
+      font-size: 9px;
+    }
+    
+    /* Hide engine status on small windows */
+    @media (max-width: 600px) {
+      .engine-status {
+        display: none;
+      }
+    }
+    
+    /* Also fade when ask input is focused */
+    .editor-footer:has(.ask-input-wrapper:focus-within) .engine-status {
+      opacity: 0.3;
+    }
+    
+    .engine-name {
+      font-weight: 500;
+      letter-spacing: -0.2px;
+    }
+    
+    .ai-badge.local .engine-name {
+      color: #22c55e;
+    }
+    
+    .ai-badge.openai .engine-name {
+      color: #10b981;
+    }
+    
+    .transcription-badge.local .engine-name {
+      color: #f59e0b;
+    }
+    
+    .transcription-badge.cloud .engine-name {
+      color: #3b82f6;
+    }
+    
+    .engine-badge.loading {
+      animation: pulse-loading 1.5s ease-in-out infinite;
+    }
+    
+    .engine-badge.loading .engine-name {
+      color: #f59e0b !important;
+    }
+    
+    @keyframes pulse-loading {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
     }
     
     .ask-input-wrapper {
@@ -6394,7 +6519,7 @@
   <!-- Setup/Permissions Overlay -->
   <div class="setup-overlay hidden" id="setupOverlay">
     <div class="setup-container">
-      <div class="setup-icon"><img src="assets/logo.png" alt="IceCubes"></div>
+      <div class="setup-icon"><img src="/logo.png" alt="IceCubes"></div>
       <div class="setup-title">Welcome to IceCubes</div>
       <div class="setup-subtitle">
         IceCubes needs a few things set up before it can record and transcribe your meetings.
@@ -7244,7 +7369,7 @@
     <!-- Left Sidebar - Navigation -->
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-title"><img src="assets/logo.png" alt="IceCubes"> IceCubes</div>
+        <div class="sidebar-title"><img src="/logo.png" alt="IceCubes"></div>
       </div>
       <div class="sidebar-nav">
         <div class="nav-item active" data-folder-id="all" id="navAllNotes">
@@ -7286,7 +7411,7 @@
         <div class="header-left">
           <button class="back-btn hidden" id="backBtn">←</button>
           <button class="toggle-sidebar-btn" id="toggleSidebarBtn">☰</button>
-          <span class="collapsed-logo" id="collapsedLogo"><img src="assets/logo.png" alt="IceCubes"> IceCubes</span>
+          <span class="collapsed-logo" id="collapsedLogo"><img src="/logo.png" alt="IceCubes"> IceCubes</span>
         </div>
         <div class="global-search-wrapper" id="globalSearchWrapper">
           <svg class="global-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -7838,6 +7963,18 @@
                 </div>
               </div>
             </div>
+            
+            <!-- Regenerate AI Notes Button (shown when raw notes changed significantly) -->
+            <div class="regenerate-notes-wrapper hidden" id="regenerateNotesWrapper">
+              <button class="regenerate-notes-btn" id="regenerateNotesBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Regenerate AI notes</span>
+              </button>
+            </div>
+            
             <!-- Hidden select for compatibility -->
             <select id="templateSelector" style="display:none;"></select>
             
@@ -7958,7 +8095,16 @@
             </div>
           </div>
           <div class="footer-right">
-            <!-- Follow-up email button removed -->
+            <div class="engine-status" id="engineStatus" title="Current AI and transcription engines">
+              <span class="engine-badge ai-badge" id="aiBadge">
+                <span class="engine-icon">🤖</span>
+                <span class="engine-name" id="aiEngineName">OpenAI</span>
+              </span>
+              <span class="engine-badge transcription-badge" id="transcriptionBadge">
+                <span class="engine-icon">🎤</span>
+                <span class="engine-name" id="transcriptionEngineName">Deepgram</span>
+              </span>
+            </div>
           </div>
         </div>
       </div> <!-- Close editor-content -->
@@ -8075,6 +8221,23 @@
           if (typeof isTogglingView !== 'undefined' && isTogglingView) {
             return;
           }
+          
+          // Check if we should show generate button when user types content
+          // Show if: user has typed content (5+ words), no AI notes yet, and AI is available
+          const content = editor.getText().trim();
+          const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+          
+          if (wordCount >= 5 && isAIAvailable() && !isRecording) {
+            if (!currentAINotes) {
+              // No AI notes yet - show generate button
+              console.log('[Editor] User typed 5+ words, no AI notes - showing generate button');
+              showGenerateNotesButton();
+            } else if (!currentViewIsAI) {
+              // In raw notes view with existing AI notes - check for significant changes
+              checkRawNotesChanged();
+            }
+          }
+          
           // Trigger auto-save
           hasUnsavedChanges = true;
           scheduleAutoSave();
@@ -8393,10 +8556,10 @@
         }
       }
       
-      console.log(`[Offline] Check: online=${isOnline}, trans=${transcriptionEngine}, ai=${aiEngine}`);
-      console.log(`[Offline] Models: parakeet=${parakeetDownloaded}, llm=${llmDownloaded}`);
-      console.log(`[Offline] Working: transcription=${hasWorkingTranscription}, ai=${hasWorkingAI}`);
-      console.log(`[Offline] Issues:`, issues);
+      // Only log if there are issues (removed verbose offline checks)
+      if (!isOnline && issues.length > 0) {
+        console.log(`[Offline] ${issues.length} service(s) unavailable offline`);
+      }
       
       // Show banner if there are any issues (offline with cloud OR local model deleted)
       if (!isOnline && issues.length > 0) {
@@ -9195,6 +9358,9 @@
     // Check setup on load
     checkSetup();
     
+    // Load settings provider state and update engine badges on load
+    loadSettingsProviderState();
+    
     // Initialize wizard to step 1
     showStep(1);
     
@@ -9360,6 +9526,7 @@
     let silenceTimer = null;
     const SILENCE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
     let isRecording = false;
+    let recordingNoteId = null; // Track which note is being recorded (separate from currentNoteId for viewing)
     let recordingStartTime = null; // Track when recording started for timestamps
     let notes = [];
     let currentNoteId = null;
@@ -9502,10 +9669,16 @@
             return;
           }
           
-          console.log('[FloatingIndicator] Content clicked - showing editor and focusing window');
+          console.log('[FloatingIndicator] Content clicked - returning to recording note, recordingNoteId:', recordingNoteId);
           
-          // Show the editor view
-          showEditor();
+          // Return to the recording note
+          if (recordingNoteId) {
+            // Load the saved recording note
+            selectNote(recordingNoteId);
+          } else {
+            // New unsaved note - just show the editor (state is still there)
+            showEditor();
+          }
           
           // Focus the window
           ipcRenderer.send('focus-editor-window');
@@ -9594,12 +9767,16 @@
     }
     
     // Back button - return to All Notes from People/Companies/Folders
+    // NOTE: If recording is in progress, we keep it running and show floating indicator
     backBtn?.addEventListener('click', () => {
+      console.log('[BackBtn] Clicked, isRecording:', isRecording, 'recordingNoteId:', recordingNoteId);
+      
       // Clear any active filters
       currentPersonFilter = null;
       currentCompanyFilter = null;
       
-      // Go back to home and show floating indicator
+      // Go back to home - keep recording running if active
+      // recordingNoteId stays set so we know which note to return to
       currentNoteId = null;
       
       // If we're in recording mode, exit it to restore window position
@@ -9618,7 +9795,7 @@
       
       // Remove viewing-note class to show sidebars again
       document.body.classList.remove('viewing-note');
-      updateFloatingIndicator(); // Show floating indicator if recording
+      updateFloatingIndicator(); // Show floating indicator if recording is still active
     });
     
     function showSettings() {
@@ -9994,6 +10171,7 @@
       // Save preference and switch engine
       await ipcRenderer.invoke('transcription-set-engine', provider);
       updateSettingsProviderStatus();
+      updateEngineStatusIndicator();
     }
     
     // Select AI provider in settings
@@ -10016,6 +10194,12 @@
       // Save preference
       await ipcRenderer.invoke('ai-set-engine', provider);
       updateSettingsProviderStatus();
+      await updateEngineStatusIndicator();
+      
+      // Start checking LLM status if switching to local engine
+      if (provider === 'local') {
+        startLLMStatusCheck();
+      }
     }
     
     // Update provider status displays
@@ -10150,6 +10334,79 @@
       selectTranscriptionProviderSettings(settingsState.transcriptionEngine);
       selectAIProviderSettings(settingsState.aiEngine);
       updateSettingsProviderStatus();
+      await updateEngineStatusIndicator();
+      
+      // Start checking LLM status if using local engine
+      if (settingsState.aiEngine === 'local') {
+        startLLMStatusCheck();
+      }
+    }
+    
+    // Update the engine status indicator in the footer
+    async function updateEngineStatusIndicator() {
+      const aiBadge = document.getElementById('aiBadge');
+      const aiEngineName = document.getElementById('aiEngineName');
+      const transcriptionBadge = document.getElementById('transcriptionBadge');
+      const transcriptionEngineName = document.getElementById('transcriptionEngineName');
+      
+      // Check real-time ready status for local LLM
+      let llmReady = false;
+      if (settingsState.aiEngine === 'local') {
+        try {
+          llmReady = await ipcRenderer.invoke('llm-is-ready');
+        } catch (e) {
+          llmReady = false;
+        }
+      }
+      
+      if (aiEngineName) {
+        if (settingsState.aiEngine === 'local') {
+          if (llmReady) {
+            aiEngineName.textContent = 'Qwen ✓';
+            aiBadge?.classList.remove('loading');
+          } else {
+            aiEngineName.textContent = 'Qwen ⏳';
+            aiBadge?.classList.add('loading');
+          }
+          aiBadge?.classList.remove('openai');
+          aiBadge?.classList.add('local');
+        } else {
+          aiEngineName.textContent = 'OpenAI';
+          aiBadge?.classList.remove('local', 'loading');
+          aiBadge?.classList.add('openai');
+        }
+      }
+      
+      if (transcriptionEngineName) {
+        if (settingsState.transcriptionEngine === 'parakeet') {
+          transcriptionEngineName.textContent = 'Parakeet';
+          transcriptionBadge?.classList.remove('cloud');
+          transcriptionBadge?.classList.add('local');
+        } else {
+          transcriptionEngineName.textContent = 'Deepgram';
+          transcriptionBadge?.classList.remove('local');
+          transcriptionBadge?.classList.add('cloud');
+        }
+      }
+    }
+    
+    // Periodically check LLM ready status when using local engine
+    let llmStatusCheckInterval = null;
+    function startLLMStatusCheck() {
+      if (llmStatusCheckInterval) return;
+      llmStatusCheckInterval = setInterval(async () => {
+        if (settingsState.aiEngine === 'local') {
+          const wasLoading = document.getElementById('aiBadge')?.classList.contains('loading');
+          await updateEngineStatusIndicator();
+          const isLoading = document.getElementById('aiBadge')?.classList.contains('loading');
+          // Stop checking once it's ready
+          if (wasLoading && !isLoading) {
+            console.log('[Engine Status] LLM is now ready');
+            clearInterval(llmStatusCheckInterval);
+            llmStatusCheckInterval = null;
+          }
+        }
+      }, 2000);
     }
     
     // Provider toggle event listeners
@@ -10788,15 +11045,17 @@
         transcriptSection.classList.remove('collapsed');
       }
       
-      // Scroll transcript to bottom
-      if (transcriptContent) {
+      // Scroll transcript to bottom only if user hasn't manually scrolled up
+      if (transcriptContent && !isUserScrolling) {
         transcriptContent.scrollTop = transcriptContent.scrollHeight;
       }
       
-      // Also scroll editor area to show transcript section
-      const editorContent = document.querySelector('.editor-content');
-      if (editorContent) {
-        editorContent.scrollTop = editorContent.scrollHeight;
+      // Also scroll editor area to show transcript section (only if auto-scrolling)
+      if (!isUserScrolling) {
+        const editorContent = document.querySelector('.editor-content');
+        if (editorContent) {
+          editorContent.scrollTop = editorContent.scrollHeight;
+        }
       }
     }
     
@@ -10862,12 +11121,26 @@
       // Don't show AI panel during meeting - only after
     }
     
-    // Check if AI is available (either OpenAI or local LLM based on current engine)
+    // Check if AI is available (either OpenAI or local LLM)
+    // Returns true if ANY AI engine is available, regardless of current selection
     function isAIAvailable() {
-      if (currentAIEngine === 'local') {
-        return hasLocalLLM;
+      const available = hasOpenAIKey || hasLocalLLM;
+      console.log('[AI] isAIAvailable:', available, '(openai:', hasOpenAIKey, 'local:', hasLocalLLM, 'engine:', currentAIEngine, ')');
+      return available;
+    }
+    
+    // Get the actual engine to use (prefer user's choice, but fall back if unavailable)
+    function getActiveAIEngine() {
+      if (currentAIEngine === 'local' && hasLocalLLM) {
+        return 'local';
       }
-      return hasOpenAIKey;
+      if (currentAIEngine === 'openai' && hasOpenAIKey) {
+        return 'openai';
+      }
+      // Fallback: use whichever is available
+      if (hasLocalLLM) return 'local';
+      if (hasOpenAIKey) return 'openai';
+      return null;
     }
     
     // Called when recording starts - store initial state
@@ -10891,7 +11164,8 @@
     const notesViewToggle = document.getElementById('notesViewToggle');
     
     async function showGenerateNotesButton() {
-      if (!hasOpenAIKey) return; // Don't show if no API key
+      // Check if ANY AI is available (OpenAI or Local LLM)
+      if (!isAIAvailable()) return; // Don't show if no AI engine available
       generateNotesWrapper?.classList.remove('hidden');
       hideNotesViewToggle(); // Hide toggle until notes are generated
       
@@ -11116,22 +11390,34 @@
     const notesViewToggleWrapper = document.getElementById('notesViewToggleWrapper');
     
     function showNotesViewToggle() {
-      // Only show toggle if we have AI notes
+      // Show toggle - it will be clickable even without AI notes (will trigger generation)
+      console.log('[NotesToggle] Showing toggle wrapper');
+      const wrapper = document.getElementById('notesViewToggleWrapper');
+      if (wrapper) {
+        wrapper.style.display = 'flex';
+        wrapper.classList.add('visible');
+      }
+      // If we have AI notes, default to AI view (sparkle button active)
+      // Otherwise keep raw notes active
+      const rawBtn = document.getElementById('rawNotesBtn');
+      const aiBtn = document.getElementById('aiNotesBtn');
       if (currentAINotes) {
-        console.log('[NotesToggle] Showing toggle wrapper');
-        const wrapper = document.getElementById('notesViewToggleWrapper');
-        if (wrapper) {
-          wrapper.style.display = 'flex';
-          wrapper.classList.add('visible');
-        }
-        // Default to AI view (sparkle button active)
-        const rawBtn = document.getElementById('rawNotesBtn');
-        const aiBtn = document.getElementById('aiNotesBtn');
         rawBtn?.classList.remove('active');
         aiBtn?.classList.add('active');
-        // Note: updateCurrentTemplateDisplay() should be called BEFORE showNotesViewToggle()
-        // to ensure the template dropdown shows the correct template
+        currentViewIsAI = true; // IMPORTANT: Track that we're now in AI view
+        console.log('[NotesToggle] Set currentViewIsAI = true (AI notes exist)');
+      } else {
+        // No AI notes yet - keep raw active
+        rawBtn?.classList.add('active');
+        aiBtn?.classList.remove('active');
+        currentViewIsAI = false;
       }
+      // Update template dropdown visibility based on view
+      updateTemplateDropdownVisibility();
+      // Hide regenerate button when in AI view
+      regenerateNotesWrapper?.classList.add('hidden');
+      // Note: updateCurrentTemplateDisplay() should be called BEFORE showNotesViewToggle()
+      // to ensure the template dropdown shows the correct template
     }
     
     function hideNotesViewToggle() {
@@ -11285,10 +11571,13 @@
       templateDropdownContent.querySelectorAll('.template-dropdown-item').forEach(item => {
         item.addEventListener('click', async () => {
           const templateId = item.dataset.templateId;
+          console.log('[TemplateDropdown] 🎯 Template clicked:', templateId);
+          console.log('[TemplateDropdown] isAIAvailable:', isAIAvailable(), 'isGeneratingAINotes:', isGeneratingAINotes);
           await regenerateWithTemplate(templateId);
           templateDropdownMenu?.classList.remove('show');
         });
       });
+      console.log('[TemplateDropdown] ✅ Attached click handlers to', templateDropdownContent.querySelectorAll('.template-dropdown-item').length, 'items');
     }
     
     async function getAITemplateSuggestion() {
@@ -11330,12 +11619,21 @@
     }
     
     async function regenerateWithTemplate(templateId) {
-      if (!isAIAvailable() || isGeneratingAINotes) {
-        console.log('[Templates] Cannot regenerate - AI not available or already generating');
+      console.log('[Templates] 🔄 regenerateWithTemplate called with:', templateId);
+      console.log('[Templates] isAIAvailable:', isAIAvailable(), 'isGeneratingAINotes:', isGeneratingAINotes);
+      
+      if (!isAIAvailable()) {
+        console.log('[Templates] ❌ Cannot regenerate - AI not available');
+        return;
+      }
+      
+      if (isGeneratingAINotes) {
+        console.log('[Templates] ⏳ Already generating, skipping...');
         return;
       }
       
       currentTemplateId = templateId;
+      console.log('[Templates] ✅ Set currentTemplateId to:', currentTemplateId);
       
       // Update dropdown button immediately
       await updateCurrentTemplateDisplay();
@@ -11343,9 +11641,11 @@
       // Clear current AI notes to force regeneration
       currentAINotes = null;
       isGeneratingAINotes = false; // Reset flag to allow regeneration
+      console.log('[Templates] Cleared currentAINotes, calling generateEnhancedNotes...');
       
       // Regenerate with the new template
       await generateEnhancedNotes();
+      console.log('[Templates] ✅ regenerateWithTemplate completed');
     }
     
     // Handle generate notes button click
@@ -11369,11 +11669,47 @@
     // Toggle between raw notes and AI enhanced notes
     const rawNotesBtn = document.getElementById('rawNotesBtn');
     const aiNotesBtn = document.getElementById('aiNotesBtn');
+    const templateDropdownWrapper = document.querySelector('.template-dropdown-wrapper');
+    const regenerateNotesWrapper = document.getElementById('regenerateNotesWrapper');
+    const regenerateNotesBtn = document.getElementById('regenerateNotesBtn');
+    
     let rawNotesBackup = ''; // Store raw notes before switching to AI view
     let currentViewIsAI = true; // Default to AI view when toggle is visible
     let isTogglingView = false; // Flag to prevent auto-save during view toggle
     let storedRawNotes = ''; // Persisted raw notes content
     let storedEnhancedNotes = ''; // Persisted AI enhanced notes content
+    let lastGeneratedFromRawNotes = ''; // Raw notes content used for last AI generation
+    
+    // Helper to show/hide template dropdown based on view
+    function updateTemplateDropdownVisibility() {
+      if (templateDropdownWrapper) {
+        templateDropdownWrapper.style.display = currentViewIsAI ? '' : 'none';
+      }
+    }
+    
+    // Helper to check if raw notes changed significantly (5+ chars)
+    function checkRawNotesChanged() {
+      if (!currentAINotes || currentViewIsAI) {
+        regenerateNotesWrapper?.classList.add('hidden');
+        return;
+      }
+      
+      const currentRaw = stripHtml(getEditorContent());
+      const originalRaw = stripHtml(lastGeneratedFromRawNotes);
+      const diff = Math.abs(currentRaw.length - originalRaw.length);
+      
+      // Also check if content is meaningfully different (not just whitespace)
+      const currentWords = currentRaw.trim();
+      const originalWords = originalRaw.trim();
+      const contentChanged = currentWords !== originalWords && diff >= 5;
+      
+      if (contentChanged) {
+        console.log('[RawNotes] Content changed by', diff, 'chars - showing regenerate button');
+        regenerateNotesWrapper?.classList.remove('hidden');
+      } else {
+        regenerateNotesWrapper?.classList.add('hidden');
+      }
+    }
     
     rawNotesBtn?.addEventListener('click', () => {
       if (!currentAINotes) return;
@@ -11386,14 +11722,37 @@
       aiNotesBtn.classList.remove('active');
       currentViewIsAI = false;
       
+      // Hide template dropdown in raw notes view
+      updateTemplateDropdownVisibility();
+      
       // Show raw notes (prevent auto-save during toggle)
       isTogglingView = true;
       setEditorContent(storedRawNotes || rawNotesAtStart || '');
-      setTimeout(() => { isTogglingView = false; }, 100);
+      setTimeout(() => { 
+        isTogglingView = false;
+        // Check if we need to show regenerate button
+        checkRawNotesChanged();
+      }, 100);
     });
     
-    aiNotesBtn?.addEventListener('click', () => {
-      if (!currentAINotes) return;
+    aiNotesBtn?.addEventListener('click', async () => {
+      // If no AI notes exist yet, generate them
+      if (!currentAINotes) {
+        const content = getEditorContent();
+        const contentText = content.replace(/<[^>]*>/g, '').trim(); // Strip HTML tags
+        
+        // Check if there's enough content to generate notes
+        if (contentText.split(/\s+/).length >= 5 && isAIAvailable()) {
+          console.log('[AI Toggle] No AI notes yet - generating...');
+          // Hide generate button and generate notes
+          hideGenerateNotesButton();
+          await generateEnhancedNotes();
+          // Show toggle will be called after successful generation
+        } else {
+          console.log('[AI Toggle] Not enough content or AI not available');
+        }
+        return;
+      }
       
       // Save current raw notes before switching
       storedRawNotes = getEditorContent();
@@ -11402,6 +11761,10 @@
       aiNotesBtn.classList.add('active');
       rawNotesBtn.classList.remove('active');
       currentViewIsAI = true;
+      
+      // Show template dropdown in AI view, hide regenerate button
+      updateTemplateDropdownVisibility();
+      regenerateNotesWrapper?.classList.add('hidden');
       
       // Show AI notes (prevent auto-save during toggle)
       isTogglingView = true;
@@ -11412,6 +11775,29 @@
         putAINotesInEditor(currentAINotes);
       }
       setTimeout(() => { isTogglingView = false; }, 100);
+    });
+    
+    // Regenerate AI notes button click handler
+    regenerateNotesBtn?.addEventListener('click', async () => {
+      if (isGeneratingAINotes) return;
+      
+      // Save current raw notes for regeneration
+      storedRawNotes = getEditorContent();
+      
+      // Hide regenerate button
+      regenerateNotesWrapper?.classList.add('hidden');
+      
+      // Clear current AI notes to force regeneration
+      currentAINotes = null;
+      isGeneratingAINotes = false;
+      
+      // Generate new AI notes
+      await generateEnhancedNotes();
+      
+      // After generation, switch to AI view
+      if (currentAINotes) {
+        aiNotesBtn?.click();
+      }
     });
     
     let isGeneratingAINotes = false;
@@ -11430,14 +11816,48 @@
         return;
       }
       
-      if (transcript.length === 0) {
-        console.log('[AI Notes] No transcript to enhance');
+      // Determine raw notes to use:
+      // - If we're regenerating (have storedRawNotes), use those
+      // - If we're in raw view, use current editor content
+      // - Otherwise use stored raw notes or rawNotesAtStart
+      let rawNotesToUse = '';
+      if (storedRawNotes) {
+        // Regenerating - use the stored raw notes
+        rawNotesToUse = storedRawNotes;
+        console.log('[AI Notes] Using stored raw notes for regeneration');
+      } else if (!currentViewIsAI) {
+        // First generation from raw view - capture current content
+        rawNotesToUse = getEditorContent();
+        console.log('[AI Notes] Capturing raw notes from editor (raw view)');
+      } else if (rawNotesAtStart) {
+        // Have previous raw notes
+        rawNotesToUse = rawNotesAtStart;
+        console.log('[AI Notes] Using rawNotesAtStart');
+      } else {
+        // Fallback to current content
+        rawNotesToUse = getEditorContent();
+        console.log('[AI Notes] Fallback: using current editor content');
+      }
+      
+      const rawNotesText = stripHtml(rawNotesToUse);
+      const hasTranscript = transcript.length > 0;
+      const rawWordCount = rawNotesText.trim().split(/\s+/).filter(w => w.length > 0).length;
+      const hasRawNotes = rawWordCount >= 5;
+      
+      if (!hasTranscript && !hasRawNotes) {
+        console.log('[AI Notes] No transcript or notes to enhance (need transcript or 5+ words)');
         return;
       }
       
-      // Capture raw notes NOW (before AI generation), not when recording started
-      rawNotesAtStart = getEditorContent();
-      console.log('[AI Notes] Captured raw notes:', stripHtml(rawNotesAtStart).substring(0, 100));
+      console.log('[AI Notes] hasTranscript:', hasTranscript, 'hasRawNotes:', hasRawNotes, 'wordCount:', rawWordCount);
+      
+      // Only update rawNotesAtStart if this is first generation (not regeneration)
+      if (!storedRawNotes) {
+        rawNotesAtStart = rawNotesToUse;
+        console.log('[AI Notes] Set rawNotesAtStart:', rawNotesText.substring(0, 100));
+      } else {
+        console.log('[AI Notes] Keeping existing raw notes:', rawNotesText.substring(0, 100));
+      }
       
       // Prevent duplicate generation
       if (isGeneratingAINotes) {
@@ -11477,10 +11897,11 @@
         
         // Uses: transcript + raw notes + meeting info
         // Send plain text, not HTML, for better AI processing
-        const rawNotesPlainText = stripHtml(rawNotesAtStart);
+        // Use the rawNotesToUse we determined earlier (handles regeneration correctly)
+        const rawNotesPlainText = stripHtml(rawNotesToUse);
         console.log('[AI Notes] Sending raw notes to AI:', rawNotesPlainText.substring(0, 100));
         
-        // STEP 1: Ask AI to suggest the best template first
+        // STEP 1: Ask AI to suggest the best template (ONLY if no template manually selected)
         let selectedTemplateId = currentTemplateId;
         
         // Only auto-suggest if no template was manually selected
@@ -11510,6 +11931,13 @@
           }
         } else {
           console.log('[AI Notes] Using pre-selected template:', selectedTemplateId);
+          // Update banner to show we're using user's template
+          if (generatingBanner) {
+            generatingBanner.innerHTML = `
+              <div class="generating-spinner"></div>
+              <span>✨ Generating notes with selected template...</span>
+            `;
+          }
         }
         
         // STEP 2: Generate enhanced notes with the selected/suggested template
@@ -11541,9 +11969,21 @@
           }
           
           currentAINotes = result;
+          // Track raw notes used for this generation (for change detection)
+          // Only update if this is first generation (storedRawNotes was empty before)
+          if (!lastGeneratedFromRawNotes) {
+            lastGeneratedFromRawNotes = rawNotesToUse;
+            storedRawNotes = rawNotesToUse;
+            console.log('[AI Notes] First generation - stored raw notes:', stripHtml(storedRawNotes).substring(0, 50));
+          } else {
+            console.log('[AI Notes] Regeneration - keeping original raw notes:', stripHtml(storedRawNotes).substring(0, 50));
+          }
+          
           // Put AI notes directly in the main editor
           putAINotesInEditor(result);
-          console.log('[AI Notes] Enhanced notes generated and added to editor');
+          // Store enhanced notes content for save/restore
+          storedEnhancedNotes = getEditorContent();
+          console.log('[AI Notes] Enhanced notes generated and stored');
           
           // Hide generate button and show toggle
           hideGenerateNotesButton();
@@ -11567,6 +12007,70 @@
         }
       } catch (err) {
         console.error('[AI Notes] Error generating enhanced notes:', err);
+        
+        // Show error to user
+        const errorMessage = err.message || String(err);
+        let userFriendlyMessage = 'Failed to generate AI notes.';
+        
+        if (errorMessage.includes('API key')) {
+          userFriendlyMessage = '❌ OpenAI API key error. Please check your API key in Settings (⚙️).';
+        } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+          userFriendlyMessage = '❌ Rate limit reached. Please wait a moment and try again.';
+        } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+          userFriendlyMessage = '❌ Network error. Please check your internet connection.';
+        }
+        
+        // Show error banner
+        const errorBanner = document.createElement('div');
+        errorBanner.id = 'aiErrorBanner';
+        errorBanner.style.cssText = `
+          background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
+          color: white;
+          padding: 12px 16px;
+          border-radius: 8px;
+          margin: 8px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
+        `;
+        errorBanner.innerHTML = `
+          <span>${userFriendlyMessage}</span>
+          <button onclick="this.parentElement.remove()" style="
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: auto;
+          ">✕</button>
+        `;
+        
+        // Remove any existing error banner
+        const existingError = document.getElementById('aiErrorBanner');
+        if (existingError) existingError.remove();
+        
+        // Insert before the editor (same location as generating banner)
+        if (notesEditor && notesEditor.parentElement) {
+          notesEditor.parentElement.insertBefore(errorBanner, notesEditor);
+        } else {
+          // Fallback: insert into editor content area
+          const editorContent = document.getElementById('editorContent');
+          if (editorContent) {
+            editorContent.insertBefore(errorBanner, editorContent.firstChild);
+          }
+        }
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+          const banner = document.getElementById('aiErrorBanner');
+          if (banner) banner.remove();
+        }, 10000);
+        
+        // Restore the generate button so user can try again after fixing
+        showGenerateNotesButton();
       } finally {
         // Remove generating banner
         const banner = document.getElementById('aiGeneratingBanner');
@@ -11865,6 +12369,43 @@
     const templatesEditor = document.getElementById('templatesEditor');
     
     // Template icons for picker
+    // Track if user has manually scrolled up in transcript
+    let isUserScrolling = false;
+    let scrollCheckTimeout = null;
+    
+    // Check if user is at bottom of transcript
+    function isTranscriptAtBottom(element) {
+      if (!element) return true;
+      const threshold = 50; // pixels from bottom to consider "at bottom"
+      return element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+    }
+    
+    // Listen for manual scroll in transcript
+    const transcriptContentEl = document.getElementById('transcriptContent');
+    if (transcriptContentEl) {
+      transcriptContentEl.addEventListener('scroll', () => {
+        // Clear existing timeout
+        if (scrollCheckTimeout) {
+          clearTimeout(scrollCheckTimeout);
+        }
+        
+        // Check if user scrolled to bottom
+        if (isTranscriptAtBottom(transcriptContentEl)) {
+          isUserScrolling = false; // Resume auto-scroll
+        } else {
+          // User scrolled up - stop auto-scroll
+          isUserScrolling = true;
+        }
+        
+        // Debounce: wait 150ms after scroll stops to check position
+        scrollCheckTimeout = setTimeout(() => {
+          if (isTranscriptAtBottom(transcriptContentEl)) {
+            isUserScrolling = false;
+          }
+        }, 150);
+      });
+    }
+    
     const templateIcons = ['📝', '👥', '🧍', '🔍', '💼', '💰', '📊', '🎯', '💡', '🚀', '📅', '🎨', '⚙️', '📈', '🤝', '💬', '📢', '🎓', '✅', '⭐'];
     
     async function loadTemplates() {
@@ -14090,6 +14631,41 @@
     }
     
     async function selectNote(id) {
+      // If recording is in progress and selecting a DIFFERENT note, stop recording first
+      if (isRecording && recordingNoteId && recordingNoteId !== id) {
+        console.log('[SelectNote] Recording in progress for note', recordingNoteId, '- stopping before switching to note', id);
+        // Stop recording
+        isRecording = false;
+        isMicActive = false;
+        recordingNoteId = null;
+        
+        // Clear timers
+        if (scheduledStartTimer) {
+          clearTimeout(scheduledStartTimer);
+          scheduledStartTimer = null;
+        }
+        stopSilenceDetection();
+        
+        // Disconnect Deepgram
+        disconnectDeepgram();
+        
+        // Stop recording
+        ipcRenderer.send('stop-recording');
+        
+        // Exit recording mode
+        if (document.body.classList.contains('recording-mode')) {
+          ipcRenderer.send('exit-recording-mode');
+          document.body.classList.remove('recording-mode');
+        }
+        
+        // Update UI
+        updateMicUI();
+        micLabel.textContent = 'Start';
+        updateFloatingIndicator();
+      } else if (isRecording && recordingNoteId === id) {
+        console.log('[SelectNote] Returning to the recording note', id, '- keeping recording active');
+      }
+      
       currentNoteId = id;
       
       const note = await ipcRenderer.invoke('get-note', id);
@@ -14142,7 +14718,7 @@
         setTimeout(() => { isTogglingView = false; }, 100);
         // Update template display for the loaded note's template
         updateCurrentTemplateDisplay();
-      } else if (transcript.length > 0 && hasOpenAIKey) {
+      } else if (transcript.length > 0 && isAIAvailable()) {
         // Note has transcript but no AI notes - show generate button
         currentAINotes = null;
         currentViewIsAI = false;
@@ -14152,7 +14728,7 @@
         showGenerateNotesButton();
         hideNotesViewToggle();
       } else {
-        // No transcript or no API key - hide both, show raw notes
+        // No transcript or no AI available - hide both, show raw notes
         currentAINotes = null;
         currentViewIsAI = false;
         isTogglingView = true;
@@ -14177,6 +14753,7 @@
       
       meetingTitle.textContent = meeting.title || 'Meeting Notes';
       currentNoteId = null;
+      recordingNoteId = null; // Will be set when note is saved
       transcript = [];
       setEditorContent('');
       isRecording = true;
@@ -14251,6 +14828,7 @@
       
       document.body.classList.add('recording-mode');
       isRecording = true;
+      recordingNoteId = currentNoteId; // Track which note is being recorded
       recordingStartTime = Date.now();
       isMicActive = true;
       
@@ -14286,10 +14864,7 @@
     
     // segment: { text, speaker, channel, timestamp, isYou, isFinal, speechFinal }
     ipcRenderer.on('transcript-segment', (_, segment) => {
-      const finalLabel = segment.isFinal ? '✓' : '...';
-      const speakerLabel = segment.isYou ? 'YOU' : 'THEM';
-      const channelLabel = `CH${segment.channel}`;
-      console.log(`[Transcript] ${speakerLabel} ${channelLabel} [${finalLabel}]: ${segment.text.substring(0, 50)}`);
+      // Removed verbose logging - keeping UI updates only
       
       if (!segment.isFinal) {
         // Interim result - replace the single interim display
@@ -14395,6 +14970,11 @@
     ipcRenderer.on('note-saved', async (_, savedNote) => {
       if (savedNote && savedNote.id) {
         currentNoteId = savedNote.id;
+        // If recording and we don't have a recordingNoteId yet, set it now
+        if (isRecording && !recordingNoteId) {
+          recordingNoteId = savedNote.id;
+          console.log('[NoteSaved] Set recordingNoteId to', savedNote.id);
+        }
       }
       hasUnsavedChanges = false;
       saveStatus.textContent = 'Saved';
@@ -14859,6 +15439,7 @@
       console.log('[App] Starting transcription');
       isMicActive = true;
       isRecording = true;
+      recordingNoteId = currentNoteId; // Track which note is being recorded
       recordingStartTime = Date.now();
       lastTranscriptTime = Date.now();
       
@@ -14901,6 +15482,7 @@
       console.log('[App] Stopping transcription');
       isMicActive = false;
       isRecording = false;
+      recordingNoteId = null; // Clear recording note tracker
       
       // Clear timers
       if (scheduledStartTimer) {

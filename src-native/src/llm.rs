@@ -382,7 +382,22 @@ pub fn llm_chat(messages_json: String, _max_tokens: Option<u32>, _temperature: O
     let messages: Vec<serde_json::Value> = serde_json::from_str(&messages_json)
         .map_err(|e| Error::from_reason(format!("Invalid JSON: {}", e)))?;
     
-    println!("[LLM] Chat called with {} messages", messages.len());
+    // Safety check: estimate total input tokens and reject if too large
+    // Max safe input is ~3500 tokens (leaves room in 4096 context for response)
+    let total_chars: usize = messages.iter()
+        .map(|m| m.get("content").and_then(|c| c.as_str()).unwrap_or("").len())
+        .sum();
+    let estimated_tokens = total_chars / 4;
+    const MAX_INPUT_TOKENS: usize = 3500;
+    
+    if estimated_tokens > MAX_INPUT_TOKENS {
+        return Err(Error::from_reason(format!(
+            "Input too large for local LLM: ~{} tokens (max {}). Try using OpenAI for longer content.",
+            estimated_tokens, MAX_INPUT_TOKENS
+        )));
+    }
+    
+    println!("[LLM] Chat called with {} messages, ~{} input tokens", messages.len(), estimated_tokens);
     
     let model = engine.model.clone();
     drop(state); // Release lock before async operation
@@ -438,8 +453,9 @@ pub fn llm_chat(messages_json: String, _max_tokens: Option<u32>, _temperature: O
 
 /// Stream chat completion - returns chunks as they're generated
 /// This is useful for showing real-time responses
+/// max_tokens limits output length (default 2000 if not specified)
 #[napi]
-pub fn llm_chat_stream(messages_json: String, callback: JsFunction) -> Result<()> {
+pub fn llm_chat_stream(messages_json: String, max_tokens: Option<u32>, callback: JsFunction) -> Result<()> {
     let state = LLM_STATE.lock();
     
     let engine = state.as_ref()
@@ -449,7 +465,25 @@ pub fn llm_chat_stream(messages_json: String, callback: JsFunction) -> Result<()
     let messages: Vec<serde_json::Value> = serde_json::from_str(&messages_json)
         .map_err(|e| Error::from_reason(format!("Invalid JSON: {}", e)))?;
     
-    println!("[LLM] Stream chat called with {} messages", messages.len());
+    // Safety check: estimate total input tokens and reject if too large
+    // Max safe input is ~3500 tokens (leaves room in 4096 context for response)
+    // Rough estimate: 4 chars per token
+    let total_chars: usize = messages.iter()
+        .map(|m| m.get("content").and_then(|c| c.as_str()).unwrap_or("").len())
+        .sum();
+    let estimated_tokens = total_chars / 4;
+    const MAX_INPUT_TOKENS: usize = 3500;
+    
+    if estimated_tokens > MAX_INPUT_TOKENS {
+        return Err(Error::from_reason(format!(
+            "Input too large for local LLM: ~{} tokens (max {}). Try using OpenAI for longer content.",
+            estimated_tokens, MAX_INPUT_TOKENS
+        )));
+    }
+    
+    let token_limit = max_tokens.unwrap_or(2000) as usize;
+    println!("[LLM] Stream chat called with {} messages, ~{} input tokens, max_tokens: {}", 
+             messages.len(), estimated_tokens, token_limit);
     
     let model = engine.model.clone();
     drop(state);
@@ -485,6 +519,9 @@ pub fn llm_chat_stream(messages_json: String, callback: JsFunction) -> Result<()
             
             match model.stream_chat_request(request).await {
                 Ok(mut stream) => {
+                    let mut token_count = 0usize;
+                    let mut stopped_early = false;
+                    
                     while let Some(chunk) = stream.next().await {
                         if let Response::Chunk(ChatCompletionChunkResponse { choices, .. }) = chunk {
                             if let Some(ChunkChoice {
@@ -492,14 +529,31 @@ pub fn llm_chat_stream(messages_json: String, callback: JsFunction) -> Result<()
                                 ..
                             }) = choices.first()
                             {
+                                // Rough token estimate: ~4 chars per token
+                                token_count += (content.len() + 3) / 4;
+                                
                                 tsfn.call(content.clone(), ThreadsafeFunctionCallMode::NonBlocking);
+                                
+                                // Stop if we've exceeded token limit
+                                if token_count >= token_limit {
+                                    println!("[LLM] Stopping stream: reached {} tokens (limit: {})", token_count, token_limit);
+                                    stopped_early = true;
+                                    break;
+                                }
                             }
                         }
+                    }
+                    
+                    if stopped_early {
+                        println!("[LLM] ✅ Stream completed (stopped at token limit)");
+                    } else {
+                        println!("[LLM] ✅ Stream completed naturally");
                     }
                     // Signal completion
                     tsfn.call("[DONE]".to_string(), ThreadsafeFunctionCallMode::NonBlocking);
                 }
                 Err(e) => {
+                    println!("[LLM] ❌ Stream error: {}", e);
                     tsfn.call(format!("[ERROR] {}", e), ThreadsafeFunctionCallMode::NonBlocking);
                 }
             }
