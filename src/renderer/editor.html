@@ -9358,9 +9358,6 @@
     // Check setup on load
     checkSetup();
     
-    // Load settings provider state and update engine badges on load
-    loadSettingsProviderState();
-    
     // Initialize wizard to step 1
     showStep(1);
     
@@ -10648,6 +10645,10 @@
       e.preventDefault();
       shell.openExternal('https://platform.openai.com/api-keys');
     });
+    
+    // Load settings provider state and update engine badges on load
+    // (Must be called after settingsState and all settings functions are defined)
+    loadSettingsProviderState();
     
     // Update meeting meta info
     function updateMeetingMeta(meeting) {
