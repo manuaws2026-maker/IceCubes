@@ -1438,6 +1438,7 @@
       await ipcRenderer.invoke('transcription-set-engine', 'deepgram');
       updateUI();
       updateLanguageDropdowns();
+      ipcRenderer.send('notify-settings-changed'); // Notify editor window
     });
     
     document.getElementById('transcriptionProviderParakeet')?.addEventListener('click', async () => {
@@ -1456,6 +1457,7 @@
       await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
       updateUI();
       updateLanguageDropdowns();
+      ipcRenderer.send('notify-settings-changed'); // Notify editor window
     });
     
     // AI provider toggle
@@ -1475,6 +1477,7 @@
       await ipcRenderer.invoke('ai-set-engine', 'openai');
       updateUI();
       updateLanguageDropdowns();
+      ipcRenderer.send('notify-settings-changed'); // Notify editor window
     });
     
     document.getElementById('aiProviderLocal')?.addEventListener('click', async () => {
@@ -1493,6 +1496,7 @@
       await ipcRenderer.invoke('ai-set-engine', 'local');
       updateUI();
       updateLanguageDropdowns();
+      ipcRenderer.send('notify-settings-changed'); // Notify editor window
     });
     
     // Language settings - save on change

@@ -2,6 +2,16 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Handle EPIPE errors gracefully (happens when stdout/stderr is closed during shutdown)
+process.stdout?.on?.('error', (err: any) => {
+  if (err.code === 'EPIPE') return; // Ignore EPIPE errors
+  throw err;
+});
+process.stderr?.on?.('error', (err: any) => {
+  if (err.code === 'EPIPE') return; // Ignore EPIPE errors
+  throw err;
+});
+
 // Polyfill for undici/openai compatibility with Electron
 // These globals are expected by undici but not available in Electron's main process
 if (typeof (globalThis as any).File === 'undefined') {
@@ -1331,6 +1341,14 @@ function setupIPC() {
     // Notify editor window that settings closed (to re-check offline status)
     if (editorWindow && !editorWindow.isDestroyed()) {
       editorWindow.webContents.send('settings-closed');
+    }
+  });
+  
+  // Notify editor when settings change (from settings window)
+  ipcMain.on('notify-settings-changed', () => {
+    console.log('[IPC] Settings changed, notifying editor window');
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('engine-changed');
     }
   });
   
@@ -2797,7 +2815,9 @@ Answer:`;
 
   // Get/Set AI engine preference (openai or local)
   ipcMain.handle('ai-get-engine', async () => {
-    return store.get('aiEngine', 'openai') as string;
+    const engine = store.get('aiEngine', 'openai') as string;
+    console.log('[IPC] ai-get-engine returning:', engine);
+    return engine;
   });
 
   ipcMain.handle('ai-set-engine', async (_, engine: 'openai' | 'local') => {

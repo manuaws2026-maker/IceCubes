@@ -8697,8 +8697,9 @@
     
     // Re-check when settings window closes (model might have been deleted/downloaded)
     ipcRenderer.on('settings-closed', () => {
-      console.log('[Offline] Settings closed, re-checking status...');
+      console.log('[Editor] Settings closed, re-checking status and refreshing badges...');
       checkOfflineStatus();
+      loadSettingsProviderState(); // Refresh engine badges
     });
     
     // Refresh calendar events when selection changes in settings
@@ -8716,8 +8717,9 @@
     
     // Re-check when engine settings change
     ipcRenderer.on('engine-changed', () => {
-      console.log('[Offline] Engine changed, re-checking status...');
+      console.log('[Editor] Engine changed, re-checking status and refreshing badges...');
       checkOfflineStatus();
+      loadSettingsProviderState(); // Refresh engine badges
     });
     
     // ============================================================================
@@ -9377,9 +9379,11 @@
       }
     })();
     
-    // Listen for settings saved to recheck setup
+    // Listen for settings saved to recheck setup and refresh badges
     ipcRenderer.on('settings-updated', () => {
+      console.log('[Editor] settings-updated received - refreshing setup and badges');
       checkSetup();
+      loadSettingsProviderState(); // Refresh engine badges
     });
     
     // ============================================================================
@@ -10376,10 +10380,22 @@
     
     // Update the engine status indicator in the footer
     async function updateEngineStatusIndicator() {
+      console.log('[EngineStatus] Updating badges, settingsState:', {
+        aiEngine: settingsState.aiEngine,
+        transcriptionEngine: settingsState.transcriptionEngine
+      });
+      
       const aiBadge = document.getElementById('aiBadge');
       const aiEngineName = document.getElementById('aiEngineName');
       const transcriptionBadge = document.getElementById('transcriptionBadge');
       const transcriptionEngineName = document.getElementById('transcriptionEngineName');
+      
+      console.log('[EngineStatus] Badge elements found:', {
+        aiBadge: !!aiBadge,
+        aiEngineName: !!aiEngineName,
+        transcriptionBadge: !!transcriptionBadge,
+        transcriptionEngineName: !!transcriptionEngineName
+      });
       
       // Check real-time ready status for local LLM
       let llmReady = false;
@@ -10683,6 +10699,7 @@
     
     // Load settings provider state and update engine badges on load
     // (Must be called after settingsState and all settings functions are defined)
+    console.log('[Editor] Calling loadSettingsProviderState() now...');
     loadSettingsProviderState();
     
     // Update meeting meta info
