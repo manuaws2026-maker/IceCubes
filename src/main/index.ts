@@ -1,6 +1,16 @@
 // Load environment variables from .env file
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+
+// In production, .env is in the Resources folder
+if (process.env.NODE_ENV === 'development') {
+  dotenv.config();
+} else {
+  // Production: load from app resources
+  const envPath = path.join(process.resourcesPath || '', '.env');
+  console.log('[App] Loading .env from:', envPath);
+  dotenv.config({ path: envPath });
+}
 
 // Handle EPIPE errors gracefully (happens when stdout/stderr is closed during shutdown)
 process.stdout?.on?.('error', (err: any) => {
@@ -38,7 +48,6 @@ if (typeof (globalThis as any).FormData === 'undefined') {
 }
 
 import { app, BrowserWindow, ipcMain, systemPreferences, shell, Tray, Menu, Notification, nativeImage, screen, powerMonitor, dialog } from 'electron';
-import path from 'path';
 import fs from 'fs';
 import { MeetingWatcher, MeetingInfo } from './meeting-watcher';
 import { AudioEngine } from './audio-engine';
