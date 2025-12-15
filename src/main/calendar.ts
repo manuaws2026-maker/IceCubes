@@ -745,6 +745,27 @@ export class CalendarService {
       return this.calendarList;
     } catch (e: any) {
       console.error('[Calendar] Error fetching calendar list:', e?.message || e);
+      
+      // Check for auth errors and disconnect if needed
+      const errorMsg = String(e?.message || e);
+      if (e?.code === 401 || e?.code === 403 || 
+          errorMsg.includes('invalid') || 
+          errorMsg.includes('authentication') ||
+          errorMsg.includes('credential') ||
+          errorMsg.includes('expired') ||
+          errorMsg.includes('revoked')) {
+        console.log('[Calendar] Auth error in fetchCalendarList, disconnecting...');
+        this.isAuthenticated = false;
+        this.calendar = null;
+        // Delete old token file so user can reconnect
+        try {
+          if (fs.existsSync(TOKEN_PATH)) {
+            fs.unlinkSync(TOKEN_PATH);
+            console.log('[Calendar] Cleared invalid token');
+          }
+        } catch {}
+      }
+      
       return [];
     }
   }

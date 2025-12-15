@@ -1926,6 +1926,8 @@
         const result = await ipcRenderer.invoke('calendar-connect');
         if (result) {
           await checkCalendarStatus();
+          // Notify editor window that calendar connected
+          ipcRenderer.send('notify-settings-changed');
         } else {
           calendarStatusText.textContent = 'Connection failed';
         }
