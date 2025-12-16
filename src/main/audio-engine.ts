@@ -93,6 +93,18 @@ export class AudioEngine {
       return 0;
     }
   }
+  
+  // Pause recording - for now just a flag, audio continues to buffer
+  // The transcription router handles the actual pausing of processing
+  pauseRecording(): void {
+    console.log('[AudioEngine] Pause recording (transcription will pause)');
+    // Note: Audio continues to capture but transcription stops
+  }
+  
+  resumeRecording(): void {
+    console.log('[AudioEngine] Resume recording');
+    // Transcription resumes
+  }
 }
 
 

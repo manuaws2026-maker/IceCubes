@@ -6100,6 +6100,88 @@
       color: #10b981;
     }
     
+    .mic-control.paused {
+      background: rgba(251, 191, 36, 0.08);
+      border-color: #fbbf24;
+    }
+    
+    .mic-control.paused .mic-bar {
+      background: #fbbf24;
+      animation: none;
+    }
+    
+    .mic-control.paused .mic-label {
+      color: #fbbf24;
+    }
+    
+    /* Pause button - inside pill */
+    .pause-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: #f59e0b;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-left: 8px;
+      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+    }
+    
+    .pause-btn:hover {
+      background: #d97706;
+      transform: scale(1.05);
+    }
+    
+    .pause-btn.active {
+      background: #10b981;
+      box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+    }
+    
+    .pause-btn.active:hover {
+      background: #059669;
+    }
+    
+    .pause-icon {
+      font-size: 11px;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .pause-btn.hidden {
+      display: none;
+    }
+    
+    /* Stop button - inside pill */
+    .stop-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: #ef4444;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-left: 6px;
+      font-size: 9px;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+    }
+    
+    .stop-btn:hover {
+      background: #dc2626;
+      transform: scale(1.05);
+    }
+    
+    .stop-btn.hidden {
+      display: none;
+    }
+    
     .language-selector {
       display: flex;
       align-items: center;
@@ -8087,6 +8169,10 @@
               </div>
               <span class="mic-chevron">▲</span>
               <span class="mic-label" id="micLabel">Resume</span>
+              <button class="pause-btn hidden" id="pauseBtn" title="Pause recording">
+                <span class="pause-icon">⏸</span>
+              </button>
+              <button class="stop-btn hidden" id="stopBtn" title="Stop recording">■</button>
             </div>
           </div>
           <div class="footer-center">
@@ -9448,6 +9534,8 @@
     const notesEditor = document.getElementById('notesEditor');
     const micControl = document.getElementById('micControl');
     const micLabel = document.getElementById('micLabel');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
     // Transcript elements (may not exist if hidden)
     const transcriptSection = document.getElementById('transcriptSection');
     const transcriptContent = document.getElementById('transcriptContent');
@@ -9548,6 +9636,7 @@
     let silenceTimer = null;
     const SILENCE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
     let isRecording = false;
+    let isPaused = false; // Track pause state
     let recordingNoteId = null; // Track which note is being recorded (separate from currentNoteId for viewing)
     let recordingStartTime = null; // Track when recording started for timestamps
     let notes = [];
@@ -10931,16 +11020,48 @@
     // ============================================================================
     
     function updateMicUI() {
+      console.log('[UI] updateMicUI called - isRecording:', isRecording, 'isMicActive:', isMicActive, 'isPaused:', isPaused);
       if (isMicActive || isRecording) {
         micControl?.classList.add('recording');
-        if (micLabel) micLabel.textContent = 'Stop';
-        if (transcriptStatus) transcriptStatus.textContent = 'Listening...';
+        micControl?.classList.toggle('paused', isPaused);
+        // Hide mic label when recording (buttons are visible)
+        if (micLabel) micLabel.style.display = 'none';
+        if (transcriptStatus) transcriptStatus.textContent = isPaused ? 'Paused' : 'Listening...';
         if (transcriptEmpty) transcriptEmpty.style.display = transcript.length > 0 ? 'none' : 'flex';
+        // Show pause and stop buttons when recording
+        if (pauseBtn) {
+          pauseBtn.classList.remove('hidden');
+          pauseBtn.classList.toggle('active', isPaused);
+          pauseBtn.title = isPaused ? 'Resume recording' : 'Pause recording';
+          const pauseIcon = pauseBtn.querySelector('.pause-icon');
+          if (pauseIcon) pauseIcon.textContent = isPaused ? '▶' : '⏸';
+        }
+        if (stopBtn) stopBtn.classList.remove('hidden');
+        
+        // HIDE ALL generate-related buttons during recording
+        const generateNotesWrapper = document.getElementById('generateNotesWrapper');
+        if (generateNotesWrapper) generateNotesWrapper.classList.add('hidden');
+        const generateBtnWithDropdown = document.querySelector('.generate-btn-with-dropdown');
+        if (generateBtnWithDropdown) generateBtnWithDropdown.style.display = 'none';
+        const regenerateNotesWrapper = document.getElementById('regenerateNotesWrapper');
+        if (regenerateNotesWrapper) regenerateNotesWrapper.classList.add('hidden');
       } else {
         micControl?.classList.remove('recording');
-        if (micLabel) micLabel.textContent = transcript.length > 0 ? 'Resume' : 'Start';
+        micControl?.classList.remove('paused');
+        // Show mic label when not recording
+        if (micLabel) {
+          micLabel.style.display = '';
+          micLabel.textContent = transcript.length > 0 ? 'Resume' : 'Start';
+        }
         if (transcriptStatus) transcriptStatus.textContent = transcript.length > 0 ? 'Transcript Paused' : 'Click Start to begin transcribing';
         if (transcriptEmpty) transcriptEmpty.style.display = transcript.length > 0 ? 'none' : 'flex';
+        // Hide pause and stop buttons when not recording
+        if (pauseBtn) pauseBtn.classList.add('hidden');
+        if (stopBtn) stopBtn.classList.add('hidden');
+        
+        // Restore generate button visibility (if should be shown)
+        const generateBtnWithDropdown = document.querySelector('.generate-btn-with-dropdown');
+        if (generateBtnWithDropdown) generateBtnWithDropdown.style.display = '';
       }
       // Update ask input visibility whenever recording state changes
       updateAskInputVisibility();
@@ -11164,13 +11285,46 @@
       }
     }
     
-    // Mic control click handler
-    micControl?.addEventListener('click', async () => {
-      if (isMicActive || isRecording) {
-        stopTranscription();
-      } else {
+    // Mic control click handler - only starts recording (stop is separate button now)
+    micControl?.addEventListener('click', async (e) => {
+      // Ignore clicks on buttons inside
+      if (e.target.closest('.pause-btn') || e.target.closest('.stop-btn')) return;
+      
+      if (!isMicActive && !isRecording) {
         startTranscription();
       }
+    });
+    
+    // Pause button click handler
+    pauseBtn?.addEventListener('click', (e) => {
+      e.stopPropagation(); // Don't trigger mic control
+      if (!isRecording) return;
+      
+      if (isPaused) {
+        // Resume - send to main, wait for confirmation
+        console.log('[Editor] Requesting resume...');
+        ipcRenderer.send('resume-recording');
+      } else {
+        // Pause - send to main, wait for confirmation
+        console.log('[Editor] Requesting pause...');
+        ipcRenderer.send('pause-recording');
+      }
+      // Don't update isPaused here - wait for 'recording-paused' event from main
+    });
+    
+    // Stop button click handler
+    stopBtn?.addEventListener('click', (e) => {
+      e.stopPropagation(); // Don't trigger mic control
+      if (isRecording || isMicActive) {
+        stopTranscription();
+      }
+    });
+    
+    // Listen for pause state changes from main process
+    ipcRenderer.on('recording-paused', (_, paused) => {
+      console.log('[Editor] Recording paused state:', paused);
+      isPaused = paused;
+      updateMicUI();
     });
     
     // ============================================================================
@@ -11233,6 +11387,11 @@
     const notesViewToggle = document.getElementById('notesViewToggle');
     
     async function showGenerateNotesButton() {
+      // Don't show during active recording
+      if (isRecording || isMicActive) {
+        console.log('[GenerateNotes] Not showing - recording is active');
+        return;
+      }
       // Check if ANY AI is available (OpenAI or Local LLM)
       if (!isAIAvailable()) return; // Don't show if no AI engine available
       generateNotesWrapper?.classList.remove('hidden');
@@ -15043,6 +15202,11 @@
         if (isRecording && !recordingNoteId) {
           recordingNoteId = savedNote.id;
           console.log('[NoteSaved] Set recordingNoteId to', savedNote.id);
+          // Update the meeting indicator with the new noteId
+          ipcRenderer.send('update-indicator-note', {
+            noteId: savedNote.id,
+            title: savedNote.title || 'Meeting Notes'
+          });
         }
       }
       hasUnsavedChanges = false;
@@ -15073,6 +15237,78 @@
     ipcRenderer.on('show-home-view', () => {
       console.log('[Editor] show-home-view received - showing home');
       showEmptyState();
+    });
+    
+    // Load specific note (triggered from meeting indicator click)
+    ipcRenderer.on('load-note', (_, noteId) => {
+      console.log('[Editor] load-note received - loading note:', noteId);
+      if (noteId) {
+        selectNote(noteId);
+      }
+    });
+    
+    // Handle opening note from indicator - includes recording state sync
+    ipcRenderer.on('open-note-from-indicator', async (_, data) => {
+      console.log('[Editor] open-note-from-indicator received:', data);
+      console.log('[Editor] Current state before sync - isRecording:', isRecording, 'recordingNoteId:', recordingNoteId);
+      
+      // Close any open dropdowns and hide generate buttons
+      const generateTemplateMenu = document.getElementById('generateTemplateMenu');
+      if (generateTemplateMenu) generateTemplateMenu.classList.remove('show');
+      const templateDropdownMenu = document.querySelector('.template-dropdown-menu');
+      if (templateDropdownMenu) templateDropdownMenu.classList.remove('show');
+      
+      // Get the note ID - use currentNoteId as fallback if noteId not provided
+      const targetNoteId = data.noteId || data.recordingNoteId || recordingNoteId || currentNoteId;
+      console.log('[Editor] Target noteId:', targetNoteId);
+      console.log('[Editor] recordingNoteId:', recordingNoteId, 'currentNoteId:', currentNoteId);
+      
+      // First, load the note if we have an ID
+      if (targetNoteId) {
+        // Set recordingNoteId BEFORE selectNote so it recognizes this as the recording note
+        if (data.isRecording) {
+          recordingNoteId = data.recordingNoteId || targetNoteId;
+        }
+        
+        await selectNote(targetNoteId);
+      } else if (data.isRecording) {
+        // Recording is active but no note ID yet (unsaved new note) - just show the editor
+        console.log('[Editor] Recording active but no noteId, showing current editor view');
+        showEditor();
+      } else {
+        console.log('[Editor] No noteId and not recording, showing home');
+        showHome();
+      }
+      
+      // NOW sync recording state from main process AFTER loading note
+      if (data.isRecording) {
+        isRecording = true;
+        isMicActive = true;
+        recordingNoteId = data.recordingNoteId || targetNoteId;
+        isPaused = data.isPaused || false;
+        
+        console.log('[Editor] State synced - isRecording:', isRecording, 'recordingNoteId:', recordingNoteId, 'isPaused:', isPaused);
+        
+        // Forcefully enter recording mode UI
+        document.body.classList.add('recording-mode');
+        document.body.classList.add('viewing-note');
+        micControl?.classList.add('recording');
+        if (isPaused) {
+          micControl?.classList.add('paused');
+        }
+        
+        // Hide ALL "Generate notes" related elements during recording
+        const generateNotesWrapper = document.getElementById('generateNotesWrapper');
+        if (generateNotesWrapper) generateNotesWrapper.classList.add('hidden');
+        const generateBtnWithDropdown = document.querySelector('.generate-btn-with-dropdown');
+        if (generateBtnWithDropdown) generateBtnWithDropdown.style.display = 'none';
+        const regenerateNotesWrapper = document.getElementById('regenerateNotesWrapper');
+        if (regenerateNotesWrapper) regenerateNotesWrapper.classList.add('hidden');
+      }
+      
+      // Update UI to reflect correct state
+      console.log('[Editor] After state sync - isRecording:', isRecording, 'isPaused:', isPaused);
+      updateMicUI();
     });
     
     // Show editor view (triggered from main when "Open Current Note" is clicked)
@@ -15526,6 +15762,7 @@
       console.log('[App] Starting transcription');
       isMicActive = true;
       isRecording = true;
+      isPaused = false; // Reset pause state
       recordingNoteId = currentNoteId; // Track which note is being recorded
       recordingStartTime = Date.now();
       lastTranscriptTime = Date.now();
@@ -15533,9 +15770,10 @@
       // Store raw notes state at start
       onRecordingStart();
       
-      // Start mic recording
+      // Start mic recording - include noteId for the meeting indicator
       ipcRenderer.send('start-manual-recording', {
-        title: meetingTitle.textContent || 'Meeting Notes'
+        title: meetingTitle.textContent || 'Meeting Notes',
+        noteId: currentNoteId
       });
       
       // ENTER RECORDING MODE: Move window to right side of screen
@@ -15569,6 +15807,7 @@
       console.log('[App] Stopping transcription');
       isMicActive = false;
       isRecording = false;
+      isPaused = false; // Reset pause state
       recordingNoteId = null; // Clear recording note tracker
       
       // Clear timers

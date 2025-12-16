@@ -276,6 +276,45 @@ export class TranscriptionService {
     return this.isStreaming;
   }
   
+  private isPaused: boolean = false;
+  
+  /**
+   * Pause streaming (Deepgram - stop polling and mark as paused)
+   */
+  public pauseStreaming(): void {
+    console.log('[Transcription] Pausing Deepgram streaming');
+    this.isPaused = true;
+    // Stop polling for audio - connection stays open
+    if (this.audioPollingInterval) {
+      clearInterval(this.audioPollingInterval);
+      this.audioPollingInterval = null;
+    }
+  }
+  
+  /**
+   * Resume streaming
+   */
+  public resumeStreaming(): void {
+    console.log('[Transcription] Resuming Deepgram streaming');
+    this.isPaused = false;
+    
+    // IMPORTANT: Discard any audio that was buffered during pause
+    // by calling getAudioChunks but not sending it
+    if (this.nativeModule) {
+      try {
+        const discardedChunks = this.nativeModule.getAudioChunks();
+        console.log(`[Transcription] Discarded ${discardedChunks?.length || 0} audio chunks buffered during pause`);
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Restart audio polling
+    if (this.isStreaming && !this.audioPollingInterval && this.nativeModule) {
+      this.startAudioPolling();
+    }
+  }
+  
   /**
    * Start polling native module for audio chunks
    */

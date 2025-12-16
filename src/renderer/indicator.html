@@ -4,95 +4,296 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Recording</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
     <style>
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
+      html, body {
+        overflow: hidden;
+        height: auto;
+        width: auto;
+      }
       body {
-        font-family: 'JetBrains Mono', monospace;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: transparent;
       }
       .indicator {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 8px;
-        padding: 8px 14px;
-        background: rgba(20, 20, 22, 0.92);
+        gap: 6px;
+        padding: 12px 10px 10px 10px;
+        background: rgba(18, 18, 20, 0.95);
         backdrop-filter: blur(20px);
-        border-radius: 20px;
-        border: 1px solid rgba(255, 59, 48, 0.3);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 14px;
+        border: 1px solid rgba(74, 222, 128, 0.25);
+        box-shadow: 
+          0 8px 32px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(255, 255, 255, 0.05),
+          inset 0 1px 0 rgba(255, 255, 255, 0.05);
         cursor: pointer;
-        transition: all 0.2s;
-        -webkit-app-region: no-drag;
+        transition: all 0.2s ease;
+        user-select: none;
+      }
+      .indicator.dragging {
+        cursor: grabbing;
+      }
+      .indicator.paused {
+        border-color: rgba(251, 191, 36, 0.3);
       }
       .indicator:hover {
-        background: rgba(40, 40, 45, 0.95);
-        border-color: rgba(255, 59, 48, 0.5);
-        transform: scale(1.02);
+        border-color: rgba(74, 222, 128, 0.4);
+        box-shadow: 
+          0 12px 40px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(255, 255, 255, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
       }
-      .indicator:hover .stop-hint {
-        opacity: 1;
+      .indicator.paused:hover {
+        border-color: rgba(251, 191, 36, 0.5);
+      }
+      
+      /* Logo */
+      .logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        flex-shrink: 0;
+        transition: transform 0.2s;
+        -webkit-user-drag: none;
+        user-select: none;
+        pointer-events: none;
+      }
+      .indicator:hover .logo {
+        transform: scale(1.05);
+      }
+      
+      /* Audio bars container */
+      .audio-bars {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 3px;
+        height: 22px;
+        padding: 0 4px;
+        pointer-events: none;
+      }
+      .bar {
+        width: 4px;
+        background: linear-gradient(to top, #4ade80, #22c55e);
+        border-radius: 2px;
+        box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+        transition: all 0.2s ease;
+      }
+      .bar.animated {
+        animation: audioBar 0.8s ease-in-out infinite;
+      }
+      .bar:nth-child(1) { height: 40%; animation-delay: 0s; }
+      .bar:nth-child(2) { height: 70%; animation-delay: 0.1s; }
+      .bar:nth-child(3) { height: 100%; animation-delay: 0.2s; }
+      .bar:nth-child(4) { height: 60%; animation-delay: 0.3s; }
+      .bar:nth-child(5) { height: 80%; animation-delay: 0.15s; }
+      
+      /* Paused state - bars don't animate */
+      .bar.paused {
+        animation: none !important;
+        height: 20% !important;
+        opacity: 0.4;
+        background: linear-gradient(to top, #fbbf24, #f59e0b);
+        box-shadow: 0 0 6px rgba(251, 191, 36, 0.3);
+      }
+      
+      @keyframes audioBar {
+        0%, 100% { transform: scaleY(1); }
+        50% { transform: scaleY(0.4); }
+      }
+      
+      /* Status and timer */
+      .meta {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 5px;
       }
       .dot {
-        width: 10px;
-        height: 10px;
-        background: #ff3b30;
+        width: 7px;
+        height: 7px;
+        background: #4ade80;
         border-radius: 50%;
         animation: pulse 1.5s ease-in-out infinite;
-        box-shadow: 0 0 12px rgba(255, 59, 48, 0.6);
+        box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+      }
+      .dot.paused {
+        background: #fbbf24;
+        animation: none;
+        box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
       }
       @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.6; transform: scale(0.9); }
+        50% { opacity: 0.5; transform: scale(0.8); }
       }
-      .text {
-        font-size: 12px;
-        font-weight: 500;
-        color: #ff3b30;
-        letter-spacing: 0.5px;
+      .status-text {
+        font-size: 10px;
+        font-weight: 600;
+        color: #4ade80;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .status-text.paused {
+        color: #fbbf24;
       }
       .timer {
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.6);
-        margin-left: 4px;
+        font-size: 14px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.85);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.5px;
       }
-      .stop-hint {
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.4);
-        margin-left: 8px;
-        opacity: 0;
-        transition: opacity 0.2s;
+      .timer.paused {
+        color: rgba(255, 255, 255, 0.5);
       }
     </style>
   </head>
   <body>
-    <div class="indicator" id="indicator" title="Click to stop recording">
-      <div class="dot"></div>
-      <span class="text">REC</span>
-      <span class="timer" id="timer">00:00</span>
-      <span class="stop-hint">click to stop</span>
+    <div class="indicator" id="indicator">
+      <img class="logo" id="logo" src="logo.png" alt="IceCubes" draggable="false">
+      <div class="audio-bars" id="audioBars">
+        <div class="bar animated"></div>
+        <div class="bar animated"></div>
+        <div class="bar animated"></div>
+        <div class="bar animated"></div>
+        <div class="bar animated"></div>
+      </div>
+      <div class="meta">
+        <div class="status">
+          <div class="dot" id="statusDot"></div>
+          <span class="status-text" id="statusText">Live</span>
+        </div>
+        <span class="timer" id="timer">00:00</span>
+      </div>
     </div>
     <script>
       const { ipcRenderer } = require('electron');
       
-      let startTime = Date.now();
-      setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
-        const secs = (elapsed % 60).toString().padStart(2, '0');
-        document.getElementById('timer').textContent = `${mins}:${secs}`;
-      }, 1000);
+      let elapsedSeconds = 0;
+      let isPaused = false;
+      let noteId = null;
+      let timerInterval = null;
+      
+      // Drag detection
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let hasMoved = false;
+      const DRAG_THRESHOLD = 5; // pixels to consider it a drag vs click
+      
+      const indicator = document.getElementById('indicator');
+      
+      function formatTime(seconds) {
+        const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const secs = (seconds % 60).toString().padStart(2, '0');
+        return `${mins}:${secs}`;
+      }
+      
+      function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+          if (!isPaused) {
+            elapsedSeconds++;
+            document.getElementById('timer').textContent = formatTime(elapsedSeconds);
+          }
+        }, 1000);
+      }
+      
+      startTimer();
 
-      // Click to stop recording
-      document.getElementById('indicator').addEventListener('click', () => {
-        ipcRenderer.send('stop-recording-from-indicator');
+      // Receive note info from main process
+      ipcRenderer.on('set-note-info', (_, info) => {
+        console.log('[Indicator] Received note info:', info);
+        if (info.noteId) noteId = info.noteId;
+        if (typeof info.elapsedSeconds === 'number') {
+          elapsedSeconds = info.elapsedSeconds;
+          document.getElementById('timer').textContent = formatTime(elapsedSeconds);
+        }
+      });
+      
+      // Handle pause/resume state
+      ipcRenderer.on('set-paused', (_, paused) => {
+        console.log('[Indicator] Set paused:', paused);
+        isPaused = paused;
+        const bars = document.querySelectorAll('.bar');
+        const dot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const timer = document.getElementById('timer');
+        
+        if (paused) {
+          indicator.classList.add('paused');
+          bars.forEach(bar => {
+            bar.classList.remove('animated');
+            bar.classList.add('paused');
+          });
+          dot.classList.add('paused');
+          statusText.classList.add('paused');
+          statusText.textContent = 'Paused';
+          timer.classList.add('paused');
+        } else {
+          indicator.classList.remove('paused');
+          bars.forEach(bar => {
+            bar.classList.remove('paused');
+            bar.classList.add('animated');
+          });
+          dot.classList.remove('paused');
+          statusText.classList.remove('paused');
+          statusText.textContent = 'Live';
+          timer.classList.remove('paused');
+        }
+      });
+
+      // Mouse handling for both click and drag
+      indicator.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        hasMoved = false;
+        dragStartX = e.screenX;
+        dragStartY = e.screenY;
+        indicator.classList.add('dragging');
+      });
+      
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const dx = e.screenX - dragStartX;
+        const dy = e.screenY - dragStartY;
+        
+        // Check if moved beyond threshold
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+          hasMoved = true;
+          // Move the window
+          ipcRenderer.send('move-indicator-window', { dx, dy });
+          dragStartX = e.screenX;
+          dragStartY = e.screenY;
+        }
+      });
+      
+      document.addEventListener('mouseup', (e) => {
+        if (!isDragging) return;
+        
+        isDragging = false;
+        indicator.classList.remove('dragging');
+        
+        // If didn't move much, treat as click
+        if (!hasMoved) {
+          console.log('[Indicator] Clicked, opening note:', noteId);
+          window.blur();
+          ipcRenderer.send('open-note-from-indicator', noteId);
+        }
       });
     </script>
   </body>

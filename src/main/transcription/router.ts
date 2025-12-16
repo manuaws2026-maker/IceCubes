@@ -25,6 +25,7 @@ export class TranscriptionRouter {
   private lastTranscriptText: string = '';
   private recordingStartTime: number = 0;  // Track when recording started
   private cumulativeAudioTime: number = 0;  // Track cumulative audio processed (seconds)
+  private isPaused: boolean = false;  // Track pause state
 
   constructor() {
     this.deepgramEngine = new TranscriptionService();
@@ -177,7 +178,7 @@ export class TranscriptionRouter {
    * Transcribe the buffered audio using Parakeet
    */
   private async transcribeBufferedAudio(): Promise<void> {
-    if (!this.isParakeetStreaming || !this.nativeModule || this.parakeetAudioBuffer.length === 0) {
+    if (!this.isParakeetStreaming || !this.nativeModule || this.parakeetAudioBuffer.length === 0 || this.isPaused) {
       return;
     }
 
@@ -321,6 +322,55 @@ export class TranscriptionRouter {
     
     this.parakeetAudioBuffer = [];
     console.log('[Parakeet] Live transcription stopped');
+  }
+
+  /**
+   * Pause streaming - stops processing but keeps state
+   */
+  pauseStreaming(): void {
+    console.log('[TranscriptionRouter] Pausing streaming...');
+    this.isPaused = true;
+    
+    if (this.currentEngine === 'parakeet') {
+      // Stop intervals but keep buffer
+      if (this.parakeetTranscribeInterval) {
+        clearInterval(this.parakeetTranscribeInterval);
+        this.parakeetTranscribeInterval = null;
+      }
+      // Keep polling for audio but don't transcribe
+    } else {
+      // Deepgram: pause by clearing interval (if any)
+      this.deepgramEngine.pauseStreaming?.();
+    }
+    
+    console.log('[TranscriptionRouter] ⏸️ Streaming paused');
+  }
+
+  /**
+   * Resume streaming
+   */
+  resumeStreaming(): void {
+    if (!this.isPaused) return;
+    
+    console.log('[TranscriptionRouter] Resuming streaming...');
+    this.isPaused = false;
+    
+    if (this.currentEngine === 'parakeet' && this.isParakeetStreaming) {
+      // Discard any audio buffered during pause
+      console.log(`[TranscriptionRouter] Discarding ${this.parakeetAudioBuffer.length} parakeet audio chunks buffered during pause`);
+      this.parakeetAudioBuffer = [];
+      
+      // Restart transcription interval
+      if (!this.parakeetTranscribeInterval) {
+        this.parakeetTranscribeInterval = setInterval(async () => {
+          await this.transcribeBufferedAudio();
+        }, 5000);
+      }
+    } else {
+      this.deepgramEngine.resumeStreaming?.();
+    }
+    
+    console.log('[TranscriptionRouter] ▶️ Streaming resumed');
   }
 
   /**

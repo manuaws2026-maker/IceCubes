@@ -111,6 +111,7 @@ let reminderWindow: BrowserWindow | null = null; // Meeting reminder slide-in
 let editorWindow: BrowserWindow | null = null;
 // Transcript widget removed - transcription now handled directly in editor
 let settingsWindow: BrowserWindow | null = null;
+let meetingIndicatorWindow: BrowserWindow | null = null; // Always-on-top recording indicator
 let meetingWatcher: MeetingWatcher | null = null;
 let audioEngine: AudioEngine | null = null;
 let transcriptionService: TranscriptionService | null = null;
@@ -121,6 +122,12 @@ let currentMeeting: MeetingInfo | null = null;
 let isRecording = false;
 let currentTranscript: string[] = [];
 let lastNotifiedMeetingPid: number | null = null; // Track which meeting we already showed bar for
+let currentRecordingNoteId: string | null = null; // Track the note being recorded
+let recordingStartTime: number = 0; // Track when recording started
+let recordingElapsedSeconds: number = 0; // Track elapsed recording time
+let isRecordingPaused: boolean = false; // Track pause state
+let pauseStartTime: number = 0; // When pause started
+let elapsedTimeInterval: ReturnType<typeof setInterval> | null = null; // Timer for updating elapsed time
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -820,6 +827,225 @@ function closeReminder() {
 }
 
 // ============================================================================
+// MEETING INDICATOR - Always-on-top recording indicator on screen edge
+// ============================================================================
+// Store indicator position for persistence across show/hide
+let indicatorPosition: { x: number; y: number } | null = null;
+
+// Start tracking elapsed recording time
+function startElapsedTimeTracking() {
+  if (elapsedTimeInterval) clearInterval(elapsedTimeInterval);
+  recordingElapsedSeconds = 0;
+  elapsedTimeInterval = setInterval(() => {
+    if (!isRecordingPaused && isRecording) {
+      recordingElapsedSeconds++;
+    }
+  }, 1000);
+}
+
+// Stop tracking elapsed recording time
+function stopElapsedTimeTracking() {
+  if (elapsedTimeInterval) {
+    clearInterval(elapsedTimeInterval);
+    elapsedTimeInterval = null;
+  }
+}
+
+function showMeetingIndicator(noteId: string) {
+  // Don't show if editor window is visible and focused
+  if (editorWindow && !editorWindow.isDestroyed() && editorWindow.isVisible() && editorWindow.isFocused()) {
+    console.log('[MeetingIndicator] Editor is focused, not showing indicator');
+    return;
+  }
+  
+  console.log('[MeetingIndicator] Showing indicator for note:', noteId);
+  
+  // Close existing indicator if any
+  if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+    meetingIndicatorWindow.close();
+    meetingIndicatorWindow = null;
+  }
+  
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const indicatorWidth = 85;
+  const indicatorHeight = 160;
+  const margin = 12;
+  
+  // Use saved position or default to right side, vertically centered
+  const x = indicatorPosition?.x ?? (width - indicatorWidth - margin);
+  const y = indicatorPosition?.y ?? Math.floor((height - indicatorHeight) / 2);
+  
+  meetingIndicatorWindow = new BrowserWindow({
+    width: indicatorWidth,
+    height: indicatorHeight,
+    x,
+    y,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: false, // Don't steal focus
+    movable: true, // Allow dragging
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  
+  meetingIndicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  
+  // Track position when moved (for persistence)
+  meetingIndicatorWindow.on('moved', () => {
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      const bounds = meetingIndicatorWindow.getBounds();
+      indicatorPosition = { x: bounds.x, y: bounds.y };
+    }
+  });
+  
+  // Load the indicator HTML
+  if (isDev) {
+    meetingIndicatorWindow.loadURL('http://localhost:5173/indicator.html');
+  } else {
+    meetingIndicatorWindow.loadFile(path.join(__dirname, '../renderer/indicator.html'));
+  }
+  
+  // Send note info to indicator once loaded
+  meetingIndicatorWindow.webContents.once('did-finish-load', () => {
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.webContents.send('set-note-info', {
+        noteId,
+        elapsedSeconds: recordingElapsedSeconds,
+      });
+      // Send pause state
+      if (isRecordingPaused) {
+        meetingIndicatorWindow.webContents.send('set-paused', true);
+      }
+    }
+  });
+  
+  meetingIndicatorWindow.on('closed', () => {
+    meetingIndicatorWindow = null;
+  });
+  
+  console.log('[MeetingIndicator] ✅ Indicator shown');
+}
+
+// Show indicator WITHOUT activating the app (for when editor loses focus)
+function showMeetingIndicatorInactive(noteId: string) {
+  console.log('[MeetingIndicator] Showing indicator INACTIVE for note:', noteId);
+  
+  // Close existing indicator if any
+  if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+    meetingIndicatorWindow.close();
+    meetingIndicatorWindow = null;
+  }
+  
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const indicatorWidth = 85;
+  const indicatorHeight = 160;
+  const margin = 12;
+  
+  const x = indicatorPosition?.x ?? (width - indicatorWidth - margin);
+  const y = indicatorPosition?.y ?? Math.floor((height - indicatorHeight) / 2);
+  
+  meetingIndicatorWindow = new BrowserWindow({
+    width: indicatorWidth,
+    height: indicatorHeight,
+    x,
+    y,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    hasShadow: false,
+    focusable: false,
+    movable: true,
+    show: false, // Don't show immediately
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  
+  meetingIndicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  
+  meetingIndicatorWindow.on('moved', () => {
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      const bounds = meetingIndicatorWindow.getBounds();
+      indicatorPosition = { x: bounds.x, y: bounds.y };
+    }
+  });
+  
+  if (isDev) {
+    meetingIndicatorWindow.loadURL('http://localhost:5173/indicator.html');
+  } else {
+    meetingIndicatorWindow.loadFile(path.join(__dirname, '../renderer/indicator.html'));
+  }
+  
+  meetingIndicatorWindow.webContents.once('did-finish-load', () => {
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.webContents.send('set-note-info', {
+        noteId,
+        elapsedSeconds: recordingElapsedSeconds,
+      });
+      if (isRecordingPaused) {
+        meetingIndicatorWindow.webContents.send('set-paused', true);
+      }
+      // CRITICAL: Use showInactive to not steal focus
+      meetingIndicatorWindow.showInactive();
+    }
+  });
+  
+  meetingIndicatorWindow.on('closed', () => {
+    meetingIndicatorWindow = null;
+  });
+}
+
+// Update indicator visibility based on editor window state
+function updateIndicatorVisibility() {
+  if (!isRecording) return;
+  
+  const editorVisible = editorWindow && !editorWindow.isDestroyed() && 
+                        editorWindow.isVisible() && !editorWindow.isMinimized();
+  const editorFocused = editorWindow && !editorWindow.isDestroyed() && editorWindow.isFocused();
+  
+  if (editorVisible && editorFocused) {
+    // Editor is visible and focused - hide indicator
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.hide();
+    }
+  } else {
+    // Editor not visible or not focused - show indicator
+    // CRITICAL: Use showInactive() to NOT steal focus from other apps
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.showInactive();
+    } else if (isRecording) {
+      // Create indicator if it doesn't exist
+      showMeetingIndicatorInactive(currentRecordingNoteId || '');
+    }
+  }
+}
+
+function hideMeetingIndicator() {
+  if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+    meetingIndicatorWindow.close();
+    meetingIndicatorWindow = null;
+    console.log('[MeetingIndicator] Hidden');
+  }
+}
+
+function updateMeetingIndicatorTitle(title: string) {
+  if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+    meetingIndicatorWindow.webContents.send('set-note-info', {
+      title: title.length > 25 ? title.substring(0, 25) + '...' : title,
+    });
+  }
+}
+
+// ============================================================================
 // RECORDING
 // ============================================================================
 async function startRecording() {
@@ -855,9 +1081,21 @@ async function startRecording() {
     
     meetingWatcher?.setRecordingLock(true);
     isRecording = true;
+    recordingStartTime = Date.now();
+    
+    // Start elapsed time tracking
+    startElapsedTimeTracking();
     
     // Update tray menu (deferred, won't block)
     updateTrayMenu();
+    
+    // Reset recording state
+    recordingElapsedSeconds = 0;
+    isRecordingPaused = false;
+    
+    // Show the meeting indicator for auto-detected meetings
+    // (noteId will be updated later when the renderer creates the note)
+    showMeetingIndicator('');
     
     // Open editor window (show editor view, not home)
     console.log('[Recording] Opening editor window...');
@@ -936,7 +1174,14 @@ async function stopRecording(): Promise<string | null> {
     
     meetingWatcher?.setRecordingLock(false);
     isRecording = false;
+    isRecordingPaused = false;
+    stopElapsedTimeTracking();
+    recordingElapsedSeconds = 0;
+    currentRecordingNoteId = null;
     updateTrayMenu();
+    
+    // Hide the meeting indicator
+    hideMeetingIndicator();
     
     // Tell editor window recording stopped (no audio path)
     if (editorWindow && !editorWindow.isDestroyed()) {
@@ -947,6 +1192,7 @@ async function stopRecording(): Promise<string | null> {
     return null;
   } catch (e) {
     console.error('[Recording] Failed to stop:', e);
+    hideMeetingIndicator();
     return null;
   }
 }
@@ -1091,6 +1337,31 @@ function openEditorWindow(showHome = true) {
   
   editorWindow.on('closed', () => {
     editorWindow = null;
+  });
+  
+  // Smart visibility for meeting indicator
+  editorWindow.on('focus', () => {
+    updateIndicatorVisibility();
+  });
+  
+  editorWindow.on('blur', () => {
+    updateIndicatorVisibility();
+  });
+  
+  editorWindow.on('minimize', () => {
+    updateIndicatorVisibility();
+  });
+  
+  editorWindow.on('restore', () => {
+    updateIndicatorVisibility();
+  });
+  
+  editorWindow.on('hide', () => {
+    updateIndicatorVisibility();
+  });
+  
+  editorWindow.on('show', () => {
+    updateIndicatorVisibility();
   });
 }
 
@@ -1416,9 +1687,158 @@ function setupIPC() {
   // Recording controls
   ipcMain.on('stop-recording', async () => {
     const audioPath = await stopRecording();
+    hideMeetingIndicator(); // Hide the indicator when recording stops
     if (editorWindow && !editorWindow.isDestroyed()) {
       editorWindow.webContents.send('recording-stopped', { audioPath });
     }
+  });
+  
+  // Open note from meeting indicator click
+  ipcMain.on('open-note-from-indicator', (_, noteId: string) => {
+    console.log('[MeetingIndicator] Opening note:', noteId, 'isRecording:', isRecording, 'currentRecordingNoteId:', currentRecordingNoteId);
+    
+    // Hide indicator first
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.hide();
+    }
+    
+    // Show and focus the editor window
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      const targetNoteId = noteId || currentRecordingNoteId;
+      
+      // Tell editor to load this specific note AND sync recording state
+      editorWindow.webContents.send('open-note-from-indicator', {
+        noteId: targetNoteId,
+        isRecording: isRecording,
+        isPaused: isRecordingPaused,
+        recordingNoteId: currentRecordingNoteId
+      });
+      
+      console.log('[MeetingIndicator] Sent open-note-from-indicator with:', {
+        noteId: targetNoteId,
+        isRecording: isRecording,
+        isPaused: isRecordingPaused,
+        recordingNoteId: currentRecordingNoteId
+      });
+      
+      // Show dock icon
+      if (process.platform === 'darwin' && app.dock) {
+        app.dock.show();
+      }
+      
+      // Simply show the window - don't force focus behavior
+      editorWindow.show();
+      
+      // Use setImmediate to let macOS handle focus naturally, then bring to front
+      setImmediate(() => {
+        if (editorWindow && !editorWindow.isDestroyed()) {
+          editorWindow.moveTop(); // Bring to front without aggressive focus grab
+        }
+      });
+    } else {
+      // If no editor window, open one and load the note
+      openEditorWindow(false); // false = editor view, not home
+      setTimeout(() => {
+        if (editorWindow && !editorWindow.isDestroyed()) {
+          const id = noteId || currentRecordingNoteId;
+          if (id) {
+            editorWindow.webContents.send('load-note', id);
+          }
+        }
+      }, 500);
+    }
+  });
+  
+  // Update meeting indicator with noteId (called when note is created during recording)
+  ipcMain.on('update-indicator-note', (_, data: { noteId: string; title: string }) => {
+    console.log('[MeetingIndicator] Updating note info:', data);
+    currentRecordingNoteId = data.noteId;
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.webContents.send('set-note-info', {
+        noteId: data.noteId,
+      });
+    }
+  });
+  
+  // Move indicator window (for drag)
+  ipcMain.on('move-indicator-window', (_, { dx, dy }: { dx: number; dy: number }) => {
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      const bounds = meetingIndicatorWindow.getBounds();
+      meetingIndicatorWindow.setBounds({
+        x: bounds.x + dx,
+        y: bounds.y + dy,
+        width: bounds.width,
+        height: bounds.height,
+      });
+      // Save position
+      indicatorPosition = { x: bounds.x + dx, y: bounds.y + dy };
+    }
+  });
+  
+  // Pause recording
+  ipcMain.on('pause-recording', () => {
+    if (!isRecording || isRecordingPaused) return;
+    
+    console.log('[Recording] Pausing...');
+    isRecordingPaused = true;
+    pauseStartTime = Date.now();
+    
+    // Pause audio capture
+    if (audioEngine) {
+      audioEngine.pauseRecording();
+    }
+    
+    // Pause transcription
+    if (transcriptionRouter) {
+      transcriptionRouter.pauseStreaming();
+    }
+    
+    // Update indicator
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.webContents.send('set-paused', true);
+    }
+    
+    // Notify editor
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('recording-paused', true);
+    }
+    
+    console.log('[Recording] ⏸️ Paused');
+  });
+  
+  // Resume recording
+  ipcMain.on('resume-recording', () => {
+    if (!isRecording || !isRecordingPaused) return;
+    
+    console.log('[Recording] Resuming...');
+    isRecordingPaused = false;
+    
+    // Resume audio capture
+    if (audioEngine) {
+      audioEngine.resumeRecording();
+    }
+    
+    // Resume transcription
+    if (transcriptionRouter) {
+      transcriptionRouter.resumeStreaming();
+    }
+    
+    // Update indicator
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.webContents.send('set-paused', false);
+    }
+    
+    // Notify editor
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('recording-paused', false);
+    }
+    
+    console.log('[Recording] ▶️ Resumed');
+  });
+  
+  // Get pause state
+  ipcMain.handle('is-recording-paused', () => {
+    return isRecordingPaused;
   });
   
   // Stop Deepgram streaming (called from renderer)
@@ -1430,8 +1850,8 @@ function setupIPC() {
   });
   
   // Manual mic recording (when no meeting detected, or restart after stop)
-  ipcMain.on('start-manual-recording', async (_, data: { title: string }) => {
-    console.log('[Ghost] Starting manual recording:', data.title);
+  ipcMain.on('start-manual-recording', async (_, data: { title: string; noteId?: string }) => {
+    console.log('[Ghost] Starting manual recording:', data.title, 'noteId:', data.noteId);
     
     if (isRecording) {
       console.log('[Ghost] Already recording');
@@ -1446,6 +1866,8 @@ function setupIPC() {
       isBrowser: false,
     };
     currentTranscript = [];
+    currentRecordingNoteId = data.noteId || null;
+    recordingStartTime = Date.now();
     
     try {
       // Start audio capture
@@ -1455,7 +1877,13 @@ function setupIPC() {
       }
       
       isRecording = true;
+      isRecordingPaused = false;
+      startElapsedTimeTracking(); // Start tracking elapsed time
       updateTrayMenu();
+      
+      // Show the always-on-top meeting indicator
+      // (noteId might be empty for new unsaved notes, but we'll update it when note is saved)
+      showMeetingIndicator(currentRecordingNoteId || '');
       
       // Start transcription streaming to Deepgram
       if (transcriptionRouter) {
@@ -1484,6 +1912,7 @@ function setupIPC() {
     } catch (e) {
       console.error('[Ghost] Failed to start manual recording:', e);
       isRecording = false;
+      hideMeetingIndicator();
     }
   });
   
