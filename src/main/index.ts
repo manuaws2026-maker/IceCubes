@@ -206,7 +206,7 @@ function loadNotes(): Note[] {
 function loadNote(id: string): Note | null {
   const note = databaseService.getNote(id);
   if (!note) return null;
-  return {
+  const result = {
     ...note,
     transcript: JSON.parse(note.transcript || '[]'),
     enhancedNotes: note.enhancedNotes ?? undefined,
@@ -218,6 +218,8 @@ function loadNote(id: string): Note | null {
     people: databaseService.getPeopleForNote(id).map(p => p.name),
     companies: databaseService.getCompaniesForNote(id).map(c => c.name)
   };
+  console.log('[LoadNote] ID:', id, 'Title:', note.title, 'FolderId:', result.folderId);
+  return result;
 }
 
 function deleteNote(id: string): boolean {

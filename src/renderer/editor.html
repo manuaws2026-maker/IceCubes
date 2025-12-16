@@ -14078,18 +14078,27 @@
     // Update the "Add to folder" button to show folder name or default text
     function updateAddToFolderButton(folderId) {
       const btn = document.getElementById('addToFolderBtn');
+      console.log('[Folder] updateAddToFolderButton called with:', folderId, 'btn exists:', !!btn);
       if (!btn) return;
       
       if (folderId) {
         const folder = folders.find(f => f.id === folderId);
+        console.log('[Folder] Found folder:', folder?.name || 'NOT FOUND');
         if (folder) {
           btn.innerHTML = `${folder.icon} ${folder.name}`;
           btn.classList.add('has-folder');
+        } else {
+          // Folder not found (deleted?) - reset to default
+          console.log('[Folder] Folder not found, resetting button');
+          btn.innerHTML = '+ Add to folder';
+          btn.classList.remove('has-folder');
         }
       } else {
+        console.log('[Folder] No folderId, resetting button');
         btn.innerHTML = '+ Add to folder';
         btn.classList.remove('has-folder');
       }
+      console.log('[Folder] Button now shows:', btn.innerHTML);
     }
     
     async function removeNoteFromFolder(noteId, folderId) {
@@ -14680,18 +14689,22 @@
         }
       }
       
-      // Only show PAST notes in the notes list
-      // Notes for upcoming events are accessible via the calendar event card
-      // Once the event date passes, the note moves here
+      // For folder views: show ALL notes in that folder (including upcoming)
+      // For "All Notes" view: only show PAST notes (upcoming accessible via calendar)
       const now = new Date();
-      let past = notes.filter(note => {
-        const noteDate = new Date(note.date);
-        return noteDate <= now;
-      });
+      let past;
       
-      // Filter by folder if viewing a specific folder
       if (isSpecificFolder) {
-        past = past.filter(note => note.folderId === currentFolderId);
+        // Folder view: show ALL notes in this folder, regardless of date
+        past = notes.filter(note => note.folderId === currentFolderId);
+      } else {
+        // All Notes view: only show PAST notes
+        // Notes for upcoming events are accessible via the calendar event card
+        // Once the event date passes, the note moves here
+        past = notes.filter(note => {
+          const noteDate = new Date(note.date);
+          return noteDate <= now;
+        });
       }
       
       // Sort past by date descending (most recent first)
@@ -14859,6 +14872,12 @@
     }
     
     async function selectNote(id) {
+      console.log('============================================');
+      console.log('[SelectNote] ENTERING selectNote with id:', id);
+      console.log('[SelectNote] Previous currentNoteId:', currentNoteId);
+      console.log('[SelectNote] Previous currentNoteFolderId:', currentNoteFolderId);
+      console.log('============================================');
+      
       // If recording is in progress and selecting a DIFFERENT note, stop recording first
       if (isRecording && recordingNoteId && recordingNoteId !== id) {
         console.log('[SelectNote] Recording in progress for note', recordingNoteId, '- stopping before switching to note', id);
@@ -14901,6 +14920,9 @@
       
       // Track folder so it's preserved on save
       currentNoteFolderId = note.folderId || null;
+      console.log('[SelectNote] Note ID:', id, 'title:', note.title);
+      console.log('[SelectNote] Note folderId from DB:', note.folderId, 'type:', typeof note.folderId);
+      console.log('[SelectNote] currentNoteFolderId set to:', currentNoteFolderId);
       updateAddToFolderButton(currentNoteFolderId);
       
       // Track template so it's preserved on save and shown in dropdown
@@ -14967,7 +14989,11 @@
       }
       
       // Update the "Add to folder" button to show current folder
+      console.log('[SelectNote] About to call updateAddToFolderButton with:', note.folderId);
       updateAddToFolderButton(note.folderId);
+      
+      console.log('[SelectNote] EXITING selectNote - folder button should now show:', note.folderId ? 'folder' : 'Add to folder');
+      console.log('============================================');
       
       showEditor();
     }
@@ -15698,6 +15724,13 @@
         currentAINotes = null;
         currentMeetingInfo = meetingInfo;
         
+        // Update folder tracking and button
+        currentNoteFolderId = existingNote.folderId || null;
+        updateAddToFolderButton(currentNoteFolderId);
+        
+        // Update template tracking
+        currentTemplateId = existingNote.templateId || null;
+        
         // Also render transcript if exists
         renderTranscript();
       } else {
@@ -15708,6 +15741,13 @@
         transcript = [];
         currentAINotes = null;
         currentMeetingInfo = meetingInfo;
+        
+        // Reset folder for new note
+        currentNoteFolderId = null;
+        updateAddToFolderButton(null);
+        
+        // Reset template for new note
+        currentTemplateId = null;
       }
       
       isRecording = false;
