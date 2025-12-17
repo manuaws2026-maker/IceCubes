@@ -6084,12 +6084,6 @@
     .mic-bar:nth-child(2) { animation-delay: 0.1s; }
     .mic-bar:nth-child(3) { animation-delay: 0.2s; }
     
-    .mic-chevron {
-      font-size: 10px;
-      color: #9ca3af;
-      margin-left: 2px;
-    }
-    
     .mic-label {
       font-size: 14px;
       font-weight: 500;
@@ -8167,7 +8161,6 @@
                 <div class="mic-bar"></div>
                 <div class="mic-bar"></div>
               </div>
-              <span class="mic-chevron">▲</span>
               <span class="mic-label" id="micLabel">Resume</span>
               <button class="pause-btn hidden" id="pauseBtn" title="Pause recording">
                 <span class="pause-icon">⏸</span>
@@ -11147,9 +11140,9 @@
         }
       }
       
-      // Update count
+      // Update count (show actual segment count, not grouped count)
       if (transcriptCount) {
-        transcriptCount.textContent = `${grouped.length} segment${grouped.length !== 1 ? 's' : ''}`;
+        transcriptCount.textContent = `${transcript.length} segment${transcript.length !== 1 ? 's' : ''}`;
       }
       
       // Render grouped transcripts with speaker colors
@@ -11230,10 +11223,8 @@
       
       transcriptBubbles.innerHTML = html;
       
-      // Auto-expand transcript section when content arrives
-      if (transcriptSection?.classList.contains('collapsed')) {
-        transcriptSection.classList.remove('collapsed');
-      }
+      // NOTE: We do NOT auto-expand collapsed transcript section
+      // If user minimized it, respect their choice even when new segments arrive
       
       // Scroll transcript to bottom only if user hasn't manually scrolled up
       if (transcriptContent && !isUserScrolling) {
@@ -14940,10 +14931,13 @@
       // DON'T update meeting meta - it changes the note's date!
       // Just display the note as-is
       
-      // Update recording/mic state for viewing old notes
-      isRecording = false;
-      isMicActive = false;
-      updateMicUI();
+      // Update recording/mic state ONLY if not viewing the active recording note
+      // CRITICAL: Don't reset recording state when reopening the recording note
+      if (recordingNoteId !== id) {
+        isRecording = false;
+        isMicActive = false;
+        updateMicUI();
+      }
       renderTranscript();
       renderNotesList();
       
@@ -15009,6 +15003,7 @@
       currentNoteId = null;
       recordingNoteId = null; // Will be set when note is saved
       transcript = [];
+      isUserScrolling = false; // Reset scroll tracking for new recording
       setEditorContent('');
       isRecording = true;
       recordingStartTime = Date.now();
@@ -15088,6 +15083,7 @@
       
       // Reset transcript for new recording
       transcript = [];
+      isUserScrolling = false; // Reset scroll tracking for new recording
       renderTranscript();
       
       // Update mic UI
@@ -15314,6 +15310,46 @@
         isPaused = data.isPaused || false;
         
         console.log('[Editor] State synced - isRecording:', isRecording, 'recordingNoteId:', recordingNoteId, 'isPaused:', isPaused);
+        
+        // SYNC ACCUMULATED SEGMENTS from main process
+        // This catches any transcripts recorded while editor was closed
+        try {
+          const recordingState = await ipcRenderer.invoke('get-recording-state');
+          console.log('[Editor] Got recording state with', recordingState.segments?.length || 0, 'accumulated segments');
+          
+          if (recordingState.segments && recordingState.segments.length > 0) {
+            // Merge segments - add any that aren't already in our transcript
+            const existingTexts = new Set(transcript.map(t => typeof t === 'string' ? t : t.text));
+            let newSegmentsAdded = 0;
+            
+            for (const segment of recordingState.segments) {
+              if (!existingTexts.has(segment.text)) {
+                transcript.push({
+                  text: segment.text,
+                  speaker: segment.speaker,
+                  channel: segment.channel,
+                  timestamp: segment.timestamp,
+                  isYou: segment.isYou,
+                  isFinal: segment.isFinal,
+                  speechFinal: segment.speechFinal,
+                  speakerName: segment.speakerName,
+                  formattedTime: segment.formattedTime
+                });
+                newSegmentsAdded++;
+              }
+            }
+            
+            console.log('[Editor] Added', newSegmentsAdded, 'new segments from main process');
+            if (newSegmentsAdded > 0) {
+              renderTranscript();
+              // Trigger save to persist the synced transcript
+              hasUnsavedChanges = true;
+              scheduleAutoSave();
+            }
+          }
+        } catch (err) {
+          console.error('[Editor] Failed to sync recording state:', err);
+        }
         
         // Forcefully enter recording mode UI
         document.body.classList.add('recording-mode');
@@ -15739,6 +15775,7 @@
         meetingTitle.textContent = meetingInfo.title || 'Meeting Notes';
         setEditorContent('');
         transcript = [];
+        isUserScrolling = false; // Reset scroll tracking for new meeting
         currentAINotes = null;
         currentMeetingInfo = meetingInfo;
         

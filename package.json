@@ -87,10 +87,6 @@
       {
         "from": "build/trayTemplate@2x.png",
         "to": "trayTemplate@2x.png"
-      },
-      {
-        "from": ".env",
-        "to": ".env"
       }
     ],
     "mac": {

@@ -120,7 +120,8 @@ let calendarService: CalendarService | null = null;
 let openaiService: OpenAIService | null = null;
 let currentMeeting: MeetingInfo | null = null;
 let isRecording = false;
-let currentTranscript: string[] = [];
+let currentTranscript: string[] = []; // String format for AI notes
+let currentTranscriptSegments: any[] = []; // Full segment objects for editor sync
 let lastNotifiedMeetingPid: number | null = null; // Track which meeting we already showed bar for
 let currentRecordingNoteId: string | null = null; // Track the note being recorded
 let recordingStartTime: number = 0; // Track when recording started
@@ -128,8 +129,64 @@ let recordingElapsedSeconds: number = 0; // Track elapsed recording time
 let isRecordingPaused: boolean = false; // Track pause state
 let pauseStartTime: number = 0; // When pause started
 let elapsedTimeInterval: ReturnType<typeof setInterval> | null = null; // Timer for updating elapsed time
+let autoSaveInterval: ReturnType<typeof setInterval> | null = null; // Auto-save when editor is closed
+let pendingNoteToLoad: { noteId: string; isRecording: boolean; isPaused: boolean; recordingNoteId: string | null } | null = null; // Track note to load after window opens
 
 const isDev = process.env.NODE_ENV === 'development';
+
+// Auto-save transcript periodically when recording and editor is closed
+function startAutoSaveInterval() {
+  if (autoSaveInterval) return;
+  
+  autoSaveInterval = setInterval(() => {
+    // Only auto-save if recording, editor is closed, and we have transcript
+    if (isRecording && !editorWindow && currentTranscriptSegments.length > 0 && currentRecordingNoteId) {
+      console.log('[AutoSave] Saving transcript while editor is closed...');
+      console.log('[AutoSave] Note ID:', currentRecordingNoteId, 'Segments:', currentTranscriptSegments.length);
+      
+      try {
+        // CRITICAL: Only save FINAL segments, not interim ones
+        const finalSegments = currentTranscriptSegments.filter(seg => seg.isFinal !== false);
+        console.log('[AutoSave] Total segments:', currentTranscriptSegments.length, 'Final segments:', finalSegments.length);
+        
+        // Trigger the save-note handler logic
+        const savedId = databaseService.saveNote({
+          id: currentRecordingNoteId,
+          title: currentMeeting?.title || 'Voice Note',
+          provider: currentMeeting?.provider || 'manual',
+          date: new Date().toISOString(),
+          transcript: JSON.stringify(finalSegments),
+          notes: '',
+          enhancedNotes: null,
+          audioPath: null,
+          calendarEventId: null,
+          startTime: null,
+          folderId: null,
+          templateId: null
+        });
+        
+        console.log('[AutoSave] ✅ Transcript saved to database, note ID:', savedId);
+        
+        // Verify it was saved
+        const saved = databaseService.getNote(currentRecordingNoteId);
+        if (saved) {
+          console.log('[AutoSave] ✅ Verified: note exists with transcript length:', saved.transcript?.length || 0);
+        } else {
+          console.error('[AutoSave] ❌ ERROR: Note not found after save!');
+        }
+      } catch (err) {
+        console.error('[AutoSave] ❌ Failed to save:', err);
+      }
+    }
+  }, 10000); // Save every 10 seconds
+}
+
+function stopAutoSaveInterval() {
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+    autoSaveInterval = null;
+  }
+}
 
 // Notes storage - now using SQLite database (icecubes.db)
 // Legacy JSON files in 'notes/' folder are no longer used
@@ -349,17 +406,72 @@ function updateTrayMenu() {
     menuItems.push({
       label: 'Open Current Note',
       click: () => setTimeout(() => {
-        console.log('[Tray] Open Current Note clicked');
-        console.log('[Tray] editorWindow exists:', !!editorWindow);
+        console.log('[Tray] Open Current Note clicked, noteId:', currentRecordingNoteId);
+        
+        // CRITICAL: Force save the current transcript to DB BEFORE opening
+        if (isRecording && currentRecordingNoteId && currentTranscriptSegments.length > 0) {
+          // CRITICAL: Only save FINAL segments, not interim ones
+          const finalSegments = currentTranscriptSegments.filter(seg => seg.isFinal !== false);
+          console.log('[Tray] Force saving note before open:', currentRecordingNoteId, 'total:', currentTranscriptSegments.length, 'final:', finalSegments.length);
+          try {
+            databaseService.saveNote({
+              id: currentRecordingNoteId,
+              title: currentMeeting?.title || 'Voice Note',
+              provider: currentMeeting?.provider || 'manual',
+              date: new Date().toISOString(),
+              transcript: JSON.stringify(finalSegments),
+              notes: '',
+              enhancedNotes: null,
+              audioPath: null,
+              calendarEventId: null,
+              startTime: null,
+              folderId: null,
+              templateId: null
+            });
+            console.log('[Tray] ✅ Force saved note before opening');
+          } catch (err) {
+            console.error('[Tray] Failed to force save:', err);
+          }
+        }
+        
+        // Show dock icon
+        if (process.platform === 'darwin' && app.dock) {
+          app.dock.show();
+        }
+        
         if (editorWindow && !editorWindow.isDestroyed()) {
+          // Window exists - show it and load the current note
           editorWindow.show();
           editorWindow.focus();
-          // Tell renderer to show editor view, not home
-          editorWindow.webContents.send('show-editor-view');
-          console.log('[Tray] Editor window shown and focused, sent show-editor-view');
+          
+          // Send the current recording note to the editor
+          if (currentRecordingNoteId) {
+            editorWindow.webContents.send('open-note-from-indicator', {
+              noteId: currentRecordingNoteId,
+              isRecording: isRecording,
+              isPaused: isRecordingPaused,
+              recordingNoteId: currentRecordingNoteId
+            });
+            console.log('[Tray] Sent open-note-from-indicator with noteId:', currentRecordingNoteId);
+          } else {
+            editorWindow.webContents.send('show-editor-view');
+          }
         } else {
-          console.log('[Tray] Editor window not available, opening new one');
-          openEditorWindow(false); // Open in editor view, not home
+          // No window - create one and load the note
+          console.log('[Tray] Creating new editor window for noteId:', currentRecordingNoteId);
+          
+          // Set pending note to load - it will be sent after window finishes loading
+          if (currentRecordingNoteId) {
+            console.log('[Tray] Setting pending note to load:', currentRecordingNoteId);
+            pendingNoteToLoad = {
+              noteId: currentRecordingNoteId,
+              isRecording: isRecording,
+              isPaused: isRecordingPaused,
+              recordingNoteId: currentRecordingNoteId
+            };
+          }
+          
+          openEditorWindow(false);
         }
       }, 0),
     });
@@ -952,7 +1064,7 @@ function showMeetingIndicatorInactive(noteId: string) {
   const x = indicatorPosition?.x ?? (width - indicatorWidth - margin);
   const y = indicatorPosition?.y ?? Math.floor((height - indicatorHeight) / 2);
   
-  meetingIndicatorWindow = new BrowserWindow({
+  const newIndicator = new BrowserWindow({
     width: indicatorWidth,
     height: indicatorHeight,
     x,
@@ -972,37 +1084,77 @@ function showMeetingIndicatorInactive(noteId: string) {
     },
   });
   
-  meetingIndicatorWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Assign to global immediately
+  meetingIndicatorWindow = newIndicator;
   
-  meetingIndicatorWindow.on('moved', () => {
-    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
-      const bounds = meetingIndicatorWindow.getBounds();
+  newIndicator.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  
+  newIndicator.on('moved', () => {
+    if (newIndicator && !newIndicator.isDestroyed()) {
+      const bounds = newIndicator.getBounds();
       indicatorPosition = { x: bounds.x, y: bounds.y };
     }
   });
   
-  if (isDev) {
-    meetingIndicatorWindow.loadURL('http://localhost:5173/indicator.html');
-  } else {
-    meetingIndicatorWindow.loadFile(path.join(__dirname, '../renderer/indicator.html'));
-  }
-  
-  meetingIndicatorWindow.webContents.once('did-finish-load', () => {
-    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
-      meetingIndicatorWindow.webContents.send('set-note-info', {
-        noteId,
-        elapsedSeconds: recordingElapsedSeconds,
-      });
-      if (isRecordingPaused) {
-        meetingIndicatorWindow.webContents.send('set-paused', true);
-      }
-      // CRITICAL: Use showInactive to not steal focus
-      meetingIndicatorWindow.showInactive();
+  // Handle load errors
+  newIndicator.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error('[MeetingIndicator] ❌ Failed to load:', errorCode, errorDescription);
+    // Try loading from file as fallback
+    if (isDev && newIndicator && !newIndicator.isDestroyed()) {
+      console.log('[MeetingIndicator] Trying file fallback...');
+      newIndicator.loadFile(path.join(__dirname, '../renderer/indicator.html'));
     }
   });
   
-  meetingIndicatorWindow.on('closed', () => {
-    meetingIndicatorWindow = null;
+  if (isDev) {
+    console.log('[MeetingIndicator] Loading from dev server...');
+    newIndicator.loadURL('http://localhost:5173/indicator.html');
+  } else {
+    newIndicator.loadFile(path.join(__dirname, '../renderer/indicator.html'));
+  }
+  
+  // Use the captured window reference (newIndicator), not the global
+  newIndicator.webContents.once('did-finish-load', () => {
+    console.log('[MeetingIndicator] ✅ Page loaded successfully');
+    try {
+      // Check BOTH: that this window still exists AND that it's still the current indicator
+      if (newIndicator && !newIndicator.isDestroyed() && meetingIndicatorWindow === newIndicator) {
+        newIndicator.webContents.send('set-note-info', {
+          noteId,
+          elapsedSeconds: recordingElapsedSeconds,
+        });
+        if (isRecordingPaused) {
+          newIndicator.webContents.send('set-paused', true);
+        }
+        // CRITICAL: Use showInactive to not steal focus
+        newIndicator.showInactive();
+        console.log('[MeetingIndicator] ✅ Indicator shown at position:', newIndicator.getBounds());
+      } else if (newIndicator && newIndicator.isDestroyed()) {
+        console.log('[MeetingIndicator] ❌ Window was destroyed before showing');
+      } else {
+        console.log('[MeetingIndicator] ⚠️ A newer indicator was created, skipping show');
+      }
+    } catch (err) {
+      console.error('[MeetingIndicator] ❌ Error showing indicator:', err);
+    }
+  });
+  
+  // Fallback: show after timeout if did-finish-load doesn't fire
+  setTimeout(() => {
+    if (newIndicator && !newIndicator.isDestroyed() && !newIndicator.isVisible() && meetingIndicatorWindow === newIndicator) {
+      console.log('[MeetingIndicator] ⚠️ Fallback: showing indicator after timeout');
+      try {
+        newIndicator.showInactive();
+      } catch (err) {
+        console.error('[MeetingIndicator] ❌ Fallback show failed:', err);
+      }
+    }
+  }, 2000);
+  
+  newIndicator.on('closed', () => {
+    if (meetingIndicatorWindow === newIndicator) {
+      meetingIndicatorWindow = null;
+    }
   });
 }
 
@@ -1069,6 +1221,7 @@ async function startRecording() {
   
   console.log('[Recording] Starting capture...');
   currentTranscript = [];
+  currentTranscriptSegments = [];
   
   // Close existing transcript window to ensure fresh state
   if (editorWindow && !editorWindow.isDestroyed()) {
@@ -1084,6 +1237,7 @@ async function startRecording() {
     meetingWatcher?.setRecordingLock(true);
     isRecording = true;
     recordingStartTime = Date.now();
+    startAutoSaveInterval(); // Auto-save transcript periodically
     
     // Start elapsed time tracking
     startElapsedTimeTracking();
@@ -1128,8 +1282,10 @@ async function startRecording() {
             // Silently ignore - window was closed/disposed during send
           }
           
-          // Also store in currentTranscript for saving
+          // Store in currentTranscript for AI notes (string format)
           currentTranscript.push(`${label} ${segment.text}`);
+          // Store full segment for editor sync when window reopens
+          currentTranscriptSegments.push(enrichedSegment);
         });
         
         // Start streaming
@@ -1147,6 +1303,7 @@ async function startRecording() {
   } catch (e) {
     console.error('[Recording] Failed to start:', e);
     isRecording = false;
+    stopAutoSaveInterval();
   }
 }
 
@@ -1178,6 +1335,7 @@ async function stopRecording(): Promise<string | null> {
     isRecording = false;
     isRecordingPaused = false;
     stopElapsedTimeTracking();
+    stopAutoSaveInterval();
     recordingElapsedSeconds = 0;
     currentRecordingNoteId = null;
     updateTrayMenu();
@@ -1326,11 +1484,24 @@ function openEditorWindow(showHome = true) {
     
     // Small delay to ensure all JS event listeners are registered
     setTimeout(() => {
-      // If we have a current meeting and not showing home, send meeting info
-      if (currentMeeting && !showHome && editorWindow && !editorWindow.isDestroyed()) {
+      // PRIORITY 1: If we have a pending note to load (from indicator/tray click during closed window)
+      if (pendingNoteToLoad && editorWindow && !editorWindow.isDestroyed()) {
+        console.log('[Editor] Loading pending note:', pendingNoteToLoad.noteId);
+        editorWindow.webContents.send('open-note-from-indicator', {
+          noteId: pendingNoteToLoad.noteId,
+          isRecording: pendingNoteToLoad.isRecording,
+          isPaused: pendingNoteToLoad.isPaused,
+          recordingNoteId: pendingNoteToLoad.recordingNoteId
+        });
+        pendingNoteToLoad = null; // Clear after sending
+      }
+      // PRIORITY 2: If we have a current meeting and not showing home, send meeting info
+      else if (currentMeeting && !showHome && editorWindow && !editorWindow.isDestroyed()) {
         console.log('[Editor] Sending current meeting info:', currentMeeting.title);
         editorWindow.webContents.send('set-meeting', currentMeeting);
-      } else if (showHome && editorWindow && !editorWindow.isDestroyed()) {
+      }
+      // PRIORITY 3: Show home view
+      else if (showHome && editorWindow && !editorWindow.isDestroyed()) {
         // Explicitly show home view
         editorWindow.webContents.send('show-home-view');
       }
@@ -1339,6 +1510,13 @@ function openEditorWindow(showHome = true) {
   
   editorWindow.on('closed', () => {
     editorWindow = null;
+    pendingNoteToLoad = null; // Clear any pending note load request
+    
+    // If recording is active, show the floating indicator
+    if (isRecording && currentRecordingNoteId) {
+      console.log('[Editor] Window closed during recording, showing indicator');
+      showMeetingIndicatorInactive(currentRecordingNoteId);
+    }
   });
   
   // Smart visibility for meeting indicator
@@ -1699,6 +1877,35 @@ function setupIPC() {
   ipcMain.on('open-note-from-indicator', (_, noteId: string) => {
     console.log('[MeetingIndicator] Opening note:', noteId, 'isRecording:', isRecording, 'currentRecordingNoteId:', currentRecordingNoteId);
     
+    const targetNoteId = noteId || currentRecordingNoteId;
+    
+    // CRITICAL: Force save the current transcript to DB BEFORE opening
+    // This ensures selectNote will find the note with current transcript
+    if (isRecording && targetNoteId && currentTranscriptSegments.length > 0) {
+      // CRITICAL: Only save FINAL segments, not interim ones
+      const finalSegments = currentTranscriptSegments.filter(seg => seg.isFinal !== false);
+      console.log('[MeetingIndicator] Force saving note before open:', targetNoteId, 'total:', currentTranscriptSegments.length, 'final:', finalSegments.length);
+      try {
+        databaseService.saveNote({
+          id: targetNoteId,
+          title: currentMeeting?.title || 'Voice Note',
+          provider: currentMeeting?.provider || 'manual',
+          date: new Date().toISOString(),
+          transcript: JSON.stringify(finalSegments),
+          notes: '',
+          enhancedNotes: null,
+          audioPath: null,
+          calendarEventId: null,
+          startTime: null,
+          folderId: null,
+          templateId: null
+        });
+        console.log('[MeetingIndicator] ✅ Force saved note before opening');
+      } catch (err) {
+        console.error('[MeetingIndicator] Failed to force save:', err);
+      }
+    }
+    
     // Hide indicator first
     if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
       meetingIndicatorWindow.hide();
@@ -1706,8 +1913,6 @@ function setupIPC() {
     
     // Show and focus the editor window
     if (editorWindow && !editorWindow.isDestroyed()) {
-      const targetNoteId = noteId || currentRecordingNoteId;
-      
       // Tell editor to load this specific note AND sync recording state
       editorWindow.webContents.send('open-note-from-indicator', {
         noteId: targetNoteId,
@@ -1739,15 +1944,17 @@ function setupIPC() {
       });
     } else {
       // If no editor window, open one and load the note
+      // Set pending note to load - it will be sent after window finishes loading
+      if (targetNoteId) {
+        console.log('[MeetingIndicator] Setting pending note to load:', targetNoteId);
+        pendingNoteToLoad = {
+          noteId: targetNoteId,
+          isRecording: isRecording,
+          isPaused: isRecordingPaused,
+          recordingNoteId: currentRecordingNoteId
+        };
+      }
       openEditorWindow(false); // false = editor view, not home
-      setTimeout(() => {
-        if (editorWindow && !editorWindow.isDestroyed()) {
-          const id = noteId || currentRecordingNoteId;
-          if (id) {
-            editorWindow.webContents.send('load-note', id);
-          }
-        }
-      }, 500);
     }
   });
   
@@ -1843,6 +2050,19 @@ function setupIPC() {
     return isRecordingPaused;
   });
   
+  // Get full recording state and accumulated segments (for editor sync after reopen)
+  ipcMain.handle('get-recording-state', () => {
+    // CRITICAL: Only return FINAL segments, not interim ones
+    const finalSegments = currentTranscriptSegments.filter(seg => seg.isFinal !== false);
+    return {
+      isRecording,
+      isPaused: isRecordingPaused,
+      noteId: currentRecordingNoteId,
+      segments: finalSegments,
+      elapsedSeconds: recordingElapsedSeconds,
+    };
+  });
+  
   // Stop Deepgram streaming (called from renderer)
   ipcMain.on('stop-deepgram-stream', () => {
     console.log('[IPC] stop-deepgram-stream received');
@@ -1868,6 +2088,7 @@ function setupIPC() {
       isBrowser: false,
     };
     currentTranscript = [];
+    currentTranscriptSegments = [];
     currentRecordingNoteId = data.noteId || null;
     recordingStartTime = Date.now();
     
@@ -1881,6 +2102,7 @@ function setupIPC() {
       isRecording = true;
       isRecordingPaused = false;
       startElapsedTimeTracking(); // Start tracking elapsed time
+      startAutoSaveInterval(); // Auto-save transcript periodically
       updateTrayMenu();
       
       // Show the always-on-top meeting indicator
@@ -1891,15 +2113,25 @@ function setupIPC() {
       if (transcriptionRouter) {
         transcriptionRouter.setNativeModule(getNativeModule());
         transcriptionRouter.setOnTranscript((segment) => {
+          // Enrich segment with speakerName for persistence
+          const enrichedSegment = {
+            ...segment,
+            speakerName: segment.isYou ? 'You' : (segment.speaker !== null ? `Speaker ${segment.speaker + 1}` : 'Them'),
+          };
+          
           try {
             if (editorWindow && !editorWindow.isDestroyed() && editorWindow.webContents && !editorWindow.webContents.isDestroyed()) {
-              editorWindow.webContents.send('transcript-segment', segment);
+              editorWindow.webContents.send('transcript-segment', enrichedSegment);
             }
           } catch (err) {
             // Silently ignore - window was closed/disposed during send
           }
+          
+          // Store in currentTranscript for AI notes (string format)
           const label = segment.isYou ? '[You]' : (segment.speaker !== null ? `[Speaker ${segment.speaker + 1}]` : '');
           currentTranscript.push(label ? `${label} ${segment.text}` : segment.text);
+          // Store full segment for editor sync when window reopens
+          currentTranscriptSegments.push(enrichedSegment);
         });
         transcriptionRouter.startStreaming();
         console.log('[Ghost] Transcription streaming started');
@@ -1914,6 +2146,7 @@ function setupIPC() {
     } catch (e) {
       console.error('[Ghost] Failed to start manual recording:', e);
       isRecording = false;
+      stopAutoSaveInterval();
       hideMeetingIndicator();
     }
   });
@@ -3465,6 +3698,22 @@ app.whenReady().then(async () => {
     console.log('[App] Applied saved language settings:', savedLangSettings);
   }
   
+  // Auto-initialize local LLM if selected
+  const aiEngine = store.get('aiEngine', 'openai') as string;
+  if (aiEngine === 'local') {
+    const isReady = nativeModule?.isLlmReady?.() ?? false;
+    console.log('[App] AI Engine set to LOCAL, checking if ready:', isReady);
+    
+    if (!isReady) {
+      console.log('[App] Auto-initializing local LLM in background...');
+      try {
+        nativeModule?.initLlm?.();
+      } catch (e) {
+        console.error('[App] Failed to init LLM:', e);
+      }
+    }
+  }
+  
   // 4. Initialize database (required - no fallback)
   console.log('[Database] Initializing SQLite database...');
   const dbInitialized = await databaseService.initialize();
@@ -3498,6 +3747,7 @@ app.whenReady().then(async () => {
         editorWindow.webContents.send('recording-stopped');
       }
       isRecording = false;
+      stopAutoSaveInterval();
     }
     // Stop meeting watcher
     meetingWatcher?.stop();
