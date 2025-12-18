@@ -1508,6 +1508,23 @@ function openEditorWindow(showHome = true) {
     }, 100);
   });
   
+  // CRITICAL: Hide window instead of closing for menu bar app behavior
+  // This allows recording to continue in background and window to be quickly restored
+  editorWindow.on('close', (event) => {
+    // Prevent actual close if not force-quitting
+    if (!forceQuit && editorWindow && !editorWindow.isDestroyed()) {
+      event.preventDefault();
+      editorWindow.hide();
+      console.log('[Editor] Window hidden (not destroyed)');
+      
+      // Show indicator if recording is active
+      if (isRecording && currentRecordingNoteId) {
+        console.log('[Editor] Recording active, showing floating indicator');
+        showMeetingIndicatorInactive(currentRecordingNoteId);
+      }
+    }
+  });
+  
   editorWindow.on('closed', () => {
     editorWindow = null;
     pendingNoteToLoad = null; // Clear any pending note load request
