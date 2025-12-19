@@ -2493,10 +2493,21 @@ function setupIPC() {
   
   // Settings
   ipcMain.handle('get-deepgram-key', () => transcriptionService?.getApiKey() ?? null);
-  ipcMain.handle('save-deepgram-key', (_, key: string) => transcriptionService?.saveApiKey(key) ?? false);
+  ipcMain.handle('save-deepgram-key', (_, key: string) => {
+    const result = transcriptionService?.saveApiKey(key) ?? false;
+    // Notify editor of config change
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('config-status-changed');
+    }
+    return result;
+  });
   ipcMain.handle('has-deepgram-key', () => transcriptionService?.hasApiKey() ?? false);
   ipcMain.handle('clear-deepgram-key', () => {
     transcriptionService?.clearApiKey?.();
+    // Notify editor of config change
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('config-status-changed');
+    }
     return true;
   });
   
@@ -2973,13 +2984,22 @@ Answer:`;
   });
   
   ipcMain.handle('openai-save-key', (_, key: string) => {
-    return openaiService?.saveApiKey(key) ?? false;
+    const result = openaiService?.saveApiKey(key) ?? false;
+    // Notify editor of config change
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('config-status-changed');
+    }
+    return result;
   });
   
   ipcMain.handle('openai-clear-key', () => {
     console.log('[OpenAI] Clear key called, hasKey before:', openaiService?.hasApiKey());
     openaiService?.clearApiKey();
     console.log('[OpenAI] Clear key done, hasKey after:', openaiService?.hasApiKey());
+    // Notify editor of config change
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('config-status-changed');
+    }
     return true;
   });
   
@@ -3333,6 +3353,7 @@ Answer:`;
     // Notify editor window that engine changed
     if (editorWindow && !editorWindow.isDestroyed()) {
       editorWindow.webContents.send('engine-changed');
+      editorWindow.webContents.send('config-status-changed');
     }
     
     return true;
@@ -3532,9 +3553,99 @@ Answer:`;
     // Notify editor window that engine changed
     if (editorWindow && !editorWindow.isDestroyed()) {
       editorWindow.webContents.send('engine-changed');
+      // Also send updated config status
+      editorWindow.webContents.send('config-status-changed');
     }
     
     return true;
+  });
+
+  // ============================================================================
+  // CONFIGURATION STATUS (for banner warnings)
+  // ============================================================================
+  
+  ipcMain.handle('get-config-status', async () => {
+    const aiEngine = store.get('aiEngine', 'openai') as string;
+    const transcriptionEngine = transcriptionRouter?.getEngine() ?? 'deepgram';
+    
+    const hasOpenAIKey = openaiService?.hasApiKey() ?? false;
+    const hasDeepgramKey = transcriptionService?.hasApiKey() ?? false;
+    const isLocalLLMReady = nativeModule?.isLlmReady?.() ?? false;
+    const isLocalLLMDownloaded = nativeModule?.isLlmDownloaded?.() ?? false;
+    const isParakeetReady = nativeModule?.isParakeetReady?.() ?? false;
+    const isParakeetDownloaded = nativeModule?.isParakeetDownloaded?.() ?? false;
+    
+    const issues: Array<{
+      type: 'error' | 'warning';
+      category: 'ai' | 'transcription';
+      message: string;
+      action: string;
+      actionType: 'add-key' | 'use-local' | 'download-model' | 'open-settings';
+    }> = [];
+    
+    // Check AI engine configuration
+    if (aiEngine === 'openai' && !hasOpenAIKey) {
+      issues.push({
+        type: 'warning',
+        category: 'ai',
+        message: 'OpenAI API key not configured. AI notes generation will not work.',
+        action: 'Add OpenAI Key',
+        actionType: 'add-key'
+      });
+    } else if (aiEngine === 'local' && !isLocalLLMDownloaded) {
+      issues.push({
+        type: 'warning',
+        category: 'ai',
+        message: 'Local AI model (Qwen) not downloaded. AI notes generation will not work.',
+        action: 'Download Model',
+        actionType: 'download-model'
+      });
+    } else if (aiEngine === 'local' && isLocalLLMDownloaded && !isLocalLLMReady) {
+      issues.push({
+        type: 'warning',
+        category: 'ai',
+        message: 'Local AI model is loading...',
+        action: 'Please wait',
+        actionType: 'open-settings'
+      });
+    }
+    
+    // Check transcription engine configuration
+    if (transcriptionEngine === 'deepgram' && !hasDeepgramKey) {
+      issues.push({
+        type: 'warning',
+        category: 'transcription',
+        message: 'Deepgram API key not configured. Transcription will not work.',
+        action: 'Add Deepgram Key',
+        actionType: 'add-key'
+      });
+    } else if (transcriptionEngine === 'parakeet' && !isParakeetDownloaded) {
+      issues.push({
+        type: 'warning',
+        category: 'transcription',
+        message: 'Local transcription model (Parakeet) not downloaded.',
+        action: 'Download Model',
+        actionType: 'download-model'
+      });
+    }
+    
+    const status = {
+      aiEngine,
+      transcriptionEngine,
+      aiReady: aiEngine === 'openai' ? hasOpenAIKey : (isLocalLLMReady || isLocalLLMDownloaded),
+      transcriptionReady: transcriptionEngine === 'deepgram' ? hasDeepgramKey : isParakeetDownloaded,
+      hasOpenAIKey,
+      hasDeepgramKey,
+      isLocalLLMReady,
+      isLocalLLMDownloaded,
+      isParakeetReady,
+      isParakeetDownloaded,
+      issues,
+      hasIssues: issues.length > 0
+    };
+    
+    console.log('[ConfigStatus]', JSON.stringify(status, null, 2));
+    return status;
   });
 
   // ============================================================================

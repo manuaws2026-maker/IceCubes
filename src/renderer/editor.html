@@ -2513,7 +2513,7 @@
       height: 18px;
     }
     
-    /* Template dropdown in toggle area */
+    /* Template dropdown in toolbar */
     .template-dropdown-wrapper {
       position: relative;
     }
@@ -2539,6 +2539,55 @@
     }
     
     .template-dropdown-btn svg {
+      width: 12px;
+      height: 12px;
+      opacity: 0.6;
+    }
+    
+    /* Meta-row template dropdown styling */
+    .meta-template {
+      display: none; /* Hidden by default, shown when AI notes exist */
+    }
+    
+    .meta-template.visible {
+      display: block;
+    }
+    
+    .template-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 6px 10px;
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(79, 70, 229, 0.15) 100%);
+      border: 1px solid rgba(147, 51, 234, 0.3);
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    
+    .template-badge:hover {
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.25) 0%, rgba(79, 70, 229, 0.25) 100%);
+      border-color: rgba(147, 51, 234, 0.5);
+    }
+    
+    .template-ai-icon {
+      font-size: 12px;
+    }
+    
+    .template-badge #currentTemplateIcon {
+      font-size: 14px;
+    }
+    
+    .template-badge #currentTemplateName {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .template-badge .template-chevron {
       width: 12px;
       height: 12px;
       opacity: 0.6;
@@ -2690,6 +2739,105 @@
       transform: translateY(0);
     }
     
+    /* Configuration Banner */
+    .config-banner {
+      display: none;
+      padding: 12px 16px;
+      background: #fef3c7;
+      border-bottom: 1px solid #fcd34d;
+      font-size: 13px;
+      color: #92400e;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .config-banner.visible {
+      display: flex;
+    }
+    
+    .config-banner.error {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #991b1b;
+    }
+    
+    .config-banner-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    
+    .config-banner-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    
+    .config-banner-message {
+      font-weight: 500;
+    }
+    
+    .config-banner-submessage {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    
+    .config-banner-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    
+    .config-banner-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    
+    .config-banner-btn.primary {
+      background: #f59e0b;
+      color: white;
+    }
+    
+    .config-banner-btn.primary:hover {
+      background: #d97706;
+    }
+    
+    .config-banner.error .config-banner-btn.primary {
+      background: #dc2626;
+    }
+    
+    .config-banner.error .config-banner-btn.primary:hover {
+      background: #b91c1c;
+    }
+    
+    .config-banner-btn.secondary {
+      background: rgba(0,0,0,0.1);
+      color: inherit;
+    }
+    
+    .config-banner-btn.secondary:hover {
+      background: rgba(0,0,0,0.15);
+    }
+    
+    .config-banner-dismiss {
+      padding: 4px 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      opacity: 0.6;
+      font-size: 16px;
+      color: inherit;
+    }
+    
+    .config-banner-dismiss:hover {
+      opacity: 1;
+    }
+
     /* Editor content */
     .editor-content {
       flex: 1;
@@ -7515,21 +7663,6 @@
                 </svg>
               </button>
             </div>
-            <div class="template-dropdown-wrapper">
-              <button class="template-dropdown-btn" id="templateDropdownBtn" title="Change template">
-                <span id="currentTemplateIcon">📝</span>
-                <span id="currentTemplateName">General</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 9l6 6 6-6"/>
-                </svg>
-              </button>
-              <div class="template-dropdown-menu" id="templateDropdownMenu">
-                <div class="template-dropdown-header">Regenerate with template</div>
-                <div id="templateDropdownContent">
-                  <div class="template-dropdown-loading">Loading templates...</div>
-                </div>
-              </div>
-            </div>
           </div>
           
           <button class="header-btn new-note-btn" id="newNoteBtn" title="Create a new note">New</button>
@@ -7955,6 +8088,20 @@
       <!-- Editor content - shown when viewing a note -->
       <div class="editor-content hidden" id="editorContent">
         
+        <!-- Configuration Banner - shown when API keys or models are missing -->
+        <div class="config-banner" id="configBanner">
+          <span class="config-banner-icon">⚠️</span>
+          <div class="config-banner-content">
+            <span class="config-banner-message" id="configBannerMessage">Configuration needed</span>
+            <span class="config-banner-submessage" id="configBannerSubmessage"></span>
+          </div>
+          <div class="config-banner-actions">
+            <button class="config-banner-btn primary" id="configBannerAction">Fix Now</button>
+            <button class="config-banner-btn secondary" id="configBannerAlt">Use Local</button>
+          </div>
+          <button class="config-banner-dismiss" id="configBannerDismiss">×</button>
+        </div>
+        
         <div class="editor-scroll">
           <div class="editor-inner">
             <div class="meeting-title" contenteditable="true" data-placeholder="Meeting Title" id="meetingTitle"></div>
@@ -7979,6 +8126,23 @@
                 </div>
               </div>
               <div class="meta-badge add-folder" id="addToFolderBtn">+ Add to folder</div>
+              <!-- Template Selector (shown when AI notes exist) -->
+              <div class="template-dropdown-wrapper meta-template" id="templateDropdownWrapper">
+                <button class="meta-badge template-badge" id="templateDropdownBtn" title="Change template">
+                  <span class="template-ai-icon">✨</span>
+                  <span id="currentTemplateIcon">📝</span>
+                  <span id="currentTemplateName">General</span>
+                  <svg class="template-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </button>
+                <div class="template-dropdown-menu" id="templateDropdownMenu">
+                  <div class="template-dropdown-header">Regenerate with template</div>
+                  <div id="templateDropdownContent">
+                    <div class="template-dropdown-loading">Loading templates...</div>
+                  </div>
+                </div>
+              </div>
             </div>
             
             <div class="notes-area">
@@ -8801,7 +8965,150 @@
       checkOfflineStatus();
       loadSettingsProviderState(); // Refresh engine badges
       checkCalendarConnection(); // Refresh calendar in case it was connected/disconnected
+      checkConfigStatus(); // Check for missing API keys/models
     });
+    
+    // ============================================================================
+    // CONFIGURATION STATUS BANNER (API Keys / Model Status)
+    // ============================================================================
+    const configBanner = document.getElementById('configBanner');
+    const configBannerMessage = document.getElementById('configBannerMessage');
+    const configBannerSubmessage = document.getElementById('configBannerSubmessage');
+    const configBannerAction = document.getElementById('configBannerAction');
+    const configBannerAlt = document.getElementById('configBannerAlt');
+    const configBannerDismiss = document.getElementById('configBannerDismiss');
+    
+    let configBannerDismissedUntil = null; // Timestamp when banner was dismissed
+    let lastConfigStatus = null;
+    
+    async function checkConfigStatus() {
+      try {
+        const status = await ipcRenderer.invoke('get-config-status');
+        lastConfigStatus = status;
+        
+        // Don't show banner if dismissed within last 5 minutes
+        if (configBannerDismissedUntil && Date.now() < configBannerDismissedUntil) {
+          return;
+        }
+        
+        if (status.hasIssues && status.issues.length > 0) {
+          showConfigBanner(status);
+        } else {
+          hideConfigBanner();
+        }
+      } catch (e) {
+        console.error('[ConfigBanner] Error checking status:', e);
+      }
+    }
+    
+    function showConfigBanner(status) {
+      if (!configBanner) return;
+      
+      // Get the most important issue (AI issues first, then transcription)
+      const aiIssue = status.issues.find(i => i.category === 'ai');
+      const transcriptionIssue = status.issues.find(i => i.category === 'transcription');
+      const primaryIssue = aiIssue || transcriptionIssue;
+      
+      if (!primaryIssue) {
+        hideConfigBanner();
+        return;
+      }
+      
+      // Set banner type
+      configBanner.classList.remove('error');
+      if (status.issues.length > 1) {
+        configBanner.classList.add('error');
+      }
+      
+      // Set message
+      configBannerMessage.textContent = primaryIssue.message;
+      
+      // Set submessage if multiple issues
+      if (status.issues.length > 1) {
+        const otherIssue = status.issues.find(i => i !== primaryIssue);
+        configBannerSubmessage.textContent = `Also: ${otherIssue?.message}`;
+        configBannerSubmessage.style.display = 'block';
+      } else {
+        configBannerSubmessage.style.display = 'none';
+      }
+      
+      // Set primary action button
+      configBannerAction.textContent = primaryIssue.action;
+      configBannerAction.onclick = () => handleConfigAction(primaryIssue, status);
+      
+      // Set alternate action (switch to local if on cloud, or vice versa)
+      if (primaryIssue.category === 'ai' && status.aiEngine === 'openai') {
+        configBannerAlt.textContent = 'Use Local AI';
+        configBannerAlt.style.display = 'inline-block';
+        configBannerAlt.onclick = async () => {
+          await ipcRenderer.invoke('ai-set-engine', 'local');
+          checkConfigStatus();
+        };
+      } else if (primaryIssue.category === 'transcription' && status.transcriptionEngine === 'deepgram') {
+        configBannerAlt.textContent = 'Use Local Transcription';
+        configBannerAlt.style.display = 'inline-block';
+        configBannerAlt.onclick = async () => {
+          await ipcRenderer.invoke('transcription-set-engine', 'parakeet');
+          checkConfigStatus();
+        };
+      } else {
+        configBannerAlt.style.display = 'none';
+      }
+      
+      configBanner.classList.add('visible');
+      console.log('[ConfigBanner] Showing:', primaryIssue.message);
+    }
+    
+    function hideConfigBanner() {
+      if (configBanner) {
+        configBanner.classList.remove('visible');
+      }
+    }
+    
+    function handleConfigAction(issue, status) {
+      if (issue.actionType === 'add-key') {
+        // Open settings and scroll to the relevant section
+        showSettings();
+        setTimeout(() => {
+          // Focus the relevant input in settings
+          if (issue.category === 'ai') {
+            const openaiInput = document.getElementById('settingsOpenaiKey');
+            openaiInput?.focus();
+          } else if (issue.category === 'transcription') {
+            const deepgramInput = document.getElementById('settingsDeepgramKey');
+            deepgramInput?.focus();
+          }
+        }, 300);
+      } else if (issue.actionType === 'download-model') {
+        showSettings();
+        // Could scroll to model download section
+      } else if (issue.actionType === 'use-local') {
+        if (issue.category === 'ai') {
+          ipcRenderer.invoke('ai-set-engine', 'local');
+        } else {
+          ipcRenderer.invoke('transcription-set-engine', 'parakeet');
+        }
+        checkConfigStatus();
+      } else {
+        showSettings();
+      }
+    }
+    
+    // Dismiss button - hides for 5 minutes
+    configBannerDismiss?.addEventListener('click', () => {
+      configBannerDismissedUntil = Date.now() + (5 * 60 * 1000); // 5 minutes
+      hideConfigBanner();
+    });
+    
+    // Listen for config status changes from main process
+    ipcRenderer.on('config-status-changed', () => {
+      console.log('[ConfigBanner] Config changed, re-checking...');
+      configBannerDismissedUntil = null; // Reset dismiss on config change
+      checkConfigStatus();
+    });
+    
+    // Check config status on startup (after a short delay)
+    setTimeout(checkConfigStatus, 1500);
     
     // Refresh calendar when window gains focus (e.g., after OAuth in browser)
     window.addEventListener('focus', () => {
@@ -11888,7 +12195,7 @@
     // Toggle between raw notes and AI enhanced notes
     const rawNotesBtn = document.getElementById('rawNotesBtn');
     const aiNotesBtn = document.getElementById('aiNotesBtn');
-    const templateDropdownWrapper = document.querySelector('.template-dropdown-wrapper');
+    const templateDropdownWrapper = document.getElementById('templateDropdownWrapper');
     const regenerateNotesWrapper = document.getElementById('regenerateNotesWrapper');
     const regenerateNotesBtn = document.getElementById('regenerateNotesBtn');
     
@@ -11902,7 +12209,11 @@
     // Helper to show/hide template dropdown based on view
     function updateTemplateDropdownVisibility() {
       if (templateDropdownWrapper) {
-        templateDropdownWrapper.style.display = currentViewIsAI ? '' : 'none';
+        if (currentViewIsAI && currentAINotes) {
+          templateDropdownWrapper.classList.add('visible');
+        } else {
+          templateDropdownWrapper.classList.remove('visible');
+        }
       }
     }
     
@@ -11933,8 +12244,15 @@
     rawNotesBtn?.addEventListener('click', () => {
       if (!currentAINotes) return;
       
+      // Don't do anything if already in raw view
+      if (!currentViewIsAI) {
+        console.log('[RawToggle] Already in raw view, ignoring click');
+        return;
+      }
+      
       // Save current AI notes before switching
       storedEnhancedNotes = getEditorContent();
+      console.log('[RawToggle] Saved AI notes, length:', storedEnhancedNotes.length);
       
       // Switch to raw notes view
       rawNotesBtn.classList.add('active');
@@ -11946,7 +12264,10 @@
       
       // Show raw notes (prevent auto-save during toggle)
       isTogglingView = true;
-      setEditorContent(storedRawNotes || rawNotesAtStart || '');
+      const rawToShow = storedRawNotes || rawNotesAtStart || '';
+      console.log('[RawToggle] Showing raw notes, storedRawNotes length:', storedRawNotes?.length, 'rawNotesAtStart length:', rawNotesAtStart?.length);
+      console.log('[RawToggle] Raw content preview:', stripHtml(rawToShow).substring(0, 100));
+      setEditorContent(rawToShow);
       setTimeout(() => { 
         isTogglingView = false;
         // Check if we need to show regenerate button
@@ -11973,8 +12294,15 @@
         return;
       }
       
-      // Save current raw notes before switching
+      // Don't do anything if already in AI view - prevents corrupting storedRawNotes
+      if (currentViewIsAI) {
+        console.log('[AIToggle] Already in AI view, ignoring click');
+        return;
+      }
+      
+      // Save current raw notes before switching (only when actually in raw view)
       storedRawNotes = getEditorContent();
+      console.log('[AIToggle] Saved raw notes before switching to AI, length:', storedRawNotes.length);
       
       // Switch to AI enhanced view
       aiNotesBtn.classList.add('active');
@@ -12032,6 +12360,8 @@
     async function generateEnhancedNotes() {
       if (!isAIAvailable()) {
         console.log('[AI Notes] No AI available (OpenAI key or local LLM not configured)');
+        // Check config status and show banner if needed
+        checkConfigStatus();
         return;
       }
       
@@ -12189,13 +12519,14 @@
           
           currentAINotes = result;
           // Track raw notes used for this generation (for change detection)
-          // Only update if this is first generation (storedRawNotes was empty before)
-          if (!lastGeneratedFromRawNotes) {
+          // ALWAYS store raw notes on first generation to ensure toggle works
+          if (!lastGeneratedFromRawNotes || !storedRawNotes) {
             lastGeneratedFromRawNotes = rawNotesToUse;
             storedRawNotes = rawNotesToUse;
-            console.log('[AI Notes] First generation - stored raw notes:', stripHtml(storedRawNotes).substring(0, 50));
+            console.log('[AI Notes] Stored raw notes for toggle, length:', storedRawNotes.length);
+            console.log('[AI Notes] Raw notes preview:', stripHtml(storedRawNotes).substring(0, 100));
           } else {
-            console.log('[AI Notes] Regeneration - keeping original raw notes:', stripHtml(storedRawNotes).substring(0, 50));
+            console.log('[AI Notes] Regeneration - keeping original raw notes, length:', storedRawNotes.length);
           }
           
           // Put AI notes directly in the main editor
@@ -12230,13 +12561,18 @@
         // Show error to user
         const errorMessage = err.message || String(err);
         let userFriendlyMessage = 'Failed to generate AI notes.';
+        let showConfigBannerAfterError = false;
         
-        if (errorMessage.includes('API key')) {
+        if (errorMessage.includes('API key') || errorMessage.includes('not configured') || errorMessage.includes('401')) {
           userFriendlyMessage = '❌ OpenAI API key error. Please check your API key in Settings (⚙️).';
+          showConfigBannerAfterError = true;
         } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
           userFriendlyMessage = '❌ Rate limit reached. Please wait a moment and try again.';
-        } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('ENOTFOUND')) {
           userFriendlyMessage = '❌ Network error. Please check your internet connection.';
+        } else if (errorMessage.includes('local') || errorMessage.includes('LLM') || errorMessage.includes('Qwen')) {
+          userFriendlyMessage = '❌ Local AI model error. Try switching to OpenAI or re-download the model in Settings.';
+          showConfigBannerAfterError = true;
         }
         
         // Show error banner
@@ -12287,6 +12623,12 @@
           const banner = document.getElementById('aiErrorBanner');
           if (banner) banner.remove();
         }, 10000);
+        
+        // Show config banner if it's a configuration issue
+        if (showConfigBannerAfterError) {
+          configBannerDismissedUntil = null; // Reset dismiss so banner shows
+          checkConfigStatus();
+        }
         
         // Restore the generate button so user can try again after fixing
         showGenerateNotesButton();
@@ -14962,6 +15304,7 @@
         setTimeout(() => { isTogglingView = false; }, 100);
         // Update template display for the loaded note's template
         updateCurrentTemplateDisplay();
+        updateTemplateDropdownVisibility(); // Show template picker for AI view
       } else if (transcript.length > 0 && isAIAvailable()) {
         // Note has transcript but no AI notes - show generate button
         currentAINotes = null;
@@ -14971,6 +15314,7 @@
         setTimeout(() => { isTogglingView = false; }, 100);
         showGenerateNotesButton();
         hideNotesViewToggle();
+        updateTemplateDropdownVisibility(); // Hide template picker (no AI notes)
       } else {
         // No transcript or no AI available - hide both, show raw notes
         currentAINotes = null;
@@ -14980,6 +15324,7 @@
         setTimeout(() => { isTogglingView = false; }, 100);
         hideGenerateNotesButton();
         hideNotesViewToggle();
+        updateTemplateDropdownVisibility(); // Hide template picker (no AI notes)
       }
       
       // Update the "Add to folder" button to show current folder

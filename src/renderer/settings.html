@@ -945,11 +945,8 @@
             </div>
           </div>
           
-          <div>
-            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Built-in</div>
-            <div id="builtInTemplatesList" style="display: flex; flex-direction: column; gap: 6px;">
-              <!-- Built-in templates -->
-            </div>
+          <div id="builtInTemplatesContainer">
+            <!-- Categories will be rendered here by JavaScript -->
           </div>
         </div>
         
@@ -2306,7 +2303,7 @@
     const templatesListView = document.getElementById('templatesListView');
     const templatesEditorView = document.getElementById('templatesEditorView');
     const myTemplatesList = document.getElementById('myTemplatesList');
-    const builtInTemplatesList = document.getElementById('builtInTemplatesList');
+    const builtInTemplatesContainer = document.getElementById('builtInTemplatesContainer');
     const newTemplateBtn = document.getElementById('newTemplateBtn');
     const templatesBackBtn = document.getElementById('templatesBackBtn');
     const deleteTemplateBtn = document.getElementById('deleteTemplateBtn');
@@ -2344,8 +2341,48 @@
           : '<div style="padding: 12px 16px; font-size: 13px; color: var(--text-muted); font-style: italic; background: var(--bg-secondary); border-radius: 8px;">No custom templates yet</div>';
       }
       
-      if (builtInTemplatesList) {
-        builtInTemplatesList.innerHTML = builtIn.map(renderTemplateCard).join('');
+      // Group built-in templates by category
+      if (builtInTemplatesContainer) {
+        const categoryOrder = ['General', 'Leadership', 'Commercial', 'Team', 'Recruiting', 'Product', 'VC'];
+        const categoryIcons = {
+          'General': '📝',
+          'Leadership': '👔',
+          'Commercial': '💼',
+          'Team': '👥',
+          'Recruiting': '🎯',
+          'Product': '🚀',
+          'VC': '💰'
+        };
+        
+        // Group templates by category
+        const grouped = {};
+        builtIn.forEach(t => {
+          const cat = t.category || 'General';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(t);
+        });
+        
+        // Render each category
+        let html = '';
+        categoryOrder.forEach(category => {
+          const templates = grouped[category];
+          if (templates && templates.length > 0) {
+            html += `
+              <div style="margin-bottom: 20px;">
+                <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                  <span>${categoryIcons[category] || '📁'}</span>
+                  <span>${category}</span>
+                  <span style="font-weight: 400; opacity: 0.7;">(${templates.length})</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  ${templates.map(renderTemplateCard).join('')}
+                </div>
+              </div>
+            `;
+          }
+        });
+        
+        builtInTemplatesContainer.innerHTML = html;
       }
       
       // Add click handlers
