@@ -1249,13 +1249,20 @@ async function startRecording() {
     recordingElapsedSeconds = 0;
     isRecordingPaused = false;
     
-    // Show the meeting indicator for auto-detected meetings
-    // (noteId will be updated later when the renderer creates the note)
-    showMeetingIndicator('');
-    
     // Open editor window (show editor view, not home)
+    // We do this BEFORE showing indicator so the indicator visibility check works correctly
     console.log('[Recording] Opening editor window...');
     openEditorWindow(false);
+    
+    // Only show the meeting indicator if editor is not visible/focused
+    // This handles the case where editor opens immediately
+    setTimeout(() => {
+      const editorIsActive = editorWindow && !editorWindow.isDestroyed() && 
+                            editorWindow.isVisible() && editorWindow.isFocused();
+      if (!editorIsActive) {
+        showMeetingIndicator('');
+      }
+    }, 200);
     
     // Start streaming to Deepgram from main process (multichannel audio)
     setTimeout(() => {
@@ -1558,7 +1565,12 @@ function openEditorWindow(showHome = true) {
   });
   
   editorWindow.on('show', () => {
-    updateIndicatorVisibility();
+    // When editor is shown, always hide the indicator (editor takes priority)
+    if (meetingIndicatorWindow && !meetingIndicatorWindow.isDestroyed()) {
+      meetingIndicatorWindow.hide();
+    }
+    // Also update visibility after a short delay to handle focus changes
+    setTimeout(() => updateIndicatorVisibility(), 100);
   });
 }
 
@@ -2122,9 +2134,15 @@ function setupIPC() {
       startAutoSaveInterval(); // Auto-save transcript periodically
       updateTrayMenu();
       
-      // Show the always-on-top meeting indicator
-      // (noteId might be empty for new unsaved notes, but we'll update it when note is saved)
-      showMeetingIndicator(currentRecordingNoteId || '');
+      // Only show indicator if editor is NOT visible and focused
+      // This prevents the indicator showing when starting from an already-visible editor
+      const editorIsActive = editorWindow && !editorWindow.isDestroyed() && 
+                            editorWindow.isVisible() && editorWindow.isFocused();
+      if (!editorIsActive) {
+        showMeetingIndicator(currentRecordingNoteId || '');
+      } else {
+        console.log('[Ghost] Editor is active, not showing indicator');
+      }
       
       // Start transcription streaming to Deepgram
       if (transcriptionRouter) {
@@ -3346,6 +3364,39 @@ Answer:`;
   ipcMain.handle('transcription-get-engine', async () => {
     return transcriptionRouter.getEngine();
   });
+  
+  // Set up transcription status change callback to forward to renderer
+  transcriptionRouter.setOnStatusChange((status, engine) => {
+    console.log(`[Transcription] Status changed: ${status} (${engine})`);
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('transcription-status', { status, engine });
+    }
+  });
+  
+  // Reconnect transcription (stop and restart streaming)
+  ipcMain.handle('transcription-reconnect', async () => {
+    console.log('[Transcription] Reconnect requested');
+    if (!isRecording) {
+      console.log('[Transcription] Not recording, cannot reconnect');
+      return false;
+    }
+    
+    try {
+      // Stop current streaming
+      transcriptionRouter.stopStreaming();
+      
+      // Small delay before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Restart streaming
+      const success = await transcriptionRouter.startStreaming();
+      console.log('[Transcription] Reconnect result:', success);
+      return success;
+    } catch (e) {
+      console.error('[Transcription] Reconnect failed:', e);
+      return false;
+    }
+  });
 
   ipcMain.handle('transcription-set-engine', async (_, engine: 'deepgram' | 'parakeet') => {
     transcriptionRouter.setEngine(engine);
@@ -3588,7 +3639,7 @@ Answer:`;
       issues.push({
         type: 'warning',
         category: 'ai',
-        message: 'OpenAI API key not configured. AI notes generation will not work.',
+        message: 'OpenAI API key not configured',
         action: 'Add OpenAI Key',
         actionType: 'add-key'
       });
@@ -3596,7 +3647,7 @@ Answer:`;
       issues.push({
         type: 'warning',
         category: 'ai',
-        message: 'Local AI model (Qwen) not downloaded. AI notes generation will not work.',
+        message: 'Local AI model not downloaded',
         action: 'Download Model',
         actionType: 'download-model'
       });
@@ -3604,7 +3655,7 @@ Answer:`;
       issues.push({
         type: 'warning',
         category: 'ai',
-        message: 'Local AI model is loading...',
+        message: 'Local AI model loading...',
         action: 'Please wait',
         actionType: 'open-settings'
       });
@@ -3615,7 +3666,7 @@ Answer:`;
       issues.push({
         type: 'warning',
         category: 'transcription',
-        message: 'Deepgram API key not configured. Transcription will not work.',
+        message: 'Deepgram API key not configured',
         action: 'Add Deepgram Key',
         actionType: 'add-key'
       });
@@ -3623,7 +3674,7 @@ Answer:`;
       issues.push({
         type: 'warning',
         category: 'transcription',
-        message: 'Local transcription model (Parakeet) not downloaded.',
+        message: 'Local transcription model not downloaded',
         action: 'Download Model',
         actionType: 'download-model'
       });

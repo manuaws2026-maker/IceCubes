@@ -2742,13 +2742,16 @@
     /* Configuration Banner */
     .config-banner {
       display: none;
-      padding: 12px 16px;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 14px 40px 14px 20px;
       background: #fef3c7;
       border-bottom: 1px solid #fcd34d;
       font-size: 13px;
       color: #92400e;
-      align-items: center;
-      gap: 12px;
+      gap: 10px;
+      position: relative;
     }
     
     .config-banner.visible {
@@ -2761,35 +2764,44 @@
       color: #991b1b;
     }
     
+    .config-banner-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
     .config-banner-icon {
-      font-size: 16px;
+      font-size: 18px;
       flex-shrink: 0;
     }
     
     .config-banner-content {
-      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 2px;
     }
     
     .config-banner-message {
-      font-weight: 500;
+      font-weight: 600;
+      font-size: 13px;
+      line-height: 1.3;
     }
     
     .config-banner-submessage {
-      font-size: 12px;
+      font-size: 11px;
       opacity: 0.8;
+      line-height: 1.3;
     }
     
     .config-banner-actions {
       display: flex;
       gap: 8px;
-      flex-shrink: 0;
+      justify-content: center;
     }
     
     .config-banner-btn {
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 6px;
       font-size: 12px;
       font-weight: 500;
@@ -2825,11 +2837,14 @@
     }
     
     .config-banner-dismiss {
+      position: absolute;
+      top: 10px;
+      right: 10px;
       padding: 4px 8px;
       background: transparent;
       border: none;
       cursor: pointer;
-      opacity: 0.6;
+      opacity: 0.5;
       font-size: 16px;
       color: inherit;
     }
@@ -5495,6 +5510,75 @@
       background: var(--bg-hover);
     }
     
+    /* Transcription connection status */
+    .transcription-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 8px;
+    }
+    
+    .transcription-status.hidden {
+      display: none;
+    }
+    
+    .transcription-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+      cursor: help;
+      position: relative;
+    }
+    
+    .transcription-status-dot.disconnected {
+      background: #ef4444;
+    }
+    
+    .transcription-status-dot::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      margin-bottom: 4px;
+    }
+    
+    .transcription-status-dot:hover::after {
+      opacity: 1;
+    }
+    
+    .transcription-reconnect-btn {
+      display: none;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .transcription-reconnect-btn:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+    
+    .transcription-status.disconnected .transcription-reconnect-btn {
+      display: inline-block;
+    }
+    
     .transcript-toggle {
       font-size: 10px;
       transition: transform 0.2s;
@@ -6492,7 +6576,7 @@
       z-index: 100000;
       background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
       color: white;
-      padding: 8px 16px;
+      padding: 12px 16px;
       font-size: 13px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       animation: slideDown 0.3s ease-out;
@@ -6527,33 +6611,43 @@
     
     .offline-banner-content {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 8px;
       max-width: 900px;
       margin: 0 auto;
+      text-align: center;
+    }
+    
+    .offline-banner-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     
     .offline-icon {
       font-size: 16px;
     }
     
-    .offline-text {
-      flex: 1;
+    .offline-message {
+      font-weight: 600;
+      font-size: 13px;
     }
     
     .offline-suggestion {
       opacity: 0.9;
-      font-size: 12px;
+      font-size: 11px;
     }
     
     .offline-switch-btn {
       background: rgba(255, 255, 255, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.4);
       color: white;
-      padding: 4px 12px;
-      border-radius: 4px;
+      padding: 6px 14px;
+      border-radius: 6px;
       font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
       white-space: nowrap;
@@ -6566,11 +6660,11 @@
     
     /* Adjust body padding when offline banner is shown */
     body.has-offline-banner .app-container {
-      padding-top: 40px;
+      padding-top: 70px;
     }
     
     body.has-offline-banner .floating-recording-indicator {
-      top: 120px;
+      top: 150px;
     }
     
     /* Floating Recording Indicator */
@@ -6715,11 +6809,11 @@
   <!-- Offline Warning Banner -->
   <div class="offline-banner hidden" id="offlineBanner">
     <div class="offline-banner-content">
-      <span class="offline-icon">📡</span>
-      <span class="offline-text">
-        <strong>You're offline.</strong> 
-        <span class="offline-suggestion">Cloud services unavailable. Switch to local models for uninterrupted use.</span>
-      </span>
+      <div class="offline-banner-text">
+        <span class="offline-icon">📡</span>
+        <span class="offline-message">You're offline</span>
+      </div>
+      <span class="offline-suggestion">Cloud services unavailable. Switch to local models for uninterrupted use.</span>
       <button class="offline-switch-btn" id="offlineSwitchBtn">Switch to Local</button>
     </div>
   </div>
@@ -8090,10 +8184,12 @@
         
         <!-- Configuration Banner - shown when API keys or models are missing -->
         <div class="config-banner" id="configBanner">
-          <span class="config-banner-icon">⚠️</span>
-          <div class="config-banner-content">
-            <span class="config-banner-message" id="configBannerMessage">Configuration needed</span>
-            <span class="config-banner-submessage" id="configBannerSubmessage"></span>
+          <div class="config-banner-header">
+            <span class="config-banner-icon">⚠️</span>
+            <div class="config-banner-content">
+              <span class="config-banner-message" id="configBannerMessage">Configuration needed</span>
+              <span class="config-banner-submessage" id="configBannerSubmessage"></span>
+            </div>
           </div>
           <div class="config-banner-actions">
             <button class="config-banner-btn primary" id="configBannerAction">Fix Now</button>
@@ -8224,6 +8320,10 @@
                 <span class="transcript-toggle">▼</span>
                 <span>Live Transcript</span>
                 <span class="transcript-count" id="transcriptCount">0 segments</span>
+                <div class="transcription-status hidden" id="transcriptionStatus">
+                  <button class="transcription-reconnect-btn" id="transcriptionReconnectBtn">Reconnect</button>
+                  <span class="transcription-status-dot" id="transcriptionStatusDot" data-tooltip="Connected to Deepgram"></span>
+                </div>
               </div>
               <div class="transcript-content" id="transcriptContent">
                 <div class="transcript-empty" id="transcriptEmpty">
@@ -9023,10 +9123,16 @@
       // Set message
       configBannerMessage.textContent = primaryIssue.message;
       
-      // Set submessage if multiple issues
+      // Set submessage
       if (status.issues.length > 1) {
         const otherIssue = status.issues.find(i => i !== primaryIssue);
-        configBannerSubmessage.textContent = `Also: ${otherIssue?.message}`;
+        configBannerSubmessage.textContent = otherIssue?.message || '';
+        configBannerSubmessage.style.display = 'block';
+      } else if (primaryIssue.category === 'ai') {
+        configBannerSubmessage.textContent = 'AI notes generation will not work';
+        configBannerSubmessage.style.display = 'block';
+      } else if (primaryIssue.category === 'transcription') {
+        configBannerSubmessage.textContent = 'Transcription will not work';
         configBannerSubmessage.style.display = 'block';
       } else {
         configBannerSubmessage.style.display = 'none';
@@ -11623,6 +11729,13 @@
       console.log('[Editor] Recording paused state:', paused);
       isPaused = paused;
       updateMicUI();
+      
+      // Hide/show transcription status based on pause state
+      if (paused) {
+        hideTranscriptionStatus();
+      } else if (isRecording) {
+        showTranscriptionStatus();
+      }
     });
     
     // ============================================================================
@@ -12581,26 +12694,30 @@
         errorBanner.style.cssText = `
           background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
           color: white;
-          padding: 12px 16px;
+          padding: 14px 20px;
           border-radius: 8px;
           margin: 8px;
           display: flex;
+          flex-direction: column;
           align-items: center;
-          gap: 8px;
-          font-size: 14px;
+          gap: 10px;
+          font-size: 13px;
+          text-align: center;
           box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
+          position: relative;
         `;
         errorBanner.innerHTML = `
-          <span>${userFriendlyMessage}</span>
+          <span style="font-weight: 500;">${userFriendlyMessage}</span>
           <button onclick="this.parentElement.remove()" style="
             background: rgba(255,255,255,0.2);
             border: none;
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
-            margin-left: auto;
-          ">✕</button>
+          ">Dismiss</button>
         `;
         
         // Remove any existing error banner
@@ -15279,6 +15396,7 @@
         isRecording = false;
         isMicActive = false;
         updateMicUI();
+        hideTranscriptionStatus(); // Hide connection indicator for non-recording notes
       }
       renderTranscript();
       renderNotesList();
@@ -15530,12 +15648,90 @@
       scheduleAutoSave();
     });
     
+    // ============================================================================
+    // TRANSCRIPTION CONNECTION STATUS
+    // ============================================================================
+    const transcriptionStatus = document.getElementById('transcriptionStatus');
+    const transcriptionStatusDot = document.getElementById('transcriptionStatusDot');
+    const transcriptionReconnectBtn = document.getElementById('transcriptionReconnectBtn');
+    
+    function updateTranscriptionStatus(status, engine = 'deepgram') {
+      if (!transcriptionStatus || !transcriptionStatusDot) return;
+      
+      // Only show status indicator when recording
+      if (!isRecording) {
+        transcriptionStatus.classList.add('hidden');
+        return;
+      }
+      
+      transcriptionStatus.classList.remove('hidden');
+      
+      if (status === 'connected') {
+        transcriptionStatus.classList.remove('disconnected');
+        transcriptionStatusDot.classList.remove('disconnected');
+        const engineName = engine === 'parakeet' ? 'Parakeet (local)' : 'Deepgram';
+        transcriptionStatusDot.setAttribute('data-tooltip', `Connected to ${engineName}`);
+      } else if (status === 'disconnected') {
+        transcriptionStatus.classList.add('disconnected');
+        transcriptionStatusDot.classList.add('disconnected');
+        transcriptionStatusDot.setAttribute('data-tooltip', 'Disconnected from Deepgram');
+      }
+    }
+    
+    // Show status indicator when recording starts
+    function showTranscriptionStatus() {
+      if (transcriptionStatus) {
+        transcriptionStatus.classList.remove('hidden');
+      }
+    }
+    
+    // Hide status indicator when recording stops
+    function hideTranscriptionStatus() {
+      if (transcriptionStatus) {
+        transcriptionStatus.classList.add('hidden');
+      }
+    }
+    
+    // Listen for transcription status changes from main process
+    ipcRenderer.on('transcription-status', (_, data) => {
+      console.log('[Transcription] Status update:', data);
+      // Only update if recording is active
+      if (isRecording) {
+        updateTranscriptionStatus(data.status, data.engine);
+      }
+    });
+    
+    // Reconnect button click handler
+    transcriptionReconnectBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation(); // Prevent header collapse toggle
+      console.log('[Transcription] Reconnect clicked');
+      transcriptionReconnectBtn.textContent = 'Connecting...';
+      transcriptionReconnectBtn.disabled = true;
+      
+      try {
+        await ipcRenderer.invoke('transcription-reconnect');
+      } catch (err) {
+        console.error('[Transcription] Reconnect failed:', err);
+        transcriptionReconnectBtn.textContent = 'Reconnect';
+        transcriptionReconnectBtn.disabled = false;
+      }
+    });
+    
+    // Reset reconnect button when connection is restored
+    ipcRenderer.on('transcription-status', (_, data) => {
+      if (data.status === 'connected' && transcriptionReconnectBtn) {
+        transcriptionReconnectBtn.textContent = 'Reconnect';
+        transcriptionReconnectBtn.disabled = false;
+      }
+    });
+    
     // Recording stopped (from main process) - AUTO-GENERATE AI NOTES
     ipcRenderer.on('recording-stopped', async (_, data) => {
       isRecording = false;
       isMicActive = false;
       updateMicUI();
       micLabel.textContent = 'Start';
+      hideTranscriptionStatus(); // Hide connection indicator when recording stops
       
       // Update ask input visibility now that recording has stopped
       updateAskInputVisibility();
@@ -16231,6 +16427,7 @@
       isRecording = false;
       isPaused = false; // Reset pause state
       recordingNoteId = null; // Clear recording note tracker
+      hideTranscriptionStatus(); // Hide connection indicator
       
       // Clear timers
       if (scheduledStartTimer) {

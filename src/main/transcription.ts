@@ -64,6 +64,9 @@ export class TranscriptionService {
   // Callback for sending transcripts to renderer
   private onTranscript: ((segment: TranscriptSegment) => void) | null = null;
   
+  // Callback for connection status changes
+  private onStatusChange: ((status: 'connected' | 'disconnected', engine: string) => void) | null = null;
+  
   // Speaker tracking for diarization (supplementary to channel-based detection)
 
   constructor() {
@@ -90,6 +93,10 @@ export class TranscriptionService {
   
   public setOnTranscript(callback: (segment: TranscriptSegment) => void): void {
     this.onTranscript = callback;
+  }
+  
+  public setOnStatusChange(callback: (status: 'connected' | 'disconnected', engine: string) => void): void {
+    this.onStatusChange = callback;
   }
 
   private loadApiKey(): void {
@@ -227,6 +234,10 @@ export class TranscriptionService {
         this.isStreaming = true;
         this.startAudioPolling();
         this.startKeepalive();
+        // Notify status change
+        if (this.onStatusChange) {
+          this.onStatusChange('connected', 'deepgram');
+        }
       });
       
       this.ws.on('message', (data: Buffer) => {
@@ -235,12 +246,20 @@ export class TranscriptionService {
       
       this.ws.on('error', (err) => {
         console.error('[Transcription] WebSocket error:', err);
+        // Notify status change on error
+        if (this.onStatusChange) {
+          this.onStatusChange('disconnected', 'deepgram');
+        }
       });
       
       this.ws.on('close', (code, reason) => {
         console.log(`[Transcription] WebSocket closed: ${code} - ${reason}`);
         this.isStreaming = false;
         this.stopAudioPolling();
+        // Notify status change on close
+        if (this.onStatusChange) {
+          this.onStatusChange('disconnected', 'deepgram');
+        }
       });
       
       return true;

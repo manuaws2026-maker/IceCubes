@@ -15,6 +15,7 @@ export class TranscriptionRouter {
   private currentEngine: TranscriptionEngine;
   private nativeModule: any = null;
   private onTranscript: ((segment: TranscriptSegment) => void) | null = null;
+  private onStatusChange: ((status: 'connected' | 'disconnected', engine: string) => void) | null = null;
 
   // Parakeet live transcription state
   private parakeetAudioBuffer: Buffer[] = [];
@@ -66,6 +67,14 @@ export class TranscriptionRouter {
   setOnTranscript(callback: (segment: TranscriptSegment) => void): void {
     this.onTranscript = callback;
     this.deepgramEngine.setOnTranscript(callback);
+  }
+  
+  /**
+   * Set status change callback (for connection status updates)
+   */
+  setOnStatusChange(callback: (status: 'connected' | 'disconnected', engine: string) => void): void {
+    this.onStatusChange = callback;
+    this.deepgramEngine.setOnStatusChange(callback);
   }
 
   /**
