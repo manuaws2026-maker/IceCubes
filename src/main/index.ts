@@ -1483,16 +1483,31 @@ function openEditorWindow(showHome = true) {
     console.error('[Editor] Failed to load:', errorCode, errorDescription);
   });
   
-  editorWindow.webContents.on('did-finish-load', () => {
+  editorWindow.webContents.on('did-finish-load', async () => {
     console.log('[Editor] Page loaded successfully');
     
     // DevTools - open for debugging (disabled by default)
     // editorWindow?.webContents.openDevTools({ mode: 'detach' });
     
-    // Small delay to ensure all JS event listeners are registered
+    // Send initial permission state to renderer (so it can show setup screen if needed)
+    const initialPerms = await checkPermissions();
+    console.log('[Editor] Initial permissions:', initialPerms);
+    
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('permissions-updated', initialPerms);
+    }
+    
+    // CRITICAL: Give setup check time to run BEFORE showing other views
+    // The renderer's checkSetup() runs on load and needs time to check permissions
+    // Wait longer to ensure setup overlay is shown if needed (if permissions are missing)
+    // Only show other views if permissions are granted
+    const shouldDelay = !initialPerms.microphone || !initialPerms.screenRecording || !initialPerms.accessibility;
+    
     setTimeout(() => {
+      if (!editorWindow || editorWindow.isDestroyed()) return;
+      
       // PRIORITY 1: If we have a pending note to load (from indicator/tray click during closed window)
-      if (pendingNoteToLoad && editorWindow && !editorWindow.isDestroyed()) {
+      if (pendingNoteToLoad) {
         console.log('[Editor] Loading pending note:', pendingNoteToLoad.noteId);
         editorWindow.webContents.send('open-note-from-indicator', {
           noteId: pendingNoteToLoad.noteId,
@@ -1503,16 +1518,16 @@ function openEditorWindow(showHome = true) {
         pendingNoteToLoad = null; // Clear after sending
       }
       // PRIORITY 2: If we have a current meeting and not showing home, send meeting info
-      else if (currentMeeting && !showHome && editorWindow && !editorWindow.isDestroyed()) {
+      else if (currentMeeting && !showHome) {
         console.log('[Editor] Sending current meeting info:', currentMeeting.title);
         editorWindow.webContents.send('set-meeting', currentMeeting);
       }
       // PRIORITY 3: Show home view
-      else if (showHome && editorWindow && !editorWindow.isDestroyed()) {
+      else if (showHome) {
         // Explicitly show home view
         editorWindow.webContents.send('show-home-view');
       }
-    }, 100);
+    }, shouldDelay ? 1000 : 100); // Longer delay if permissions are missing
   });
   
   // CRITICAL: Hide window instead of closing for menu bar app behavior
@@ -1544,8 +1559,13 @@ function openEditorWindow(showHome = true) {
   });
   
   // Smart visibility for meeting indicator
-  editorWindow.on('focus', () => {
+  editorWindow.on('focus', async () => {
     updateIndicatorVisibility();
+    // Check permissions when window regains focus (user may have returned from Settings)
+    const perms = await checkPermissions();
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('permissions-updated', perms);
+    }
   });
   
   editorWindow.on('blur', () => {
@@ -1589,6 +1609,9 @@ function openSettingsWindow() {
 // ============================================================================
 // PERMISSIONS
 // ============================================================================
+let permissionPollInterval: ReturnType<typeof setInterval> | null = null;
+let lastPermissionState: { microphone: boolean; screenRecording: boolean; accessibility: boolean } | null = null;
+
 async function checkPermissions() {
   const mic = systemPreferences.getMediaAccessStatus('microphone');
   const screen = systemPreferences.getMediaAccessStatus('screen');
@@ -1596,31 +1619,87 @@ async function checkPermissions() {
   
   // Also check using native module for more accurate ScreenCaptureKit permission
   const native = getNativeModule();
-  const nativeScreenPermission = native ? native.checkScreenRecordingPermission() : false;
+  let nativeScreenPermission = false;
+  try {
+    nativeScreenPermission = native ? native.checkScreenRecordingPermission() : false;
+  } catch (e) {
+    console.error('[Permissions] Error checking native screen permission:', e);
+    // Fallback to system check if native check fails
+    nativeScreenPermission = screen === 'granted';
+  }
   
-  console.log('[Permissions] Mic:', mic, '| Screen (system):', screen, '| Screen (native):', nativeScreenPermission, '| Accessibility:', accessibility);
+  console.log('[Permissions] Check result - Mic:', mic, '| Screen (system):', screen, '| Screen (native):', nativeScreenPermission, '| Accessibility:', accessibility);
   
   // Use native check for screen recording as it's more accurate for ScreenCaptureKit
-  return {
+  const currentState = {
     microphone: mic === 'granted',
     screenRecording: nativeScreenPermission,
     accessibility,
   };
+  
+  console.log('[Permissions] Current state:', currentState);
+  console.log('[Permissions] Last state:', lastPermissionState);
+  
+  // Emit event if permissions changed OR if this is the first check (lastPermissionState is null)
+  if (!lastPermissionState || 
+      (lastPermissionState.microphone !== currentState.microphone ||
+       lastPermissionState.screenRecording !== currentState.screenRecording ||
+       lastPermissionState.accessibility !== currentState.accessibility)) {
+    console.log('[Permissions] State changed or first check, notifying renderer');
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('permissions-updated', currentState);
+    } else {
+      console.log('[Permissions] Editor window not available, cannot send event');
+    }
+  }
+  
+  lastPermissionState = currentState;
+  return currentState;
+}
+
+function startPermissionPolling() {
+  if (permissionPollInterval) {
+    console.log('[Permissions] Polling already active');
+    return;
+  }
+  
+  console.log('[Permissions] Starting continuous polling');
+  permissionPollInterval = setInterval(async () => {
+    const perms = await checkPermissions();
+    // Notify renderer of current state
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.webContents.send('permissions-updated', perms);
+    }
+  }, 500); // Check every 500ms
+}
+
+function stopPermissionPolling() {
+  if (permissionPollInterval) {
+    console.log('[Permissions] Stopping continuous polling');
+    clearInterval(permissionPollInterval);
+    permissionPollInterval = null;
+  }
 }
 
 async function requestPermissions() {
   // Request microphone
   await systemPreferences.askForMediaAccess('microphone');
   
-  // Open system settings for screen recording and accessibility
+  // Immediately check after request
   const perms = await checkPermissions();
   
+  // Open system settings for screen recording and accessibility
   if (!perms.screenRecording) {
     exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"');
   }
   
   if (!perms.accessibility) {
     exec('open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"');
+  }
+  
+  // Start polling when settings are opened
+  if (!perms.screenRecording || !perms.accessibility) {
+    startPermissionPolling();
   }
 }
 
@@ -1767,16 +1846,38 @@ function setupIPC() {
     return perms.screenRecording;
   });
   
+  ipcMain.handle('request-microphone-permission', async () => {
+    // Request microphone permission (shows macOS dialog)
+    await systemPreferences.askForMediaAccess('microphone');
+    // Immediately check and return status
+    const perms = await checkPermissions();
+    return perms.microphone;
+  });
+  
+  ipcMain.handle('start-permission-polling', () => {
+    startPermissionPolling();
+    return true;
+  });
+  
+  ipcMain.handle('stop-permission-polling', () => {
+    stopPermissionPolling();
+    return true;
+  });
+  
   ipcMain.on('open-screen-recording-settings', () => {
     // Open System Settings to Screen Recording
     const { shell } = require('electron');
     shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    // Start polling when Settings opens
+    startPermissionPolling();
   });
   
   ipcMain.on('open-microphone-settings', () => {
     // Open System Settings to Microphone
     const { shell } = require('electron');
     shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone');
+    // Start polling when Settings opens
+    startPermissionPolling();
   });
   
   // Open Settings in a separate window
@@ -4068,8 +4169,14 @@ app.on('before-quit', (event) => {
 });
 
 // Handle dock icon click on macOS - open editor window
-app.on('activate', () => {
+app.on('activate', async () => {
   console.log('[App] Dock icon clicked (activate event)');
   // If recording, show editor view with current note. Otherwise show home.
   openEditorWindow(!isRecording);
+  
+  // Check permissions when app is activated (user may have returned from Settings)
+  const perms = await checkPermissions();
+  if (editorWindow && !editorWindow.isDestroyed()) {
+    editorWindow.webContents.send('permissions-updated', perms);
+  }
 });

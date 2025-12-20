@@ -9289,11 +9289,54 @@
       selectedEngine: null
     };
     
+    // Permission polling management
+    let permissionPollInterval = null;
+    
+    function startPermissionPolling() {
+      if (permissionPollInterval) {
+        return; // Already polling
+      }
+      console.log('[Setup] Starting permission polling');
+      permissionPollInterval = setInterval(async () => {
+        await checkSetup();
+      }, 500); // Check every 500ms
+    }
+    
+    function stopPermissionPolling() {
+      if (permissionPollInterval) {
+        console.log('[Setup] Stopping permission polling');
+        clearInterval(permissionPollInterval);
+        permissionPollInterval = null;
+      }
+    }
+    
+    // Listen for permission updates from main process
+    ipcRenderer.on('permissions-updated', async (_, perms) => {
+      console.log('[Setup] Permissions updated:', perms);
+      await checkSetup();
+    });
+    
     async function checkSetup() {
+      console.log('[Setup] checkSetup() called');
+      
+      if (!setupOverlay) {
+        console.error('[Setup] setupOverlay is null!');
+        return false;
+      }
+      
       // Check permissions
-      const perms = await ipcRenderer.invoke('check-permissions');
+      let perms;
+      try {
+        perms = await ipcRenderer.invoke('check-permissions');
+        console.log('[Setup] Permissions check result:', perms);
+      } catch (e) {
+        console.error('[Setup] Error checking permissions:', e);
+        return false;
+      }
+      
       setupState.microphone = perms.microphone;
       setupState.screenRecording = perms.screenRecording;
+      console.log('[Setup] Permission state:', { microphone: setupState.microphone, screenRecording: setupState.screenRecording });
       
       // Check API keys
       setupState.deepgramKey = await ipcRenderer.invoke('has-deepgram-key');
@@ -9349,11 +9392,42 @@
       
       const allSetupComplete = permissionsOk && transcriptionOk && aiOk;
       
+      console.log('[Setup] Setup state:', {
+        permissionsOk,
+        transcriptionOk,
+        aiOk,
+        allSetupComplete
+      });
+      
+      // Manage permission polling based on setup state
+      const permissionsPending = !permissionsOk;
+      
       if (allSetupComplete) {
+        console.log('[Setup] All setup complete, hiding overlay');
+        isSetupComplete = true;
         setupOverlay.classList.add('hidden');
+        stopPermissionPolling(); // Stop polling when complete
         return true;
       } else {
+        // Show overlay if setup is incomplete
+        console.log('[Setup] Setup incomplete, showing overlay. Permissions pending:', permissionsPending);
+        isSetupComplete = false;
         setupOverlay.classList.remove('hidden');
+        
+        // Verify overlay is actually visible
+        const isHidden = setupOverlay.classList.contains('hidden');
+        console.log('[Setup] Overlay hidden state after remove:', isHidden);
+        console.log('[Setup] Overlay element:', setupOverlay);
+        console.log('[Setup] Overlay computed display:', window.getComputedStyle(setupOverlay).display);
+        
+        // Start polling if permissions are pending (overlay is now visible)
+        if (permissionsPending) {
+          console.log('[Setup] Starting permission polling');
+          startPermissionPolling();
+        } else if (permissionsOk) {
+          console.log('[Setup] Permissions OK, stopping polling');
+          stopPermissionPolling(); // Stop polling if permissions are granted
+        }
         return false;
       }
     }
@@ -9691,29 +9765,112 @@
     setupBackBtn3?.addEventListener('click', () => showStep(2));
     
     setupMicBtn?.addEventListener('click', async () => {
-      // Open System Settings to Microphone permissions
-      ipcRenderer.send('open-microphone-settings');
-      // Keep checking until permission is granted
-      const checkMicPermission = setInterval(async () => {
-        const setup = await checkSetup();
-        if (setup || setupState.microphone) {
-          clearInterval(checkMicPermission);
+      // Show "Requesting..." state
+      const originalText = setupMicBtn.textContent;
+      setupMicBtn.textContent = 'Requesting...';
+      setupMicBtn.disabled = true;
+      
+      try {
+        // Request microphone permission (shows macOS dialog)
+        const granted = await ipcRenderer.invoke('request-microphone-permission');
+        
+        if (granted) {
+          // Permission granted immediately
+          setupMicBtn.textContent = 'Granted';
+          await checkSetup();
+        } else {
+          // Permission not granted, open Settings
+          setupMicBtn.textContent = 'Waiting...';
+          ipcRenderer.send('open-microphone-settings');
+          // Start continuous polling (already handled by checkSetup)
+          startPermissionPolling();
+          
+          // Show message to user
+          const micItem = document.getElementById('setupMic');
+          if (micItem) {
+            const desc = micItem.querySelector('.setup-item-desc');
+            if (desc) {
+              const originalDesc = desc.textContent;
+              desc.textContent = 'Grant permission in System Settings, then return to IceCubes';
+              
+              // Restore original text after 10 seconds or when granted
+              const restoreDesc = setInterval(async () => {
+                await checkSetup();
+                if (setupState.microphone) {
+                  clearInterval(restoreDesc);
+                  desc.textContent = originalDesc;
+                }
+              }, 1000);
+              
+              setTimeout(() => {
+                clearInterval(restoreDesc);
+                if (!setupState.microphone) {
+                  desc.textContent = originalDesc;
+                }
+              }, 30000); // Restore after 30 seconds max
+            }
+          }
         }
-      }, 2000);
+      } catch (e) {
+        console.error('[Setup] Microphone permission error:', e);
+        setupMicBtn.textContent = originalText;
+        setupMicBtn.disabled = false;
+      }
     });
     
     setupScreenBtn?.addEventListener('click', async () => {
-      // Request and trigger screen recording permission prompt
-      await ipcRenderer.invoke('request-screen-recording-permission');
-      // Open System Settings to Screen Recording permissions
-      ipcRenderer.send('open-screen-recording-settings');
-      // Keep checking until permission is granted
-      const checkScreenPermission = setInterval(async () => {
-        const setup = await checkSetup();
-        if (setup || setupState.screenRecording) {
-          clearInterval(checkScreenPermission);
+      // Show "Requesting..." state
+      const originalText = setupScreenBtn.textContent;
+      setupScreenBtn.textContent = 'Requesting...';
+      setupScreenBtn.disabled = true;
+      
+      try {
+        // Request and trigger screen recording permission prompt
+        await ipcRenderer.invoke('request-screen-recording-permission');
+        
+        // Check immediately
+        await checkSetup();
+        
+        if (!setupState.screenRecording) {
+          // Permission not granted, open Settings
+          setupScreenBtn.textContent = 'Waiting...';
+          ipcRenderer.send('open-screen-recording-settings');
+          // Start continuous polling (already handled by checkSetup)
+          startPermissionPolling();
+          
+          // Show message to user
+          const screenItem = document.getElementById('setupScreen');
+          if (screenItem) {
+            const desc = screenItem.querySelector('.setup-item-desc');
+            if (desc) {
+              const originalDesc = desc.textContent;
+              desc.textContent = 'Grant permission in System Settings, then return to IceCubes';
+              
+              // Restore original text after 10 seconds or when granted
+              const restoreDesc = setInterval(async () => {
+                await checkSetup();
+                if (setupState.screenRecording) {
+                  clearInterval(restoreDesc);
+                  desc.textContent = originalDesc;
+                }
+              }, 1000);
+              
+              setTimeout(() => {
+                clearInterval(restoreDesc);
+                if (!setupState.screenRecording) {
+                  desc.textContent = originalDesc;
+                }
+              }, 30000); // Restore after 30 seconds max
+            }
+          }
+        } else {
+          setupScreenBtn.textContent = 'Granted';
         }
-      }, 2000);
+      } catch (e) {
+        console.error('[Setup] Screen recording permission error:', e);
+        setupScreenBtn.textContent = originalText;
+        setupScreenBtn.disabled = false;
+      }
     });
     
     let downloadProgressInterval = null;
@@ -9870,8 +10027,30 @@
       setupOverlay.classList.add('hidden');
     });
     
-    // Check setup on load
-    checkSetup();
+    // Check setup on load - ensure DOM and IPC are ready
+    // Use a small delay to ensure IPC channels are established
+    setTimeout(async () => {
+      console.log('[Setup] Initial checkSetup() call');
+      try {
+        await checkSetup();
+      } catch (e) {
+        console.error('[Setup] Error in initial checkSetup():', e);
+        // Retry after a longer delay if first attempt fails
+        setTimeout(async () => {
+          console.log('[Setup] Retrying checkSetup()');
+          try {
+            await checkSetup();
+          } catch (e2) {
+            console.error('[Setup] Retry also failed:', e2);
+          }
+        }, 1000);
+      }
+    }, 100);
+    
+    // Cleanup polling on page unload
+    window.addEventListener('beforeunload', () => {
+      stopPermissionPolling();
+    });
     
     // Initialize wizard to step 1
     showStep(1);
@@ -15459,6 +15638,12 @@
     ipcRenderer.on('set-meeting', (_, meeting) => {
       console.log('[Editor] ====== SET-MEETING RECEIVED ======', meeting);
       
+      // Only proceed if setup is complete
+      if (!isSetupComplete) {
+        console.log('[Editor] Setup incomplete, ignoring set-meeting');
+        return;
+      }
+      
       // IMPORTANT: Show editor FIRST to prevent race conditions
       showEditor();
       
@@ -15796,10 +15981,33 @@
       showSettings();
     });
     
+    // Track if setup is complete
+    let isSetupComplete = false;
+    
     // Show home view (triggered from main when "Open Notes" is clicked)
     ipcRenderer.on('show-home-view', () => {
       console.log('[Editor] show-home-view received - showing home');
-      showEmptyState();
+      // Only show home if setup is complete
+      if (isSetupComplete) {
+        showEmptyState();
+      } else {
+        console.log('[Editor] Setup incomplete, ignoring show-home-view');
+      }
+    });
+    
+    // Handle request to show other views (only if setup complete)
+    ipcRenderer.on('should-show-other-views', () => {
+      console.log('[Editor] should-show-other-views received, setup complete:', isSetupComplete);
+      if (isSetupComplete && editorWindow && !editorWindow.isDestroyed()) {
+        // Show appropriate view based on state
+        if (pendingNoteToLoad) {
+          // Handle pending note
+        } else if (currentMeeting && !showHome) {
+          editorWindow.webContents.send('set-meeting', currentMeeting);
+        } else if (showHome) {
+          showEmptyState();
+        }
+      }
     });
     
     // Load specific note (triggered from meeting indicator click)
