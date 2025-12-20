@@ -16,6 +16,7 @@
   },
   "scripts": {
     "build": "napi build --platform --release",
+    "build:all": "napi build --target x86_64-apple-darwin --release && napi build --target aarch64-apple-darwin --release",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm"
   },
