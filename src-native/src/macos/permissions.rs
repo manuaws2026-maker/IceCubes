@@ -47,7 +47,7 @@ pub fn request_accessibility() -> bool {
 /// Check if screen recording permission is granted by actually querying ScreenCaptureKit
 #[allow(deprecated)]
 pub fn check_screen_recording() -> bool {
-    // First try CG preflight
+    // First try CG preflight (checks System Settings permission)
     let cg_check = unsafe { CGPreflightScreenCaptureAccess() };
     
     // Also verify with actual SCK call for accuracy
@@ -55,8 +55,10 @@ pub fn check_screen_recording() -> bool {
     
     tracing::debug!("Screen recording check - CG: {}, SCK: {}", cg_check, sck_check);
     
-    // Return true only if SCK actually works
-    sck_check
+    // Return true if either check passes
+    // CG check is more reliable for System Settings permission
+    // SCK check verifies ScreenCaptureKit actually works
+    cg_check || sck_check
 }
 
 /// Actually try to get shareable content to verify permission

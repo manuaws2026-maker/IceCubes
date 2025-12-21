@@ -1630,10 +1630,17 @@ async function checkPermissions() {
   
   console.log('[Permissions] Check result - Mic:', mic, '| Screen (system):', screen, '| Screen (native):', nativeScreenPermission, '| Accessibility:', accessibility);
   
-  // Use native check for screen recording as it's more accurate for ScreenCaptureKit
+  // Use native check for screen recording, but fallback to system check if native returns false
+  // This handles cases where System Settings shows permission granted but native check fails
+  const screenRecordingGranted = nativeScreenPermission || screen === 'granted';
+  
+  if (screen === 'granted' && !nativeScreenPermission) {
+    console.log('[Permissions] Warning: System Settings shows permission granted, but native check returned false. Using system check as fallback.');
+  }
+  
   const currentState = {
     microphone: mic === 'granted',
-    screenRecording: nativeScreenPermission,
+    screenRecording: screenRecordingGranted,
     accessibility,
   };
   
