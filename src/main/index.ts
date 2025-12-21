@@ -3360,8 +3360,19 @@ Answer:`;
     console.log('[Parakeet] Starting download via Rust (background thread)...');
     
     try {
+      const native = getNativeModule();
+      if (!native) {
+        console.error('[Parakeet] Native module not loaded');
+        return { success: false, started: false, error: 'Native module not loaded' };
+      }
+      
+      if (!native.downloadParakeetModel) {
+        console.error('[Parakeet] downloadParakeetModel function not available');
+        return { success: false, started: false, error: 'downloadParakeetModel function not available' };
+      }
+      
       // This now spawns a background thread and returns immediately
-      const started = nativeModule?.downloadParakeetModel?.();
+      const started = native.downloadParakeetModel();
       console.log('[Parakeet] Download started:', started);
       return { success: true, started: !!started };
     } catch (error: any) {

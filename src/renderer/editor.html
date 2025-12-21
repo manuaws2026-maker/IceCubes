@@ -11233,7 +11233,15 @@
       if (progressText) progressText.textContent = 'Starting download...';
       
       try {
-        await ipcRenderer.invoke('parakeet-download-model');
+        const result = await ipcRenderer.invoke('parakeet-download-model');
+        console.log('[Editor] Parakeet download started:', result);
+        
+        if (!result.success || !result.started) {
+          document.getElementById('parakeetSettingsNotDownloaded')?.classList.remove('hidden');
+          document.getElementById('parakeetSettingsDownloading')?.classList.add('hidden');
+          if (progressText) progressText.textContent = `Failed to start: ${result.error || 'Unknown error'}`;
+          return;
+        }
         
         // Poll for progress
         const pollInterval = setInterval(async () => {

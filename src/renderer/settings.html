@@ -1635,7 +1635,20 @@
       
       try {
         // Start download (returns immediately, runs in background)
-        await ipcRenderer.invoke('parakeet-download-model');
+        const result = await ipcRenderer.invoke('parakeet-download-model');
+        console.log('[Settings] Parakeet download started:', result);
+        
+        if (!result.success || !result.started) {
+          document.getElementById('parakeetDownloading')?.classList.add('hidden');
+          document.getElementById('parakeetNotDownloaded')?.classList.remove('hidden');
+          
+          await ipcRenderer.invoke('show-alert-dialog', {
+            title: 'Download Failed',
+            message: `Failed to start download: ${result.error || 'Unknown error'}`,
+            type: 'error'
+          });
+          return;
+        }
         
         // Poll for completion
         const checkProgress = setInterval(async () => {
