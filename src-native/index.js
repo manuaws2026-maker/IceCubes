@@ -9,6 +9,32 @@ const { join } = require('path')
 
 const { platform, arch } = process
 
+// Helper to check if a native file exists (checking both ASAR and unpacked locations)
+function nativeFileExists(filename) {
+  // Check relative to __dirname (works in development and when unpacked)
+  const localPath = join(__dirname, filename)
+  if (existsSync(localPath)) {
+    return true
+  }
+  
+  // In packaged Electron apps, native modules are unpacked to app.asar.unpacked
+  // Node.js require() will automatically look there, but existsSync needs explicit path
+  if (__dirname.includes('.asar')) {
+    const unpackedDir = __dirname.replace('.asar', '.asar.unpacked')
+    const unpackedPath = join(unpackedDir, filename)
+    if (existsSync(unpackedPath)) {
+      return true
+    }
+    // Also check in node_modules within unpacked
+    const unpackedNodeModules = join(unpackedDir, 'node_modules', 'ghost-native', filename)
+    if (existsSync(unpackedNodeModules)) {
+      return true
+    }
+  }
+  
+  return false
+}
+
 let nativeBinding = null
 let localFileExisted = false
 let loadError = null
@@ -108,18 +134,24 @@ switch (platform) {
     }
     break
   case 'darwin':
-    localFileExisted = existsSync(join(__dirname, 'ghost-native.darwin-universal.node'))
+    // Try universal binary first
+    localFileExisted = nativeFileExists('ghost-native.darwin-universal.node')
     try {
       if (localFileExisted) {
         nativeBinding = require('./ghost-native.darwin-universal.node')
+        break
       } else {
         nativeBinding = require('ghost-native-darwin-universal')
+        break
       }
-      break
-    } catch {}
+    } catch (e) {
+      // Universal binary failed, fall through to architecture-specific
+      loadError = e
+    }
+    // Fall back to architecture-specific binaries
     switch (arch) {
       case 'x64':
-        localFileExisted = existsSync(join(__dirname, 'ghost-native.darwin-x64.node'))
+        localFileExisted = nativeFileExists('ghost-native.darwin-x64.node')
         try {
           if (localFileExisted) {
             nativeBinding = require('./ghost-native.darwin-x64.node')
@@ -131,9 +163,7 @@ switch (platform) {
         }
         break
       case 'arm64':
-        localFileExisted = existsSync(
-          join(__dirname, 'ghost-native.darwin-arm64.node')
-        )
+        localFileExisted = nativeFileExists('ghost-native.darwin-arm64.node')
         try {
           if (localFileExisted) {
             nativeBinding = require('./ghost-native.darwin-arm64.node')

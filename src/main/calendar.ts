@@ -7,18 +7,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { app } from 'electron';
+import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from './google-config';
 
 // ============================================================================
 // PKCE OAuth Flow for Desktop Apps
 // ============================================================================
 
-// Google Cloud OAuth credentials - set via environment variables or replace with your own
-// To get your own credentials:
-// 1. Go to https://console.cloud.google.com/apis/credentials
-// 2. Create OAuth 2.0 Client ID (Desktop app type)
-// 3. Enable Google Calendar API
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+// Google Cloud OAuth credentials - hardcoded in the app bundle
+// Environment variables take precedence if set (for development)
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || GOOGLE_CLIENT_SECRET;
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 const TOKEN_PATH = path.join(app.getPath('userData'), 'calendar-token.json');

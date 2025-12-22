@@ -1719,15 +1719,71 @@ function getNativeModule() {
   if (nativeModule) return nativeModule;
   
   try {
+    console.log('[Native] Attempting to load ghost-native module...');
+    console.log('[Native] Platform:', process.platform, 'Architecture:', process.arch);
+    console.log('[Native] __dirname:', __dirname);
+    console.log('[Native] process.cwd():', process.cwd());
+    console.log('[Native] process.resourcesPath:', process.resourcesPath);
+    
+    // Check for native module files in common locations
+    const possiblePaths = [
+      path.join(__dirname, '..', '..', 'node_modules', 'ghost-native'),
+      path.join(__dirname, 'node_modules', 'ghost-native'),
+      path.join(process.resourcesPath || '', 'node_modules', 'ghost-native'),
+      path.join(process.resourcesPath || '', 'app.asar.unpacked', 'node_modules', 'ghost-native'),
+    ];
+    
+    console.log('[Native] Checking for native module files:');
+    possiblePaths.forEach(p => {
+      const x64File = path.join(p, 'ghost-native.darwin-x64.node');
+      const arm64File = path.join(p, 'ghost-native.darwin-arm64.node');
+      const universalFile = path.join(p, 'ghost-native.darwin-universal.node');
+      console.log(`  ${p}:`);
+      console.log(`    x64: ${fs.existsSync(x64File)}`);
+      console.log(`    arm64: ${fs.existsSync(arm64File)}`);
+      console.log(`    universal: ${fs.existsSync(universalFile)}`);
+    });
+    
     nativeModule = require('ghost-native');
-    console.log('[Native] Module loaded');
+    console.log('[Native] ✅ Module loaded successfully');
+    
+    // Verify key functions exist
+    if (!nativeModule.downloadParakeetModel) {
+      console.warn('[Native] ⚠️ downloadParakeetModel function not found in module');
+      console.warn('[Native] Available functions:', Object.keys(nativeModule).filter(k => typeof nativeModule[k] === 'function'));
+    }
+    if (!nativeModule.initParakeet) {
+      console.warn('[Native] ⚠️ initParakeet function not found in module');
+    }
     
     // Set native module for AI router (for local LLM)
     setNativeModuleForAI(nativeModule);
     
     return nativeModule;
-  } catch (e) {
-    console.error('[Native] Failed to load:', e);
+  } catch (e: any) {
+    console.error('[Native] ❌ Failed to load ghost-native module:', e);
+    console.error('[Native] Error details:', {
+      message: e.message,
+      stack: e.stack,
+      code: e.code,
+      path: e.path,
+      errno: e.errno,
+      syscall: e.syscall
+    });
+    
+    // On Intel Macs, provide specific guidance
+    if (process.platform === 'darwin' && process.arch === 'x64') {
+      console.error('[Native] ⚠️ Intel Mac detected - checking for x64 native module...');
+      const x64Paths = [
+        path.join(__dirname, '..', '..', 'node_modules', 'ghost-native', 'ghost-native.darwin-x64.node'),
+        path.join(__dirname, 'node_modules', 'ghost-native', 'ghost-native.darwin-x64.node'),
+        path.join(process.resourcesPath || '', 'node_modules', 'ghost-native', 'ghost-native.darwin-x64.node'),
+      ];
+      x64Paths.forEach(p => {
+        console.error(`  ${p}: ${fs.existsSync(p)}`);
+      });
+    }
+    
     return null;
   }
 }
@@ -3360,14 +3416,37 @@ Answer:`;
     console.log('[Parakeet] Starting download via Rust (background thread)...');
     
     try {
+      // Try to load native module with detailed error reporting
       const native = getNativeModule();
       if (!native) {
-        console.error('[Parakeet] Native module not loaded');
-        return { success: false, started: false, error: 'Native module not loaded' };
+        // Check if the module file exists
+        const nativeModulePath = path.join(__dirname, '..', '..', 'node_modules', 'ghost-native');
+        const nativeModuleExists = fs.existsSync(nativeModulePath);
+        console.error('[Parakeet] Native module not loaded. Module path exists:', nativeModuleExists);
+        console.error('[Parakeet] __dirname:', __dirname);
+        console.error('[Parakeet] Expected module path:', nativeModulePath);
+        
+        // Try alternative paths
+        const altPaths = [
+          path.join(__dirname, 'node_modules', 'ghost-native'),
+          path.join(process.cwd(), 'node_modules', 'ghost-native'),
+          path.join(process.resourcesPath || '', 'node_modules', 'ghost-native'),
+        ];
+        console.error('[Parakeet] Checking alternative paths:');
+        altPaths.forEach(p => {
+          console.error(`  ${p}: ${fs.existsSync(p)}`);
+        });
+        
+        return { 
+          success: false, 
+          started: false, 
+          error: `Native module not loaded. Check console for details. Module path exists: ${nativeModuleExists}` 
+        };
       }
       
       if (!native.downloadParakeetModel) {
         console.error('[Parakeet] downloadParakeetModel function not available');
+        console.error('[Parakeet] Available functions:', Object.keys(native).filter(k => typeof native[k] === 'function'));
         return { success: false, started: false, error: 'downloadParakeetModel function not available' };
       }
       
@@ -3377,6 +3456,7 @@ Answer:`;
       return { success: true, started: !!started };
     } catch (error: any) {
       console.error('[Parakeet] Download start error:', error);
+      console.error('[Parakeet] Error stack:', error.stack);
       return { success: false, started: false, error: error.message || String(error) };
     }
   });
@@ -3981,10 +4061,19 @@ app.whenReady().then(async () => {
   // 1. Create anchor window FIRST (keeps app stable)
   createAnchorWindow();
   
-  // 2. Setup IPC
+  // 2. Preload native module early to catch any loading issues
+  console.log('[App] Preloading native module...');
+  const preloadedNative = getNativeModule();
+  if (!preloadedNative) {
+    console.error('[App] ⚠️ Warning: Native module failed to load. Some features may not work.');
+  } else {
+    console.log('[App] ✅ Native module preloaded successfully');
+  }
+  
+  // 3. Setup IPC
   setupIPC();
   
-  // 3. Initialize services
+  // 4. Initialize services
   transcriptionService = transcriptionRouter.getDeepgramService(); // For backward compatibility
   calendarService = new CalendarService(store);
   openaiService = new OpenAIService();

@@ -53,3 +53,4 @@ echo "   - Microphone: System Settings → Privacy & Security → Microphone"
 echo "   - Screen Recording: System Settings → Privacy & Security → Screen Recording"
 echo "   - Accessibility: System Settings → Privacy & Security → Accessibility"
 
+

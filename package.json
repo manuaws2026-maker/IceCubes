@@ -69,6 +69,10 @@
     "directories": {
       "output": "release"
     },
+    "asarUnpack": [
+      "**/node_modules/ghost-native/**/*.node",
+      "**/ghost-native*.node"
+    ],
     "files": [
       "dist/**/*",
       "node_modules/**/*",
