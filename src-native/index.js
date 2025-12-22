@@ -9,30 +9,37 @@ const { join } = require('path')
 
 const { platform, arch } = process
 
-// Helper to check if a native file exists (checking both ASAR and unpacked locations)
-function nativeFileExists(filename) {
+// Helper to resolve native module path (checking both ASAR and unpacked locations)
+function resolveNativePath(filename) {
   // Check relative to __dirname (works in development and when unpacked)
   const localPath = join(__dirname, filename)
   if (existsSync(localPath)) {
-    return true
+    return localPath
   }
   
   // In packaged Electron apps, native modules are unpacked to app.asar.unpacked
-  // Node.js require() will automatically look there, but existsSync needs explicit path
+  // Check unpacked location
   if (__dirname.includes('.asar')) {
     const unpackedDir = __dirname.replace('.asar', '.asar.unpacked')
     const unpackedPath = join(unpackedDir, filename)
     if (existsSync(unpackedPath)) {
-      return true
+      return unpackedPath
     }
     // Also check in node_modules within unpacked
     const unpackedNodeModules = join(unpackedDir, 'node_modules', 'ghost-native', filename)
     if (existsSync(unpackedNodeModules)) {
-      return true
+      return unpackedNodeModules
     }
   }
   
-  return false
+  // Return local path even if it doesn't exist (will fail with better error)
+  return localPath
+}
+
+// Helper to check if a native file exists
+function nativeFileExists(filename) {
+  const resolvedPath = resolveNativePath(filename)
+  return existsSync(resolvedPath)
 }
 
 let nativeBinding = null
@@ -135,10 +142,11 @@ switch (platform) {
     break
   case 'darwin':
     // Try universal binary first
-    localFileExisted = nativeFileExists('ghost-native.darwin-universal.node')
+    const universalPath = resolveNativePath('ghost-native.darwin-universal.node')
+    localFileExisted = existsSync(universalPath)
     try {
       if (localFileExisted) {
-        nativeBinding = require('./ghost-native.darwin-universal.node')
+        nativeBinding = require(universalPath)
         break
       } else {
         nativeBinding = require('ghost-native-darwin-universal')
@@ -151,27 +159,33 @@ switch (platform) {
     // Fall back to architecture-specific binaries
     switch (arch) {
       case 'x64':
-        localFileExisted = nativeFileExists('ghost-native.darwin-x64.node')
+        const x64Path = resolveNativePath('ghost-native.darwin-x64.node')
+        localFileExisted = existsSync(x64Path)
         try {
           if (localFileExisted) {
-            nativeBinding = require('./ghost-native.darwin-x64.node')
+            nativeBinding = require(x64Path)
           } else {
             nativeBinding = require('ghost-native-darwin-x64')
           }
         } catch (e) {
           loadError = e
+          console.error('[Native] Failed to load x64 module:', e.message)
+          console.error('[Native] Tried path:', x64Path)
         }
         break
       case 'arm64':
-        localFileExisted = nativeFileExists('ghost-native.darwin-arm64.node')
+        const arm64Path = resolveNativePath('ghost-native.darwin-arm64.node')
+        localFileExisted = existsSync(arm64Path)
         try {
           if (localFileExisted) {
-            nativeBinding = require('./ghost-native.darwin-arm64.node')
+            nativeBinding = require(arm64Path)
           } else {
             nativeBinding = require('ghost-native-darwin-arm64')
           }
         } catch (e) {
           loadError = e
+          console.error('[Native] Failed to load arm64 module:', e.message)
+          console.error('[Native] Tried path:', arm64Path)
         }
         break
       default:
