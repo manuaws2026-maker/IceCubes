@@ -12,12 +12,17 @@ exports.default = async function notarizing(context) {
 
   console.log(`Notarizing ${appPath}...`);
 
-  return await notarize({
-    appBundleId: 'ai.icecubes.app',
-    appPath: appPath,
-    appleId: process.env.APPLE_ID,
-    appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
-    teamId: process.env.APPLE_TEAM_ID || 'V3ED3574U9',
-  });
+        if (!process.env.APPLE_ID || !process.env.APPLE_APP_SPECIFIC_PASSWORD) {
+          console.log('⚠️  Apple credentials not set, skipping notarization');
+          return;
+        }
+
+        return await notarize({
+          appBundleId: 'ai.icecubes.app',
+          appPath: appPath,
+          appleId: process.env.APPLE_ID,
+          appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
+          teamId: process.env.APPLE_TEAM_ID || 'V3ED3574U9',
+        });
 };
 
