@@ -70,7 +70,6 @@ export interface LlmResponse {
 }
 export declare function getLlmModelInfo(): LlmModelInfo
 export declare function getLlmInitProgress(): LlmInitProgress
-export declare function getLlmDownloadProgress(): LlmDownloadProgress
 export declare function isLlmReady(): boolean
 /** Check if LLM model is downloaded (cached by HuggingFace Hub) */
 export declare function isLlmDownloaded(): boolean
