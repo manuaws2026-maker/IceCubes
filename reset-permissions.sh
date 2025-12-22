@@ -54,3 +54,4 @@ echo "   - Screen Recording: System Settings → Privacy & Security → Screen R
 echo "   - Accessibility: System Settings → Privacy & Security → Accessibility"
 
 
+

@@ -296,6 +296,16 @@ fn do_init_llm() {
     println!("[LLM] File: {}", GGUF_FILE);
     println!("[LLM] Tokenizer: {}", TOKENIZER_REPO);
     
+    // Ensure HuggingFace cache directory exists (important for fresh installs from DMG)
+    if let Some(home) = dirs::home_dir() {
+        let cache_dir = home.join(".cache/huggingface/hub");
+        if let Err(e) = std::fs::create_dir_all(&cache_dir) {
+            println!("[LLM] ⚠️ Warning: Could not create cache directory: {} (download may still work)", e);
+        } else {
+            println!("[LLM] Cache directory ready: {}", cache_dir.display());
+        }
+    }
+    
     {
         let mut progress = LLM_INIT_PROGRESS.lock();
         progress.status = "Downloading model from HuggingFace (if not cached)...".to_string();
