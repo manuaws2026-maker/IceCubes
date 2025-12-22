@@ -9703,6 +9703,10 @@
       localLLMDownloading?.classList.remove('hidden');
       localLLMDownloaded?.classList.add('hidden');
       if (llmProgressText) llmProgressText.textContent = 'Starting download from HuggingFace...';
+      if (llmProgressFill) {
+        llmProgressFill.classList.remove('llm-progress-indeterminate');
+        llmProgressFill.style.width = '0%';
+      }
       
       try {
         // Start the LLM init (downloads model from HuggingFace if not cached)
@@ -9710,42 +9714,60 @@
         console.log('[Setup] LLM init started:', started);
         
         if (started) {
-          // Poll for progress
+          // Poll for download progress (file size tracking)
           const pollProgress = setInterval(async () => {
-            const progress = await ipcRenderer.invoke('llm-get-init-progress');
-            console.log('[Setup] LLM progress:', progress);
-            
-            if (progress.error) {
-              clearInterval(pollProgress);
-              if (llmProgressText) llmProgressText.textContent = 'Download failed: ' + progress.error;
-              localLLMNotDownloaded?.classList.remove('hidden');
-              localLLMDownloading?.classList.add('hidden');
-              return;
-            }
-            
-            // Update progress text
-            if (llmProgressText) {
-              if (progress.status) {
-                llmProgressText.textContent = progress.status;
-              } else if (progress.isLoading) {
-                llmProgressText.textContent = 'Downloading model from HuggingFace... Please wait.';
-              }
-            }
-            
-            // Check if download is complete (not loading anymore and no error)
-            if (!progress.isLoading && !progress.error) {
-              // Double-check by verifying the model is downloaded
-              const isDownloaded = await ipcRenderer.invoke('llm-is-downloaded');
-              console.log('[Setup] LLM download complete, isDownloaded:', isDownloaded);
+            try {
+              const downloadProgress = await ipcRenderer.invoke('llm-get-download-progress');
+              const initProgress = await ipcRenderer.invoke('llm-get-init-progress');
+              console.log('[Setup] LLM download progress:', downloadProgress);
               
-              if (isDownloaded) {
+              if (initProgress.error) {
                 clearInterval(pollProgress);
-                setupState.localLLMReady = true;
-                updateLocalLLMUI(true);
-                updateSetupUI();
+                if (llmProgressText) llmProgressText.textContent = 'Download failed: ' + initProgress.error;
+                localLLMNotDownloaded?.classList.remove('hidden');
+                localLLMDownloading?.classList.add('hidden');
+                return;
               }
+              
+              // Update progress bar and text
+              if (downloadProgress.isDownloading) {
+                const downloadedGB = (downloadProgress.bytesDownloaded / (1024 * 1024 * 1024)).toFixed(2);
+                const totalGB = (downloadProgress.totalBytes / (1024 * 1024 * 1024)).toFixed(1);
+                
+                if (llmProgressFill) {
+                  llmProgressFill.style.width = `${downloadProgress.percent}%`;
+                }
+                
+                if (llmProgressText) {
+                  llmProgressText.textContent = `Downloading ${downloadProgress.currentFile}... ${downloadedGB}/${totalGB} GB (${downloadProgress.percent}%)`;
+                }
+              } else if (initProgress.isLoading) {
+                // Still initializing but download might be complete
+                if (llmProgressText) {
+                  llmProgressText.textContent = initProgress.status || 'Initializing model...';
+                }
+              }
+              
+              // Check if download is complete (not loading anymore and no error)
+              if (!initProgress.isLoading && !initProgress.error) {
+                // Double-check by verifying the model is downloaded
+                const isDownloaded = await ipcRenderer.invoke('llm-is-downloaded');
+                console.log('[Setup] LLM download complete, isDownloaded:', isDownloaded);
+                
+                if (isDownloaded) {
+                  clearInterval(pollProgress);
+                  if (llmProgressFill) {
+                    llmProgressFill.style.width = '100%';
+                  }
+                  setupState.localLLMReady = true;
+                  updateLocalLLMUI(true);
+                  updateSetupUI();
+                }
+              }
+            } catch (e) {
+              console.error('[Setup] Progress poll error:', e);
             }
-          }, 1500);
+          }, 500); // Poll every 500ms for smoother updates
         }
       } catch (e) {
         console.error('[Setup] LLM init error:', e);
@@ -11308,36 +11330,64 @@
       document.getElementById('localLLMSettingsDownloaded')?.classList.add('hidden');
       
       const progressText = document.getElementById('localLLMSettingsProgressText');
+      const progressFill = document.getElementById('localLLMSettingsProgressFill');
       if (progressText) progressText.textContent = 'Initializing download...';
+      if (progressFill) {
+        progressFill.classList.remove('llm-progress-indeterminate');
+        progressFill.style.width = '0%';
+      }
       
       try {
         await ipcRenderer.invoke('llm-init');
         
-        // Poll for progress
+        // Poll for download progress (file size tracking)
         const pollInterval = setInterval(async () => {
-          const progress = await ipcRenderer.invoke('llm-get-init-progress');
-          
-          if (progress.error) {
-            clearInterval(pollInterval);
-            if (progressText) progressText.textContent = 'Error: ' + progress.error;
-            document.getElementById('localLLMSettingsNotDownloaded')?.classList.remove('hidden');
-            document.getElementById('localLLMSettingsDownloading')?.classList.add('hidden');
-            return;
+          try {
+            const downloadProgress = await ipcRenderer.invoke('llm-get-download-progress');
+            const initProgress = await ipcRenderer.invoke('llm-get-init-progress');
+            
+            if (initProgress.error) {
+              clearInterval(pollInterval);
+              if (progressText) progressText.textContent = 'Error: ' + initProgress.error;
+              document.getElementById('localLLMSettingsNotDownloaded')?.classList.remove('hidden');
+              document.getElementById('localLLMSettingsDownloading')?.classList.add('hidden');
+              return;
+            }
+            
+            // Update progress bar and text
+            if (downloadProgress.isDownloading) {
+              const downloadedGB = (downloadProgress.bytesDownloaded / (1024 * 1024 * 1024)).toFixed(2);
+              const totalGB = (downloadProgress.totalBytes / (1024 * 1024 * 1024)).toFixed(1);
+              
+              if (progressFill) {
+                progressFill.style.width = `${downloadProgress.percent}%`;
+              }
+              
+              if (progressText) {
+                progressText.textContent = `Downloading ${downloadProgress.currentFile}... ${downloadedGB}/${totalGB} GB (${downloadProgress.percent}%)`;
+              }
+            } else if (initProgress.isLoading) {
+              // Still initializing but download might be complete
+              if (progressText) {
+                progressText.textContent = initProgress.status || 'Initializing model...';
+              }
+            }
+            
+            // Check if done
+            const isReady = await ipcRenderer.invoke('llm-is-ready');
+            if (isReady && !initProgress.isLoading) {
+              clearInterval(pollInterval);
+              if (progressFill) {
+                progressFill.style.width = '100%';
+              }
+              settingsState.localLLMReady = true;
+              updateSettingsProviderStatus();
+              checkSetup();
+            }
+          } catch (e) {
+            console.error('Progress poll error:', e);
           }
-          
-          if (progress.isLoading) {
-            if (progressText) progressText.textContent = progress.status || 'Downloading...';
-          }
-          
-          // Check if done
-          const isReady = await ipcRenderer.invoke('llm-is-ready');
-          if (isReady && !progress.isLoading) {
-            clearInterval(pollInterval);
-            settingsState.localLLMReady = true;
-            updateSettingsProviderStatus();
-            checkSetup();
-          }
-        }, 1000);
+        }, 500); // Poll every 500ms for smoother updates
       } catch (e) {
         console.error('LLM init error:', e);
         if (progressText) progressText.textContent = 'Download failed: ' + e.message;

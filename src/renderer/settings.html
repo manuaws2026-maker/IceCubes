@@ -1749,47 +1749,79 @@
       document.getElementById('localLLMDownloading')?.classList.remove('hidden');
       
       const progressText = document.getElementById('localLLMProgressText');
+      const progressFill = document.getElementById('localLLMProgressFill');
+      if (progressFill) {
+        progressFill.classList.remove('llm-progress-indeterminate');
+        progressFill.style.width = '0%';
+      }
       
       try {
         // llm-init downloads and loads the model (handled by mistralrs)
         await ipcRenderer.invoke('llm-init');
         
-        // Poll for completion
+        // Poll for download progress (file size tracking)
         const checkProgress = setInterval(async () => {
-          const progress = await ipcRenderer.invoke('llm-get-init-progress');
-          console.log('[Settings] LLM init progress:', progress);
-          
-          if (progressText && progress.status) {
-            progressText.textContent = progress.status;
-          }
-          
-          if (progress.status === 'Model ready' || (!progress.isLoading && !progress.error)) {
-            clearInterval(checkProgress);
-            console.log('[Settings] LLM init complete!');
-            settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
-            document.getElementById('localLLMDownloading')?.classList.add('hidden');
-            updateUI();
+          try {
+            const downloadProgress = await ipcRenderer.invoke('llm-get-download-progress');
+            const initProgress = await ipcRenderer.invoke('llm-get-init-progress');
+            console.log('[Settings] LLM download progress:', downloadProgress);
             
-            if (settingsState.localLLMReady) {
+            if (initProgress.error) {
+              clearInterval(checkProgress);
+              console.error('[Settings] LLM init error:', initProgress.error);
+              if (progressText) progressText.textContent = 'Error: ' + initProgress.error;
+              document.getElementById('localLLMDownloading')?.classList.add('hidden');
+              document.getElementById('localLLMNotDownloaded')?.classList.remove('hidden');
+              
               await ipcRenderer.invoke('show-alert-dialog', {
-                title: 'Model Ready',
-                message: 'Qwen2.5 3B model is ready for local AI notes!',
-                type: 'info'
+                title: 'Download Failed',
+                message: 'Failed to download/initialize model: ' + initProgress.error,
+                type: 'error'
               });
+              return;
             }
-          } else if (progress.error) {
-            clearInterval(checkProgress);
-            console.error('[Settings] LLM init error:', progress.error);
-            document.getElementById('localLLMDownloading')?.classList.add('hidden');
-            document.getElementById('localLLMNotDownloaded')?.classList.remove('hidden');
             
-            await ipcRenderer.invoke('show-alert-dialog', {
-              title: 'Download Failed',
-              message: 'Failed to download/initialize model: ' + progress.error,
-              type: 'error'
-            });
+            // Update progress bar and text
+            if (downloadProgress.isDownloading) {
+              const downloadedGB = (downloadProgress.bytesDownloaded / (1024 * 1024 * 1024)).toFixed(2);
+              const totalGB = (downloadProgress.totalBytes / (1024 * 1024 * 1024)).toFixed(1);
+              
+              if (progressFill) {
+                progressFill.style.width = `${downloadProgress.percent}%`;
+              }
+              
+              if (progressText) {
+                progressText.textContent = `Downloading ${downloadProgress.currentFile}... ${downloadedGB}/${totalGB} GB (${downloadProgress.percent}%)`;
+              }
+            } else if (initProgress.isLoading) {
+              // Still initializing but download might be complete
+              if (progressText) {
+                progressText.textContent = initProgress.status || 'Initializing model...';
+              }
+            }
+            
+            if (initProgress.status === 'Model ready' || (!initProgress.isLoading && !initProgress.error)) {
+              clearInterval(checkProgress);
+              console.log('[Settings] LLM init complete!');
+              if (progressFill) {
+                progressFill.style.width = '100%';
+              }
+              settingsState.localLLMReady = await ipcRenderer.invoke('llm-is-downloaded');
+              document.getElementById('localLLMDownloading')?.classList.add('hidden');
+              updateUI();
+              
+              if (settingsState.localLLMReady) {
+                await ipcRenderer.invoke('show-alert-dialog', {
+                  title: 'Model Ready',
+                  message: 'Qwen2.5 3B model is ready for local AI notes!',
+                  type: 'info'
+                });
+              }
+            }
+          } catch (e) {
+            console.error('[Settings] Progress poll error:', e);
           }
-        }, 1000);
+        }, 500); // Poll every 500ms for smoother updates
       } catch (e) {
         console.error('[Settings] LLM init exception:', e);
         document.getElementById('localLLMDownloading')?.classList.add('hidden');

@@ -3720,6 +3720,29 @@ Answer:`;
     }
   });
 
+  // Get download progress (file size tracking)
+  ipcMain.handle('llm-get-download-progress', async () => {
+    try {
+      return nativeModule?.getLlmDownloadProgress?.() ?? {
+        isDownloading: false,
+        bytesDownloaded: 0,
+        totalBytes: 2100000000,
+        percent: 0,
+        currentFile: ''
+      };
+    } catch (e) {
+      console.error('[LLM] Get download progress error:', e);
+      return {
+        isDownloading: false,
+        bytesDownloaded: 0,
+        totalBytes: 2100000000,
+        percent: 0,
+        currentFile: '',
+        error: String(e)
+      };
+    }
+  });
+
   // Chat completion (non-streaming)
   ipcMain.handle('llm-chat', async (_, messagesJson: string, maxTokens?: number, temperature?: number) => {
     console.log('[LLM] Chat request received');

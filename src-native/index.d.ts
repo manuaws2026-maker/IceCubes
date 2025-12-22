@@ -55,6 +55,13 @@ export interface LlmInitProgress {
   status: string
   error?: string
 }
+export interface LlmDownloadProgress {
+  isDownloading: boolean
+  bytesDownloaded: number
+  totalBytes: number
+  percent: number
+  currentFile: string
+}
 export interface LlmResponse {
   text: string
   promptTokens: number
@@ -63,9 +70,12 @@ export interface LlmResponse {
 }
 export declare function getLlmModelInfo(): LlmModelInfo
 export declare function getLlmInitProgress(): LlmInitProgress
+export declare function getLlmDownloadProgress(): LlmDownloadProgress
 export declare function isLlmReady(): boolean
 /** Check if LLM model is downloaded (cached by HuggingFace Hub) */
 export declare function isLlmDownloaded(): boolean
+/** Get download progress by checking HuggingFace cache for .part files */
+export declare function getLlmDownloadProgress(): LlmDownloadProgress
 /**
  * Initialize the LLM - downloads model from HuggingFace if not cached
  * This is handled automatically by mistral.rs

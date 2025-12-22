@@ -66,6 +66,16 @@ pub struct LlmInitProgress {
 
 #[napi(object)]
 #[derive(Clone)]
+pub struct LlmDownloadProgress {
+    pub is_downloading: bool,
+    pub bytes_downloaded: i64,
+    pub total_bytes: i64,
+    pub percent: u32,
+    pub current_file: String,
+}
+
+#[napi(object)]
+#[derive(Clone)]
 pub struct LlmResponse {
     pub text: String,
     pub prompt_tokens: u32,
@@ -154,6 +164,92 @@ pub fn is_llm_downloaded() -> bool {
     
     println!("[LLM] ❌ Model not downloaded or incomplete");
     false
+}
+
+/// Get download progress by checking HuggingFace cache for .part files
+#[napi]
+pub fn get_llm_download_progress() -> LlmDownloadProgress {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            return LlmDownloadProgress {
+                is_downloading: false,
+                bytes_downloaded: 0,
+                total_bytes: MODEL_SIZE_BYTES as i64,
+                percent: 0,
+                current_file: String::new(),
+            };
+        }
+    };
+    
+    let cache_dir = home.join(".cache/huggingface/hub");
+    let model_dir_name = format!("models--{}", GGUF_REPO.replace("/", "--"));
+    let model_dir = cache_dir.join(&model_dir_name);
+    let blobs_dir = model_dir.join("blobs");
+    
+    // Check if model is already downloaded
+    if is_llm_downloaded() {
+        return LlmDownloadProgress {
+            is_downloading: false,
+            bytes_downloaded: MODEL_SIZE_BYTES as i64,
+            total_bytes: MODEL_SIZE_BYTES as i64,
+            percent: 100,
+            current_file: GGUF_FILE.to_string(),
+        };
+    }
+    
+    // Check for .part files (download in progress)
+    if blobs_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&blobs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                
+                // Look for .part files (HuggingFace download in progress)
+                if file_name.ends_with(".part") {
+                    if let Ok(metadata) = std::fs::metadata(&path) {
+                        let downloaded_bytes = metadata.len() as i64;
+                        let total_bytes = MODEL_SIZE_BYTES as i64;
+                        let percent = if total_bytes > 0 {
+                            ((downloaded_bytes as f64 / total_bytes as f64) * 100.0) as u32
+                        } else {
+                            0
+                        };
+                        
+                        return LlmDownloadProgress {
+                            is_downloading: true,
+                            bytes_downloaded: downloaded_bytes,
+                            total_bytes,
+                            percent: percent.min(100),
+                            current_file: GGUF_FILE.to_string(),
+                        };
+                    }
+                }
+            }
+        }
+    }
+    
+    // Check if init is in progress (from init progress state)
+    let init_progress = LLM_INIT_PROGRESS.lock();
+    if init_progress.is_loading && init_progress.status.contains("Downloading") {
+        // Download might be starting, return minimal progress
+        return LlmDownloadProgress {
+            is_downloading: true,
+            bytes_downloaded: 0,
+            total_bytes: MODEL_SIZE_BYTES as i64,
+            percent: 0,
+            current_file: GGUF_FILE.to_string(),
+        };
+    }
+    
+    // No download in progress
+    LlmDownloadProgress {
+        is_downloading: false,
+        bytes_downloaded: 0,
+        total_bytes: MODEL_SIZE_BYTES as i64,
+        percent: 0,
+        current_file: String::new(),
+    }
 }
 
 // ============================================================================

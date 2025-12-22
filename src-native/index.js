@@ -9,39 +9,6 @@ const { join } = require('path')
 
 const { platform, arch } = process
 
-// Helper to resolve native module path (checking both ASAR and unpacked locations)
-function resolveNativePath(filename) {
-  // Check relative to __dirname (works in development and when unpacked)
-  const localPath = join(__dirname, filename)
-  if (existsSync(localPath)) {
-    return localPath
-  }
-  
-  // In packaged Electron apps, native modules are unpacked to app.asar.unpacked
-  // Check unpacked location
-  if (__dirname.includes('.asar')) {
-    const unpackedDir = __dirname.replace('.asar', '.asar.unpacked')
-    const unpackedPath = join(unpackedDir, filename)
-    if (existsSync(unpackedPath)) {
-      return unpackedPath
-    }
-    // Also check in node_modules within unpacked
-    const unpackedNodeModules = join(unpackedDir, 'node_modules', 'ghost-native', filename)
-    if (existsSync(unpackedNodeModules)) {
-      return unpackedNodeModules
-    }
-  }
-  
-  // Return local path even if it doesn't exist (will fail with better error)
-  return localPath
-}
-
-// Helper to check if a native file exists
-function nativeFileExists(filename) {
-  const resolvedPath = resolveNativePath(filename)
-  return existsSync(resolvedPath)
-}
-
 let nativeBinding = null
 let localFileExisted = false
 let loadError = null
@@ -141,51 +108,40 @@ switch (platform) {
     }
     break
   case 'darwin':
-    // Try universal binary first
-    const universalPath = resolveNativePath('ghost-native.darwin-universal.node')
-    localFileExisted = existsSync(universalPath)
+    localFileExisted = existsSync(join(__dirname, 'ghost-native.darwin-universal.node'))
     try {
       if (localFileExisted) {
-        nativeBinding = require(universalPath)
-        break
+        nativeBinding = require('./ghost-native.darwin-universal.node')
       } else {
         nativeBinding = require('ghost-native-darwin-universal')
-        break
       }
-    } catch (e) {
-      // Universal binary failed, fall through to architecture-specific
-      loadError = e
-    }
-    // Fall back to architecture-specific binaries
+      break
+    } catch {}
     switch (arch) {
       case 'x64':
-        const x64Path = resolveNativePath('ghost-native.darwin-x64.node')
-        localFileExisted = existsSync(x64Path)
+        localFileExisted = existsSync(join(__dirname, 'ghost-native.darwin-x64.node'))
         try {
           if (localFileExisted) {
-            nativeBinding = require(x64Path)
+            nativeBinding = require('./ghost-native.darwin-x64.node')
           } else {
             nativeBinding = require('ghost-native-darwin-x64')
           }
         } catch (e) {
           loadError = e
-          console.error('[Native] Failed to load x64 module:', e.message)
-          console.error('[Native] Tried path:', x64Path)
         }
         break
       case 'arm64':
-        const arm64Path = resolveNativePath('ghost-native.darwin-arm64.node')
-        localFileExisted = existsSync(arm64Path)
+        localFileExisted = existsSync(
+          join(__dirname, 'ghost-native.darwin-arm64.node')
+        )
         try {
           if (localFileExisted) {
-            nativeBinding = require(arm64Path)
+            nativeBinding = require('./ghost-native.darwin-arm64.node')
           } else {
             nativeBinding = require('ghost-native-darwin-arm64')
           }
         } catch (e) {
           loadError = e
-          console.error('[Native] Failed to load arm64 module:', e.message)
-          console.error('[Native] Tried path:', arm64Path)
         }
         break
       default:
@@ -354,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, initLlm, initLlmSync, shutdownLlm, deleteLlmModel, llmGenerate, llmChat, llmChatStream, isEmbeddingDownloaded, downloadEmbeddingModel, getEmbeddingDownloadProgress, initEmbeddingModel, isEmbeddingReady, generateEmbedding, generateEmbeddingsBatch, deleteEmbeddingModel, getEmbeddingDimension, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
+const { isParakeetDownloaded, getParakeetModelInfo, getParakeetLanguages, getParakeetDownloadProgress, downloadParakeetModel, initParakeet, isParakeetReady, transcribeAudioBuffer, transcribeAudioBufferWithTimestamps, deleteParakeetModel, getParakeetModelPath, shutdownParakeet, getLlmModelInfo, getLlmInitProgress, isLlmReady, isLlmDownloaded, getLlmDownloadProgress, initLlm, initLlmSync, shutdownLlm, deleteLlmModel, llmGenerate, llmChat, llmChatStream, isEmbeddingDownloaded, downloadEmbeddingModel, getEmbeddingDownloadProgress, initEmbeddingModel, isEmbeddingReady, generateEmbedding, generateEmbeddingsBatch, deleteEmbeddingModel, getEmbeddingDimension, getActiveWindows, checkAccessibilityPermission, requestAccessibilityPermission, checkScreenRecordingPermission, requestScreenRecordingPermission, triggerScreenRecordingPrompt, getBrowserUrl, startAudioCapture, stopAudioCapture, getAudioLevel, isCapturing, getCaptureDuration, isMicrophoneInUse, getAudioChunks, hasAudioChunks } = nativeBinding
 
 module.exports.isParakeetDownloaded = isParakeetDownloaded
 module.exports.getParakeetModelInfo = getParakeetModelInfo
@@ -372,6 +328,7 @@ module.exports.getLlmModelInfo = getLlmModelInfo
 module.exports.getLlmInitProgress = getLlmInitProgress
 module.exports.isLlmReady = isLlmReady
 module.exports.isLlmDownloaded = isLlmDownloaded
+module.exports.getLlmDownloadProgress = getLlmDownloadProgress
 module.exports.initLlm = initLlm
 module.exports.initLlmSync = initLlmSync
 module.exports.shutdownLlm = shutdownLlm
