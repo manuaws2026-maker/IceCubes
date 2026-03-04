@@ -1,4 +1,4 @@
-# 🧊 IceCubes
+# 🧊 IceCubes (www.AppOptima.com)
 
 **AI-powered meeting notes that help you focus on the conversation.**
 
